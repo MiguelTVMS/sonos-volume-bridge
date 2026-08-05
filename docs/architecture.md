@@ -29,3 +29,11 @@ contains a Windows-only Core Audio implementation. It keeps COM objects on a
 dedicated worker thread, maps Core Audio callbacks to bounded broadcast events,
 and handles default multimedia render endpoint replacement. It is not wired to
 the synchronization state machine yet.
+
+## macOS platform adapter
+
+The Phase 4 macOS implementation in `platform-audio` calls the system CoreAudio
+framework through focused FFI. It observes default-output, mute, and volume
+properties; uses deterministic expected-write suppression; and falls back from
+master volume to output-channel controls when necessary. It remains independent
+of Sonos, Tauri, and synchronization wiring.

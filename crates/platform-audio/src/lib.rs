@@ -45,6 +45,14 @@ pub mod windows {
     //! The Windows adapter is only compiled on Windows targets.
 }
 
+#[cfg(target_os = "macos")]
+pub mod macos;
+
+#[cfg(not(target_os = "macos"))]
+pub mod macos {
+    //! The macOS adapter is only compiled on macOS targets.
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

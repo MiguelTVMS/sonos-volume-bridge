@@ -14,6 +14,12 @@ Windows Core Audio is present in Phase 3 and must be exercised on a Windows mach
 cargo run -p sonos-volume-bridge-platform-audio --example windows_audio_probe
 ```
 
+On macOS, exercise the native listener and output controls with:
+
+```sh
+cargo run -p sonos-volume-bridge-platform-audio --example macos_audio_probe
+```
+
 macOS Core Audio, Tauri, and the production GENA callback listener remain for
 later phases. The `test-support` crate has a small local RenderingControl mock
 server for integration tests.
