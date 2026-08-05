@@ -4,19 +4,29 @@
 //! thread. The Windows implementation owns Core Audio COM interfaces on a
 //! dedicated worker thread and forwards events through a bounded broadcast bus.
 
+#![allow(unsafe_code)]
+
 use async_trait::async_trait;
 use sonos_volume_bridge_domain::{LocalAudioState, LocalOrigin, NormalizedVolume};
 use thiserror::Error;
 use tokio::sync::broadcast;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum AudioDeviceSelection { FollowDefault, Fixed { device_id: String } }
+pub enum AudioDeviceSelection {
+    FollowDefault,
+    Fixed { device_id: String },
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SystemAudioEvent {
-    StateChanged { state: LocalAudioState, origin: LocalOrigin },
+    StateChanged {
+        state: LocalAudioState,
+        origin: LocalOrigin,
+    },
     DefaultOutputChanged,
-    DeviceUnavailable { device_id: Option<String> },
+    DeviceUnavailable {
+        device_id: Option<String>,
+    },
 }
 
 #[derive(Debug, Error)]
@@ -32,7 +42,11 @@ pub enum PlatformAudioError {
 #[async_trait]
 pub trait SystemAudioController: Send + Sync {
     async fn current_state(&self) -> Result<LocalAudioState, PlatformAudioError>;
-    async fn set_volume(&self, volume: NormalizedVolume, origin: LocalOrigin) -> Result<(), PlatformAudioError>;
+    async fn set_volume(
+        &self,
+        volume: NormalizedVolume,
+        origin: LocalOrigin,
+    ) -> Result<(), PlatformAudioError>;
     async fn set_muted(&self, muted: bool, origin: LocalOrigin) -> Result<(), PlatformAudioError>;
     fn subscribe(&self) -> broadcast::Receiver<SystemAudioEvent>;
 }
@@ -58,7 +72,17 @@ mod tests {
     use super::*;
     #[test]
     fn selection_models_follow_default_and_fixed_devices() {
-        assert_eq!(AudioDeviceSelection::FollowDefault, AudioDeviceSelection::FollowDefault);
-        assert_eq!(AudioDeviceSelection::Fixed { device_id: "id".to_owned() }, AudioDeviceSelection::Fixed { device_id: "id".to_owned() });
+        assert_eq!(
+            AudioDeviceSelection::FollowDefault,
+            AudioDeviceSelection::FollowDefault
+        );
+        assert_eq!(
+            AudioDeviceSelection::Fixed {
+                device_id: "id".to_owned()
+            },
+            AudioDeviceSelection::Fixed {
+                device_id: "id".to_owned()
+            }
+        );
     }
 }

@@ -33,9 +33,15 @@ impl NormalizedVolume {
     pub const MAX: Self = Self(100);
 
     pub const fn new(value: u8) -> Result<Self, VolumeError> {
-        if value <= 100 { Ok(Self(value)) } else { Err(VolumeError::OutOfRange { value }) }
+        if value <= 100 {
+            Ok(Self(value))
+        } else {
+            Err(VolumeError::OutOfRange { value })
+        }
     }
-    pub const fn get(self) -> u8 { self.0 }
+    pub const fn get(self) -> u8 {
+        self.0
+    }
 }
 
 impl SonosVolume {
@@ -43,9 +49,20 @@ impl SonosVolume {
     pub const MAX: Self = Self(100);
 
     pub const fn new(value: u8) -> Result<Self, VolumeError> {
-        if value <= 100 { Ok(Self(value)) } else { Err(VolumeError::OutOfRange { value }) }
+        if value <= 100 {
+            Ok(Self(value))
+        } else {
+            Err(VolumeError::OutOfRange { value })
+        }
     }
-    pub const fn get(self) -> u8 { self.0 }
-    pub const fn capped_at(self, maximum: Self) -> Self { Self(if self.0 > maximum.0 { maximum.0 } else { self.0 }) }
+    pub const fn get(self) -> u8 {
+        self.0
+    }
+    pub const fn capped_at(self, maximum: Self) -> Self {
+        Self(if self.0 > maximum.0 {
+            maximum.0
+        } else {
+            self.0
+        })
+    }
 }
-

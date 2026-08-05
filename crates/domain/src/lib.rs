@@ -10,4 +10,3 @@ pub use state::{
     ConfirmedSonosState, ExpectedLocalWrite, LocalAudioState, PendingIntent, SuppressionDecision,
     SyncState,
 };
-

@@ -1,6 +1,6 @@
 # Development
 
-Install Rust 1.85.0 (including `clippy` and `rustfmt`), then run:
+Install Rust 1.88.0 (including `clippy` and `rustfmt`), then run:
 
 ```sh
 cargo fmt --check
