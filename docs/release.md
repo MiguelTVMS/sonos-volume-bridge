@@ -26,3 +26,8 @@ normal background operation, autostart, wake/reconnect, and uninstall.
 - Diagnostic export contains no serial numbers, host paths, full XML, or secrets.
 - Default safety cap and mapping have been reviewed.
 - README, architecture, protocol, development, and release notes are current.
+- Run the manual [hardware verification matrix](verification-matrix.md) and
+  attach the redacted results to the release issue.
+- Run the `Release candidate` workflow and retain its Windows and macOS bundles
+  for the manual verification period. Signing and notarization are intentionally
+  separate protected CI steps; do not add credentials to this repository.

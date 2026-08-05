@@ -7,10 +7,10 @@ communicate with one another directly.
 
 ## Project status
 
-Phase 6 is in progress: the pure Rust domain model, synchronization policy,
-local Sonos client, platform adapters, integration layer, and minimal Tauri
-settings shell are implemented. Packaging and release artifacts are deliberately
-not yet present.
+Phase 9 is in progress: the local Sonos client, platform adapters, integration
+runtime, settings shell, CI, and release-candidate workflow are implemented.
+Physical Windows/macOS and Sonos verification remains a release gate; see the
+[hardware verification matrix](docs/verification-matrix.md).
 
 ## Safety and privacy
 
