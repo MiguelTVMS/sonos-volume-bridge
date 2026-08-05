@@ -32,6 +32,9 @@ npm --prefix ui run lint
 npm --prefix ui run format
 ```
 
+Logs are written as daily rolling files in the application log directory. Use
+`info` by default; enable `debug` or `trace` only for a short diagnostic session.
+
 ## Phase tracking
 
 Each implementation phase has a GitHub issue. Create the issue before changing

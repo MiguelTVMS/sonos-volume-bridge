@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+mod logging;
 mod state;
 mod tray;
 
@@ -13,7 +14,9 @@ pub fn run() {
             let config_path = app.path().app_config_dir()?.join("config.json");
             let store = ConfigStore::new(config_path);
             let configuration = store.load_or_default().map_err(|error| std::io::Error::other(error.to_string()))?;
-            app.manage(AppState::new(store, configuration));
+            let guard = logging::initialize(&app.path().app_log_dir()?, configuration.log_level)?;
+            tracing::info!("SonosVolumeBridge application shell starting");
+            app.manage(AppState::new(store, configuration, guard));
             tray::install(app.handle())?;
             Ok(())
         })

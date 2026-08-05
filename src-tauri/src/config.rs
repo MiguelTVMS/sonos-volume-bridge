@@ -16,12 +16,18 @@ pub struct AppConfiguration {
     pub synchronize_mute: bool,
     pub start_at_login: bool,
     pub fallback_polling: bool,
+    #[serde(default)]
+    pub log_level: LogLevel,
     pub maximum_sonos_volume: SonosVolume,
     pub mapping: VolumeMapping,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LogLevel { Error, Warn, #[default] Info, Debug, Trace }
+
 impl Default for AppConfiguration {
-    fn default() -> Self { Self { schema_version: SCHEMA_VERSION, selected_sonos_id: None, last_known_sonos_address: None, follow_default_audio_device: true, fixed_audio_device_id: None, synchronize_mute: true, start_at_login: false, fallback_polling: true, maximum_sonos_volume: SonosVolume::new(55).unwrap_or(SonosVolume::MAX), mapping: VolumeMapping::Piecewise { points: default_points() } } }
+    fn default() -> Self { Self { schema_version: SCHEMA_VERSION, selected_sonos_id: None, last_known_sonos_address: None, follow_default_audio_device: true, fixed_audio_device_id: None, synchronize_mute: true, start_at_login: false, fallback_polling: true, log_level: LogLevel::default(), maximum_sonos_volume: SonosVolume::new(55).unwrap_or(SonosVolume::MAX), mapping: VolumeMapping::Piecewise { points: default_points() } } }
 }
 
 impl AppConfiguration {
