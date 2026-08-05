@@ -38,10 +38,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.88.0
         with:
           components: rustfmt, clippy
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 11
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -111,10 +111,10 @@ jobs:
         with:
           ref: ${{ needs.prepare-version.outputs.commit }}
       - uses: dtolnay/rust-toolchain@1.88.0
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 11
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -136,7 +136,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             'target/release/bundle/macos/Sonos Volume Bridge.app' \
             "sonos-volume-bridge-${RELEASE_TAG}-macos-unsigned.zip"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-release
           path: sonos-volume-bridge-*-macos-unsigned.zip
@@ -151,10 +151,10 @@ jobs:
         with:
           ref: ${{ needs.prepare-version.outputs.commit }}
       - uses: dtolnay/rust-toolchain@1.88.0
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 11
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -170,7 +170,7 @@ jobs:
           $installer = Get-ChildItem target/release/bundle -Recurse -Filter '*.exe' | Select-Object -First 1
           if ($null -eq $installer) { throw 'No NSIS installer was generated.' }
           Copy-Item $installer.FullName "sonos-volume-bridge-$env:RELEASE_TAG-windows-unsigned.exe"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-release
           path: sonos-volume-bridge-*-windows-unsigned.exe

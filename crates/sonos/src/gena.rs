@@ -5,7 +5,7 @@ use crate::{
     discovery::{response_bytes, validate_local_url},
     event::parse_last_change,
 };
-use rand::Rng;
+use rand::RngExt;
 use std::{
     fmt::Write,
     net::{IpAddr, SocketAddr},
