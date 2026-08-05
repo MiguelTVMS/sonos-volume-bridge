@@ -18,6 +18,13 @@ pub enum AudioDeviceSelection {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AudioOutputDevice {
+    pub id: String,
+    pub name: String,
+    pub writable_volume: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SystemAudioEvent {
     StateChanged {
         state: LocalAudioState,

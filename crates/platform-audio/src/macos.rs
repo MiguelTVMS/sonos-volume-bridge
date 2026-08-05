@@ -13,7 +13,10 @@
     clippy::semicolon_if_nothing_returned
 )]
 
-use crate::{AudioDeviceSelection, PlatformAudioError, SystemAudioController, SystemAudioEvent};
+use crate::{
+    AudioDeviceSelection, AudioOutputDevice, PlatformAudioError, SystemAudioController,
+    SystemAudioEvent,
+};
 use async_trait::async_trait;
 use sonos_volume_bridge_domain::{
     ExpectedLocalWrite, LocalAudioState, LocalOrigin, MuteState, NormalizedVolume,
@@ -40,7 +43,9 @@ const SYSTEM_OBJECT: AudioObjectID = 1;
 const SCOPE_GLOBAL: UInt32 = 0x676c_6f62; // 'glob'
 const SCOPE_OUTPUT: UInt32 = 0x6f75_7470; // 'outp'
 const ELEMENT_MASTER: UInt32 = 0;
-const DEFAULT_OUTPUT_DEVICE: UInt32 = 0x646f_7574; // 'dOut'
+const DEFAULT_OUTPUT_DEVICE: UInt32 = 0x644f_7574; // 'dOut'
+const DEVICES: UInt32 = 0x6465_7623; // 'dev#'
+const OBJECT_NAME: UInt32 = 0x6c6e_616d; // 'lnam'
 const VOLUME_SCALAR: UInt32 = 0x766f_6c6d; // 'volm'
 const MUTE: UInt32 = 0x6d75_7465; // 'mute'
 const STREAM_CONFIGURATION: UInt32 = 0x736c_6179; // 'slay'
@@ -107,6 +112,24 @@ unsafe extern "C" {
         listener: Listener,
         client_data: *mut c_void,
     ) -> OSStatus;
+}
+
+#[link(name = "CoreFoundation", kind = "framework")]
+unsafe extern "C" {
+    fn CFStringGetCString(
+        string: *const c_void,
+        buffer: *mut i8,
+        size: isize,
+        encoding: u32,
+    ) -> Boolean;
+}
+
+const UTF8: u32 = 0x0800_0100;
+
+/// Lists physical or virtual devices that expose output streams.
+pub fn list_output_devices() -> Result<Vec<AudioOutputDevice>, PlatformAudioError> {
+    // SAFETY: all FFI calls use correctly sized buffers and only copy Core Audio-owned values.
+    unsafe { output_devices().map_err(map_error) }
 }
 
 #[derive(Clone)]
@@ -212,7 +235,8 @@ fn run_worker(
     });
     let mut endpoint = match unsafe { Endpoint::attach(&selection, Arc::clone(&context)) } {
         Ok(endpoint) => endpoint,
-        Err(_error) => {
+        Err(error) => {
+            eprintln!("Core Audio default output attachment failed with OSStatus {error}");
             let _ = events.send(SystemAudioEvent::DeviceUnavailable { device_id: None });
             return;
         }
@@ -266,7 +290,7 @@ impl Endpoint {
         };
         let master = address(VOLUME_SCALAR, SCOPE_OUTPUT, ELEMENT_MASTER);
         let has_master = unsafe { AudioObjectHasProperty(id, &master) != 0 }
-            && unsafe { settable(id, &master)? };
+            && matches!(unsafe { settable(id, &master) }, Ok(true));
         let channels = if has_master {
             vec![ELEMENT_MASTER]
         } else {
@@ -277,7 +301,7 @@ impl Endpoint {
         }
         let mute_address = address(MUTE, SCOPE_OUTPUT, ELEMENT_MASTER);
         let has_mute = unsafe { AudioObjectHasProperty(id, &mute_address) != 0 }
-            && unsafe { settable(id, &mute_address)? };
+            && matches!(unsafe { settable(id, &mute_address) }, Ok(true));
         let endpoint = Self {
             id,
             channels,
@@ -348,7 +372,7 @@ impl Endpoint {
     unsafe fn listen(&self) {
         let data = Arc::as_ptr(&self.context).cast_mut().cast::<c_void>();
         for channel in &self.channels {
-            let _ = unsafe {
+            let status = unsafe {
                 AudioObjectAddPropertyListener(
                     self.id,
                     &address(VOLUME_SCALAR, SCOPE_OUTPUT, *channel),
@@ -356,9 +380,12 @@ impl Endpoint {
                     data,
                 )
             };
+            if status != NO_ERR {
+                eprintln!("Core Audio volume listener registration failed with OSStatus {status}");
+            }
         }
         if self.has_mute {
-            let _ = unsafe {
+            let status = unsafe {
                 AudioObjectAddPropertyListener(
                     self.id,
                     &address(MUTE, SCOPE_OUTPUT, ELEMENT_MASTER),
@@ -366,8 +393,11 @@ impl Endpoint {
                     data,
                 )
             };
+            if status != NO_ERR {
+                eprintln!("Core Audio mute listener registration failed with OSStatus {status}");
+            }
         }
-        let _ = unsafe {
+        let status = unsafe {
             AudioObjectAddPropertyListener(
                 SYSTEM_OBJECT,
                 &address(DEFAULT_OUTPUT_DEVICE, SCOPE_GLOBAL, ELEMENT_MASTER),
@@ -375,6 +405,11 @@ impl Endpoint {
                 data,
             )
         };
+        if status != NO_ERR {
+            eprintln!(
+                "Core Audio default-output listener registration failed with OSStatus {status}"
+            );
+        }
     }
     fn detach(&self) {
         // SAFETY: registrations use this endpoint's stable context pointer; Core Audio no longer invokes it after removal returns.
@@ -612,7 +647,8 @@ unsafe fn output_channels(id: AudioObjectID) -> Result<Vec<UInt32>, OSStatus> {
         for channel in 1..=count {
             let volume_address = address(VOLUME_SCALAR, SCOPE_OUTPUT, channel);
             if unsafe {
-                AudioObjectHasProperty(id, &volume_address) != 0 && settable(id, &volume_address)?
+                AudioObjectHasProperty(id, &volume_address) != 0
+                    && matches!(settable(id, &volume_address), Ok(true))
             } {
                 channels.push(channel);
             }
@@ -620,6 +656,86 @@ unsafe fn output_channels(id: AudioObjectID) -> Result<Vec<UInt32>, OSStatus> {
         offset += 16;
     }
     Ok(channels)
+}
+
+unsafe fn output_devices() -> Result<Vec<AudioOutputDevice>, OSStatus> {
+    let devices_address = address(DEVICES, SCOPE_GLOBAL, ELEMENT_MASTER);
+    let mut size = 0_u32;
+    let status = unsafe {
+        AudioObjectGetPropertyDataSize(
+            SYSTEM_OBJECT,
+            &devices_address,
+            0,
+            std::ptr::null(),
+            &mut size,
+        )
+    };
+    if status != NO_ERR || size % std::mem::size_of::<AudioObjectID>() as u32 != 0 {
+        return Err(status);
+    }
+    let mut ids = vec![0_u32; size as usize / std::mem::size_of::<AudioObjectID>()];
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            SYSTEM_OBJECT,
+            &devices_address,
+            0,
+            std::ptr::null(),
+            &mut size,
+            ids.as_mut_ptr().cast(),
+        )
+    };
+    if status != NO_ERR {
+        return Err(status);
+    }
+    Ok(ids
+        .into_iter()
+        .filter_map(|id| unsafe { output_device(id) })
+        .collect())
+}
+
+unsafe fn output_device(id: AudioObjectID) -> Option<AudioOutputDevice> {
+    let stream = address(STREAM_CONFIGURATION, SCOPE_OUTPUT, ELEMENT_MASTER);
+    if unsafe { AudioObjectHasProperty(id, &stream) == 0 } {
+        return None;
+    }
+    let master = address(VOLUME_SCALAR, SCOPE_OUTPUT, ELEMENT_MASTER);
+    let writable_volume = (unsafe { AudioObjectHasProperty(id, &master) != 0 }
+        && matches!(unsafe { settable(id, &master) }, Ok(true)))
+        || unsafe { output_channels(id).is_ok_and(|channels| !channels.is_empty()) };
+    Some(AudioOutputDevice {
+        id: id.to_string(),
+        name: unsafe { device_name(id) }.unwrap_or_else(|| format!("Output device {id}")),
+        writable_volume,
+    })
+}
+
+unsafe fn device_name(id: AudioObjectID) -> Option<String> {
+    let mut value: *const c_void = std::ptr::null();
+    let mut size = std::mem::size_of_val(&value) as u32;
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            id,
+            &address(OBJECT_NAME, SCOPE_GLOBAL, ELEMENT_MASTER),
+            0,
+            std::ptr::null(),
+            &mut size,
+            std::ptr::from_mut(&mut value).cast(),
+        )
+    };
+    if status != NO_ERR || value.is_null() {
+        return None;
+    }
+    let mut bytes = [0_i8; 512];
+    if unsafe { CFStringGetCString(value, bytes.as_mut_ptr(), 512, UTF8) } == 0 {
+        return None;
+    }
+    std::ffi::CStr::from_bytes_until_nul(unsafe {
+        std::slice::from_raw_parts(bytes.as_ptr().cast::<u8>(), bytes.len())
+    })
+    .ok()?
+    .to_str()
+    .ok()
+    .map(str::to_owned)
 }
 fn map_error(status: OSStatus) -> PlatformAudioError {
     if status == -1 {
