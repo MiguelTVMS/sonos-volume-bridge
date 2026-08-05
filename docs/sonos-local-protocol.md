@@ -17,6 +17,14 @@ events. It deliberately does not start a callback server or subscribe yet.
 Subscription renewal, callback binding, source validation, and polling fallback
 belong to Phase 5.
 
+## GENA lifecycle
+
+The Phase 5 client sends `SUBSCRIBE` to RenderingControl's event endpoint with
+a callback URL and requested timeout. It records the returned SID and renews
+with the SID before expiry; `UNSUBSCRIBE` ends the lifecycle. The callback
+listener has a random path, binds only to an address selected by the host, and
+accepts notifications only from the selected Sonos IP with the active SID.
+
 Sonos grouping discovery is represented by the selected player's own stable UDN.
 The client does not yet choose a group coordinator; Phase 5 must make the target
 behavior explicit for home-theater and grouped playback.

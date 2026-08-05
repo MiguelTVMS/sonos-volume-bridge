@@ -30,4 +30,6 @@ pub enum SonosError {
     Network(#[from] std::io::Error),
     #[error("SOAP response did not contain {0}")]
     MissingSoapValue(&'static str),
+    #[error("protocol error: {0}")]
+    Protocol(String),
 }

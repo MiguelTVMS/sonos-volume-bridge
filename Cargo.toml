@@ -2,6 +2,7 @@
 members = [
     "crates/domain",
     "crates/platform-audio",
+    "crates/integration",
     "crates/sonos",
     "crates/synchronization",
     "crates/test-support",
@@ -19,6 +20,7 @@ repository = "https://github.com/migueltvms/sonos-volume-bridge"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 async-trait = "0.1"
+rand = "0.9"
 quick-xml = "0.41"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 tokio = { version = "1", features = ["io-util", "macros", "net", "rt", "sync", "time"] }

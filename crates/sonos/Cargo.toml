@@ -10,6 +10,7 @@ repository.workspace = true
 [dependencies]
 quick-xml.workspace = true
 reqwest.workspace = true
+rand.workspace = true
 serde.workspace = true
 sonos-volume-bridge-domain = { path = "../domain" }
 thiserror.workspace = true

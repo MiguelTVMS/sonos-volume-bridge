@@ -30,6 +30,15 @@ dedicated worker thread, maps Core Audio callbacks to bounded broadcast events,
 and handles default multimedia render endpoint replacement. It is not wired to
 the synchronization state machine yet.
 
+## Integration and GENA lifecycle
+
+Phase 5 adds an `integration` crate with explicit asynchronous ports for Sonos
+and local audio. It debounces only user-originated volume changes, immediately
+passes mute changes, and sends local writes through the Sonos-confirmation rule.
+The Sonos crate owns GENA SUBSCRIBE/renew/UNSUBSCRIBE and a local callback
+listener. Healthy event delivery uses a slow health poll; subscription failure
+switches to one-second polling until events recover.
+
 ## macOS platform adapter
 
 The Phase 4 macOS implementation in `platform-audio` calls the system CoreAudio
