@@ -136,7 +136,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             'target/release/bundle/macos/Sonos Volume Bridge.app' \
             "sonos-volume-bridge-${RELEASE_TAG}-macos-unsigned.zip"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-release
           path: sonos-volume-bridge-*-macos-unsigned.zip
@@ -170,7 +170,7 @@ jobs:
           $installer = Get-ChildItem target/release/bundle -Recurse -Filter '*.exe' | Select-Object -First 1
           if ($null -eq $installer) { throw 'No NSIS installer was generated.' }
           Copy-Item $installer.FullName "sonos-volume-bridge-$env:RELEASE_TAG-windows-unsigned.exe"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-release
           path: sonos-volume-bridge-*-windows-unsigned.exe
