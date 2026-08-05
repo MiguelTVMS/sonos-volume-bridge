@@ -1,0 +1,21 @@
+[package]
+name = "sonos-volume-bridge-platform-audio"
+description = "Platform system-audio adapters for SonosVolumeBridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+sonos-volume-bridge-domain = { path = "../domain" }
+thiserror.workspace = true
+tokio.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_System_Com"] }
+windows-core = "0.62"
+
+[lints]
+workspace = true

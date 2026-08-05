@@ -7,10 +7,10 @@ communicate with one another directly.
 
 ## Project status
 
-Phase 2 is in progress: the pure Rust domain model, synchronization policy, and
-local Sonos discovery/RenderingControl client have unit and integration tests.
-Native audio control, Tauri UI, subscription callback listener, packaging, and
-release artifacts are deliberately not yet present.
+Phase 3 is in progress: the pure Rust domain model, synchronization policy,
+local Sonos client, and Windows Core Audio adapter are implemented. Tauri UI,
+macOS audio, subscription callback listener, packaging, and release artifacts
+are deliberately not yet present.
 
 ## Safety and privacy
 
