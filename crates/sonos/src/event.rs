@@ -86,19 +86,31 @@ pub(crate) fn first_text(xml: &[u8], wanted: &str) -> Result<Option<String>, Son
     reader.config_mut().trim_text(true);
     let mut buffer = Vec::new();
     let mut current = false;
+    let mut value = String::new();
     loop {
         match reader.read_event_into(&mut buffer) {
-            Ok(Event::Start(event)) => current = tag(event.name().as_ref())? == wanted,
+            Ok(Event::Start(event)) => {
+                current = tag(event.name().as_ref())? == wanted;
+            }
+            Ok(Event::End(event)) if current && tag(event.name().as_ref())? == wanted => {
+                return unescape(&value)
+                    .map(|text| Some(text.into_owned()))
+                    .map_err(|error| SonosError::Xml(error.to_string()));
+            }
             Ok(Event::End(_)) => current = false,
             Ok(Event::Text(text)) if current => {
-                return text
+                let text = text
                     .decode()
-                    .map_err(|error| SonosError::Xml(error.to_string()))
-                    .and_then(|text| {
-                        unescape(&text)
-                            .map(|text| Some(text.into_owned()))
-                            .map_err(|error| SonosError::Xml(error.to_string()))
-                    });
+                    .map_err(|error| SonosError::Xml(error.to_string()))?;
+                value.push_str(&text);
+            }
+            Ok(Event::GeneralRef(reference)) if current => {
+                let reference = reference
+                    .decode()
+                    .map_err(|error| SonosError::Xml(error.to_string()))?;
+                value.push('&');
+                value.push_str(&reference);
+                value.push(';');
             }
             Ok(Event::Eof) => return Ok(None),
             Err(error) => return Err(SonosError::Xml(error.to_string())),
@@ -118,8 +130,10 @@ fn attribute(
     for attribute in event.attributes() {
         let attribute = attribute.map_err(|error| SonosError::Xml(error.to_string()))?;
         if tag(attribute.key.as_ref())? == wanted {
-            return attribute
-                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            let raw_value = decoder
+                .decode(attribute.value.as_ref())
+                .map_err(|error| SonosError::Xml(error.to_string()))?;
+            return unescape(&raw_value)
                 .map(|value| Some(value.into_owned()))
                 .map_err(|error| SonosError::Xml(error.to_string()));
         }

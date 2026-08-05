@@ -4,6 +4,14 @@
 //! cross-thread values are commands and copied state. `OnNotify` and default
 //! endpoint callbacks use non-blocking `try_send`/`broadcast::send` operations.
 
+#![allow(
+    clippy::borrow_as_ptr,
+    clippy::inline_always,
+    clippy::needless_pass_by_value,
+    clippy::ptr_as_ptr,
+    clippy::ref_as_ptr
+)]
+
 use crate::{AudioDeviceSelection, PlatformAudioError, SystemAudioController, SystemAudioEvent};
 use async_trait::async_trait;
 use sonos_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, NormalizedVolume};
@@ -17,7 +25,7 @@ use windows::{
     Win32::{
         Foundation::PROPERTYKEY,
         Media::Audio::{
-            AUDIO_VOLUME_NOTIFICATION_DATA, EDataFlow, ERole,
+            AUDIO_VOLUME_NOTIFICATION_DATA, DEVICE_STATE, EDataFlow, ERole,
             Endpoints::{
                 IAudioEndpointVolume, IAudioEndpointVolumeCallback,
                 IAudioEndpointVolumeCallback_Impl,
@@ -116,7 +124,7 @@ fn run_worker(
         let _ = events.send(SystemAudioEvent::DeviceUnavailable { device_id: None });
         return;
     }
-    let result = unsafe { worker_loop(selection, receiver, events.clone(), commands) };
+    let result = worker_loop(selection, receiver, events.clone(), commands);
     if result.is_err() {
         let _ = events.send(SystemAudioEvent::DeviceUnavailable { device_id: None });
     }
@@ -125,7 +133,7 @@ fn run_worker(
     }
 }
 
-unsafe fn worker_loop(
+fn worker_loop(
     selection: AudioDeviceSelection,
     receiver: Receiver<Command>,
     events: broadcast::Sender<SystemAudioEvent>,
@@ -182,7 +190,7 @@ struct EndpointRegistration {
 }
 
 impl EndpointRegistration {
-    unsafe fn current_state(&self) -> Result<LocalAudioState, String> {
+    fn current_state(&self) -> Result<LocalAudioState, String> {
         let volume = unsafe { self.volume.GetMasterVolumeLevelScalar() }
             .map_err(|error| error.to_string())?;
         let muted = unsafe { self.volume.GetMute() }
@@ -193,7 +201,7 @@ impl EndpointRegistration {
             muted: MuteState(muted),
         })
     }
-    unsafe fn set_volume(&self, volume: NormalizedVolume) -> Result<(), String> {
+    fn set_volume(&self, volume: NormalizedVolume) -> Result<(), String> {
         unsafe {
             self.volume.SetMasterVolumeLevelScalar(
                 f32::from(volume.get()) / 100.0,
@@ -202,16 +210,16 @@ impl EndpointRegistration {
         }
         .map_err(|error| error.to_string())
     }
-    unsafe fn set_muted(&self, muted: bool) -> Result<(), String> {
+    fn set_muted(&self, muted: bool) -> Result<(), String> {
         unsafe { self.volume.SetMute(muted, &APPLICATION_EVENT_CONTEXT) }
             .map_err(|error| error.to_string())
     }
-    unsafe fn detach(&self) {
+    fn detach(&self) {
         let _ = unsafe { self.volume.UnregisterControlChangeNotify(&self.callback) };
     }
 }
 
-unsafe fn attach_endpoint(
+fn attach_endpoint(
     enumerator: &IMMDeviceEnumerator,
     selection: &AudioDeviceSelection,
     events: &broadcast::Sender<SystemAudioEvent>,
@@ -224,7 +232,7 @@ unsafe fn attach_endpoint(
             enumerator.GetDevice(&HSTRING::from(device_id))?
         },
     };
-    let volume: IAudioEndpointVolume = unsafe { device.Activate(CLSCTX_ALL, None)? };
+    let volume = unsafe { device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None)? };
     let callback: IAudioEndpointVolumeCallback = EndpointVolumeCallback {
         events: events.clone(),
     }
@@ -271,7 +279,7 @@ struct DefaultDeviceCallback {
 }
 
 impl IMMNotificationClient_Impl for DefaultDeviceCallback_Impl {
-    fn OnDeviceStateChanged(&self, _: &PCWSTR, _: u32) -> windows_core::Result<()> {
+    fn OnDeviceStateChanged(&self, _: &PCWSTR, _: DEVICE_STATE) -> windows_core::Result<()> {
         Ok(())
     }
     fn OnDeviceAdded(&self, _: &PCWSTR) -> windows_core::Result<()> {

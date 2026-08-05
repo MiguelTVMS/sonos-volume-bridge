@@ -26,6 +26,7 @@ type Snapshot = {
   localVolume: number | null;
   muted: boolean | null;
 };
+type DiscoveredSonos = { id: string; friendlyName: string; location: string };
 
 const root = document.querySelector<HTMLDivElement>('#app');
 if (!root) throw new Error('Missing application root.');
@@ -42,11 +43,25 @@ function render(snapshot: Snapshot): void {
   document.querySelector('#diagnostics')?.addEventListener('click', showDiagnostics);
   document.querySelector('#export')?.addEventListener('click', exportDiagnostics);
   document.querySelector('#reset')?.addEventListener('click', reset);
-  document
-    .querySelector('#discover')
-    ?.addEventListener('click', () =>
-      notice('Discovery is available after the runtime composition starts.'),
-    );
+  document.querySelector('#discover')?.addEventListener('click', discoverSonos);
+}
+async function discoverSonos(): Promise<void> {
+  try {
+    const devices = await invoke<DiscoveredSonos[]>('discover_sonos');
+    if (devices.length === 0) {
+      notice('No Sonos devices were found on the selected local network.');
+      return;
+    }
+    const device = devices[0];
+    const form = document.querySelector<HTMLFormElement>('#settings');
+    const id = form?.elements.namedItem('selectedSonosId') as HTMLInputElement | null;
+    const address = form?.elements.namedItem('lastKnownSonosAddress') as HTMLInputElement | null;
+    if (id) id.value = device.id;
+    if (address) address.value = device.location;
+    notice(`Selected ${device.friendlyName}. Save settings to connect.`);
+  } catch (error) {
+    notice(String(error));
+  }
 }
 function notice(value: string): void {
   const output = document.querySelector<HTMLOutputElement>('#notice');

@@ -1,5 +1,6 @@
 use crate::{
     config::AppConfiguration,
+    runtime::{self, DiscoveredSonos},
     state::{AppState, UiSnapshot},
 };
 use serde::Serialize;
@@ -37,13 +38,19 @@ pub fn save_configuration(
             .map_err(|error| error.to_string())?;
     }
     state.replace_configuration(configuration);
+    state.start_runtime(app);
     get_snapshot(state)
 }
 
 #[tauri::command]
-pub fn reset_configuration(state: State<'_, AppState>) -> Result<UiSnapshot, String> {
+#[allow(clippy::needless_pass_by_value)] // Tauri owns command argument extraction.
+pub fn reset_configuration(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<UiSnapshot, String> {
     let configuration = state.store.reset().map_err(|error| error.to_string())?;
     state.replace_configuration(configuration);
+    state.start_runtime(app);
     get_snapshot(state)
 }
 
@@ -72,14 +79,20 @@ pub fn export_diagnostics(state: State<'_, AppState>) -> Result<String, String> 
 }
 
 #[tauri::command]
+pub async fn discover_sonos() -> Result<Vec<DiscoveredSonos>, String> {
+    runtime::discover_available().await
+}
+
+#[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri injects managed state by value.
-pub fn test_volume(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn test_volume(state: State<'_, AppState>) -> Result<(), String> {
     let configuration = state
         .configuration
         .lock()
-        .map_err(|_| "application state is unavailable".to_owned())?;
+        .map_err(|_| "application state is unavailable".to_owned())?
+        .clone();
     if configuration.selected_sonos_id.is_none() {
         return Err("Select a Sonos device before testing volume.".to_owned());
     }
-    Ok(())
+    runtime::test_selected_device(configuration).await
 }

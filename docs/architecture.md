@@ -18,9 +18,7 @@ only observes and commands the same selected Sonos speaker.
 
 The Phase 2 `sonos` crate owns SSDP discovery, private-address validation,
 device-description parsing, RenderingControl SOAP requests, and GENA
-`LastChange` parsing. It is still independent of Tauri and native audio.
-It does not run an HTTP callback listener yet; subscription lifecycle and the
-listener are deferred to Phase 5, where they can be connected to synchronization.
+`LastChange` parsing. It remains independent of Tauri and native audio.
 
 ## Windows platform adapter
 
@@ -54,3 +52,18 @@ framework through focused FFI. It observes default-output, mute, and volume
 properties; uses deterministic expected-write suppression; and falls back from
 master volume to output-channel controls when necessary. It remains independent
 of Sonos, Tauri, and synchronization wiring.
+
+## Supervised runtime composition
+
+Phase 8 makes the Tauri process the composition root without moving protocol or
+platform work into commands. A cancellable runtime generation resolves the
+selected UDN through its cached description URL or bounded SSDP discovery,
+creates the selected local audio adapter, binds the GENA callback listener to
+the local interface selected for the speaker, and owns the coordinator.
+
+Configuration replacement cancels the old generation before starting the new
+one. Shutdown unsubscribes when a subscription exists. Subscription renewal is
+scheduled at 80 percent of the advertised lifetime; failures use bounded retry
+and the existing conservative polling fallback. Runtime errors are reduced to
+status categories and structured, redacted logs rather than exposing peer
+addresses or protocol payloads to the frontend.

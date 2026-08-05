@@ -102,7 +102,7 @@ fn reverse_scale(value: u8, maximum: u8) -> u8 {
 fn lerp(x: u8, x0: u8, y0: u8, x1: u8, y1: u8) -> u8 {
     bounded_u8(
         i32::from(y0)
-            + (i32::from(x - x0) * i32::from(y1) - i32::from(y0) + i32::from(x1 - x0) / 2)
+            + (i32::from(x - x0) * (i32::from(y1) - i32::from(y0)) + i32::from(x1 - x0) / 2)
                 / i32::from(x1 - x0),
     )
 }
@@ -176,7 +176,7 @@ mod tests {
             ],
         };
         assert_eq!(map.to_sonos(v(20), s(100)), Ok(s(6)));
-        assert_eq!(map.to_local(s(34)), Ok(v(70)));
+        assert_eq!(map.to_local(s(34)), Ok(v(71)));
     }
     #[test]
     fn rejects_invalid_curve() {

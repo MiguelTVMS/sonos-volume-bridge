@@ -11,15 +11,22 @@ default-run = "sonos-volume-bridge"
 tauri-build = "2"
 
 [dependencies]
+async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sonos-volume-bridge-domain = { path = "../crates/domain" }
+sonos-volume-bridge-integration = { path = "../crates/integration" }
+sonos-volume-bridge-platform-audio = { path = "../crates/platform-audio" }
+sonos-volume-bridge-sonos = { path = "../crates/sonos" }
+sonos-volume-bridge-synchronization = { path = "../crates/synchronization" }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-autostart = "2"
 thiserror.workspace = true
 tracing.workspace = true
 tracing-appender.workspace = true
 tracing-subscriber.workspace = true
+tokio.workspace = true
+url.workspace = true
 
 [lints]
 workspace = true

@@ -1,6 +1,10 @@
-use crate::config::{AppConfiguration, ConfigStore};
+use crate::{
+    config::{AppConfiguration, ConfigStore},
+    runtime::RuntimeManager,
+};
 use serde::Serialize;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use tauri::AppHandle;
 use tracing_appender::non_blocking::WorkerGuard;
 
 #[allow(dead_code)] // The shell exposes the full status vocabulary before runtime wiring.
@@ -23,6 +27,8 @@ pub enum UiStatus {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UiSnapshot {
+    #[serde(skip)]
+    pub runtime_generation: u64,
     pub configuration: AppConfiguration,
     pub status: UiStatus,
     pub sonos_name: Option<String>,
@@ -34,7 +40,8 @@ pub struct UiSnapshot {
 pub struct AppState {
     pub store: ConfigStore,
     pub configuration: Mutex<AppConfiguration>,
-    pub snapshot: Mutex<UiSnapshot>,
+    pub snapshot: Arc<Mutex<UiSnapshot>>,
+    runtime: RuntimeManager,
     _log_guard: WorkerGuard,
 }
 
@@ -52,14 +59,16 @@ impl AppState {
         Self {
             store,
             configuration: Mutex::new(configuration.clone()),
-            snapshot: Mutex::new(UiSnapshot {
+            snapshot: Arc::new(Mutex::new(UiSnapshot {
+                runtime_generation: 0,
                 configuration,
                 status,
                 sonos_name: None,
                 sonos_volume: None,
                 local_volume: None,
                 muted: None,
-            }),
+            })),
+            runtime: RuntimeManager::default(),
             _log_guard: log_guard,
         }
     }
@@ -71,5 +80,15 @@ impl AppState {
             snapshot.configuration = configuration;
             snapshot.status = UiStatus::Connecting;
         }
+    }
+    pub fn start_runtime(&self, app: AppHandle) {
+        let Ok(configuration) = self.configuration.lock().map(|value| value.clone()) else {
+            return;
+        };
+        self.runtime
+            .restart(configuration, Arc::clone(&self.snapshot), app);
+    }
+    pub fn stop_runtime(&self) {
+        self.runtime.stop();
     }
 }

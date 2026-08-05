@@ -27,7 +27,12 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .tooltip("SonosVolumeBridge")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "settings" | "diagnostics" => show_settings(app),
-            "quit" => app.exit(0),
+            "quit" => {
+                if let Some(state) = app.try_state::<AppState>() {
+                    state.stop_runtime();
+                }
+                app.exit(0);
+            }
             _ => {}
         })
         .build(app)?;

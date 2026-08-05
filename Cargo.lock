@@ -3102,16 +3102,23 @@ dependencies = [
 name = "sonos-volume-bridge"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "serde",
  "serde_json",
  "sonos-volume-bridge-domain",
+ "sonos-volume-bridge-integration",
+ "sonos-volume-bridge-platform-audio",
+ "sonos-volume-bridge-sonos",
+ "sonos-volume-bridge-synchronization",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",
  "thiserror 2.0.19",
+ "tokio",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
