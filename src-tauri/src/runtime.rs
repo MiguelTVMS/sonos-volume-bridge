@@ -57,6 +57,7 @@ pub struct AvailableAudioOutput {
     pub writable_volume: bool,
 }
 
+#[cfg_attr(not(target_os = "macos"), allow(clippy::unnecessary_wraps))]
 pub fn available_audio_outputs() -> Result<Vec<AvailableAudioOutput>, String> {
     #[cfg(target_os = "macos")]
     {
