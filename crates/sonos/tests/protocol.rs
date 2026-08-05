@@ -78,6 +78,16 @@ fn grouped_metadata_keeps_selected_player_identity() {
 }
 
 #[test]
+fn standard_rendering_control_wins_over_group_rendering_control() {
+    let xml = br"<root><device><friendlyName>Office</friendlyName><UDN>uuid:RINCON_test</UDN><serviceList><service><serviceType>urn:schemas-upnp-org:service:RenderingControl:1</serviceType><controlURL>/standard</controlURL><eventSubURL>/standard-event</eventSubURL></service><service><serviceType>urn:schemas-upnp-org:service:GroupRenderingControl:1</serviceType><controlURL>/group</controlURL><eventSubURL>/group-event</eventSubURL></service></serviceList></device></root>";
+    let device = parse_device_description(xml, &Url::parse(LOCATION).unwrap()).unwrap();
+    assert_eq!(
+        device.rendering_control.control_url.as_str(),
+        "http://192.168.1.40:1400/standard"
+    );
+}
+
+#[test]
 fn parses_escaped_last_change_and_master_values() {
     let event = parse_last_change(include_bytes!("fixtures/last-change.xml"), Some(7)).unwrap();
     assert_eq!(event.sequence, Some(7));
