@@ -1,0 +1,15 @@
+[package]
+name = "sonos-volume-bridge-synchronization"
+description = "Source-of-truth synchronization state machine for SonosVolumeBridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sonos-volume-bridge-domain = { path = "../domain" }
+
+[lints]
+workspace = true
+
