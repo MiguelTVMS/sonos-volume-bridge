@@ -32,6 +32,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Current output state: {:?}",
         controller.current_state().await?
     );
+    if arguments.iter().any(|argument| argument == "--idle-check") {
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        println!(
+            "Output state after idle: {:?}",
+            controller.current_state().await?
+        );
+        return Ok(());
+    }
     let mut events = controller.subscribe();
     println!("Listening for Core Audio events; press Ctrl+C to stop.");
     loop {

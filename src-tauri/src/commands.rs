@@ -1,6 +1,6 @@
 use crate::{
     config::AppConfiguration,
-    runtime::{self, DiscoveredSonos},
+    runtime::{self, AvailableAudioOutput, DiscoveredSonos},
     state::{AppState, UiSnapshot},
 };
 use serde::Serialize;
@@ -56,20 +56,55 @@ pub fn reset_configuration(
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)] // The diagnostics report mirrors independent persisted toggles.
 pub struct Diagnostics {
     pub configuration_present: bool,
     pub sanitized: bool,
     pub message: String,
+    pub status: String,
+    pub speaker_name: Option<String>,
+    pub selected_sonos_id: Option<String>,
+    pub last_known_sonos_address: Option<String>,
+    pub sonos_volume: Option<u8>,
+    pub local_volume: Option<u8>,
+    pub muted: Option<bool>,
+    pub follows_system_output: bool,
+    pub fixed_audio_device_id: Option<String>,
+    pub synchronize_mute: bool,
+    pub fallback_polling: bool,
 }
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri injects managed state by value.
 pub fn diagnostics(state: State<'_, AppState>) -> Diagnostics {
+    let snapshot = state.snapshot.lock().map_or_else(
+        |_| UiSnapshot {
+            runtime_generation: 0,
+            configuration: AppConfiguration::default(),
+            status: crate::state::UiStatus::Error,
+            sonos_name: None,
+            sonos_volume: None,
+            local_volume: None,
+            muted: None,
+        },
+        |snapshot| snapshot.clone(),
+    );
+    let configuration = snapshot.configuration;
     Diagnostics {
         configuration_present: state.store.path().exists(),
         sanitized: true,
-        message: "No protocol payloads, device serial numbers, or host paths are included."
-            .to_owned(),
+        message: "This report contains the saved local speaker endpoint and stable speaker identity. It excludes protocol payloads and host paths.".to_owned(),
+        status: format!("{:?}", snapshot.status),
+        speaker_name: snapshot.sonos_name,
+        selected_sonos_id: configuration.selected_sonos_id,
+        last_known_sonos_address: configuration.last_known_sonos_address,
+        sonos_volume: snapshot.sonos_volume,
+        local_volume: snapshot.local_volume,
+        muted: snapshot.muted,
+        follows_system_output: configuration.follow_default_audio_device,
+        fixed_audio_device_id: configuration.fixed_audio_device_id,
+        synchronize_mute: configuration.synchronize_mute,
+        fallback_polling: configuration.fallback_polling,
     }
 }
 
@@ -81,6 +116,11 @@ pub fn export_diagnostics(state: State<'_, AppState>) -> Result<String, String> 
 #[tauri::command]
 pub async fn discover_sonos() -> Result<Vec<DiscoveredSonos>, String> {
     runtime::discover_available().await
+}
+
+#[tauri::command]
+pub fn list_audio_outputs() -> Result<Vec<AvailableAudioOutput>, String> {
+    runtime::available_audio_outputs()
 }
 
 #[tauri::command]

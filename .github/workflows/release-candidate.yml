@@ -1,26 +1,116 @@
-name: Release candidate
+name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      bump:
+        description: Version increment for the final release
+        required: true
+        default: fix
+        type: choice
+        options: [fix, minor, major]
 
 permissions:
   contents: read
 
+concurrency:
+  group: final-release-develop
+  cancel-in-progress: false
+
 jobs:
-  bundle:
-    name: Bundle (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            artifact: windows-bundle
-          - os: macos-latest
-            artifact: macos-bundle
+  prepare-version:
+    name: Validate and version develop
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.commit.outputs.commit }}
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Require the develop branch
+        run: test "$GITHUB_REF" = refs/heads/develop
+      - uses: dtolnay/rust-toolchain@1.88.0
+        with:
+          components: rustfmt, clippy
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: cargo fmt --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - run: pnpm --dir ui run format
+      - run: pnpm --dir ui run lint
+      - run: pnpm --dir ui run build
+      - name: Bump the workspace version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          next_version="$(python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          manifest = Path("Cargo.toml")
+          contents = manifest.read_text()
+          match = re.search(r'(?m)^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"$', contents)
+          if match is None:
+              raise SystemExit("The workspace version was not found.")
+          major, minor, patch = (int(part) for part in match.groups())
+          bump = os.environ["BUMP"]
+          if bump == "fix":
+              patch += 1
+          elif bump == "minor":
+              minor += 1
+              patch = 0
+          elif bump == "major":
+              major += 1
+              minor = 0
+              patch = 0
+          else:
+              raise SystemExit(f"Unsupported version increment: {bump}")
+          version = f"{major}.{minor}.{patch}"
+          manifest.write_text(contents[:match.start(1)] + version + contents[match.end(1):])
+          print(version)
+          PY
+          )"
+          echo "version=$next_version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$next_version" >> "$GITHUB_OUTPUT"
+      - name: Verify the new version
+        run: cargo check --workspace
+      - name: Commit the version bump to develop
+        id: commit
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock
+          git commit -m "chore: release v$RELEASE_VERSION"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git push origin HEAD:develop
+
+  macos-app:
+    name: Build macOS app
+    needs: prepare-version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare-version.outputs.commit }}
+      - uses: dtolnay/rust-toolchain@1.88.0
       - uses: pnpm/action-setup@v4
         with:
           version: 11
@@ -31,10 +121,100 @@ jobs:
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
       - run: cargo install tauri-cli --version '^2' --locked
-      - run: cargo tauri build
+      - name: Verify the tag matches the application version
+        env:
+          RELEASE_VERSION: ${{ needs.prepare-version.outputs.version }}
+        run: |
+          application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "sonos-volume-bridge"))')"
+          test "$RELEASE_VERSION" = "$application_version"
+      - run: cargo tauri build --bundles app
+      - run: test -d 'target/release/bundle/macos/Sonos Volume Bridge.app'
+      - name: Archive the app bundle
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            'target/release/bundle/macos/Sonos Volume Bridge.app' \
+            "sonos-volume-bridge-${RELEASE_TAG}-macos-unsigned.zip"
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: src-tauri/target/release/bundle
+          name: macos-release
+          path: sonos-volume-bridge-*-macos-unsigned.zip
           if-no-files-found: error
-          retention-days: 14
+
+  windows-installer:
+    name: Build Windows installer
+    needs: prepare-version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare-version.outputs.commit }}
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: cargo install tauri-cli --version '^2' --locked
+      - run: cargo tauri build --bundles nsis
+      - name: Collect the unsigned installer
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+        run: |
+          $installer = Get-ChildItem target/release/bundle -Recurse -Filter '*.exe' | Select-Object -First 1
+          if ($null -eq $installer) { throw 'No NSIS installer was generated.' }
+          Copy-Item $installer.FullName "sonos-volume-bridge-$env:RELEASE_TAG-windows-unsigned.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: sonos-volume-bridge-*-windows-unsigned.exe
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [prepare-version, macos-app, windows-installer]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "*-release"
+          path: release-assets
+          merge-multiple: true
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Create the release tag on develop
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          git fetch --tags origin
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null; then
+            existing_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
+            test "$existing_commit" = "$RELEASE_COMMIT"
+          else
+            git tag -a "$RELEASE_TAG" "$RELEASE_COMMIT" -m "Release $RELEASE_TAG"
+            git push origin "$RELEASE_TAG"
+          fi
+      - name: Create or update the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          else
+            gh release create "$RELEASE_TAG" release-assets/* \
+              --title "Sonos Volume Bridge $RELEASE_TAG" \
+              --generate-notes
+          fi
