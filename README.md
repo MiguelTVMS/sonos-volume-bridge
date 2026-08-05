@@ -7,10 +7,10 @@ communicate with one another directly.
 
 ## Project status
 
-Phase 5 is in progress: the pure Rust domain model, synchronization policy,
-local Sonos client, platform adapters, and integration/GENA lifecycle are
-implemented. Tauri UI, packaging, and release artifacts are deliberately not
-yet present.
+Phase 6 is in progress: the pure Rust domain model, synchronization policy,
+local Sonos client, platform adapters, integration layer, and minimal Tauri
+settings shell are implemented. Packaging and release artifacts are deliberately
+not yet present.
 
 ## Safety and privacy
 

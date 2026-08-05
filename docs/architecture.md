@@ -39,6 +39,14 @@ The Sonos crate owns GENA SUBSCRIBE/renew/UNSUBSCRIBE and a local callback
 listener. Healthy event delivery uses a slow health poll; subscription failure
 switches to one-second polling until events recover.
 
+## Tauri application shell
+
+The Phase 6 `src-tauri` application is a thin composition root. It owns the
+tray, hidden settings window, versioned per-user configuration, autostart, and
+restricted commands. The vanilla TypeScript UI has no direct filesystem or
+network permission; it receives a status snapshot and sends validated settings
+through explicit backend commands.
+
 ## macOS platform adapter
 
 The Phase 4 macOS implementation in `platform-audio` calls the system CoreAudio

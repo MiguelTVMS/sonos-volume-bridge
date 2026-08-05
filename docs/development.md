@@ -23,3 +23,11 @@ cargo run -p sonos-volume-bridge-platform-audio --example macos_audio_probe
 macOS Core Audio, Tauri, and the production GENA callback listener remain for
 later phases. The `test-support` crate has a small local RenderingControl mock
 server for integration tests.
+
+For the settings UI, install Node.js dependencies in `ui`, then run:
+
+```sh
+npm --prefix ui run build
+npm --prefix ui run lint
+npm --prefix ui run format
+```
