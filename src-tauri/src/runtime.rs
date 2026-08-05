@@ -436,10 +436,10 @@ fn create_audio(
     };
     #[cfg(windows)]
     {
-        return Ok(Arc::new(
+        Ok(Arc::new(
             sonos_volume_bridge_platform_audio::windows::WindowsAudioController::start(selection)
                 .map_err(RuntimeError::Local)?,
-        ));
+        ))
     }
     #[cfg(target_os = "macos")]
     {
