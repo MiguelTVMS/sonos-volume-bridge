@@ -1,1 +1,1 @@
-# sonos-volume-control
+# Sonos Volume Bridge
