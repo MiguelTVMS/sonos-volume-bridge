@@ -1,6 +1,7 @@
 mod commands;
 mod config;
 mod logging;
+mod runtime;
 mod state;
 mod tray;
 
@@ -21,8 +22,11 @@ pub fn run() {
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
             let guard = logging::initialize(&app.path().app_log_dir()?, configuration.log_level)?;
             tracing::info!("SonosVolumeBridge application shell starting");
-            app.manage(AppState::new(store, configuration, guard));
+            let state = AppState::new(store, configuration, guard);
+            app.manage(state);
             tray::install(app.handle())?;
+            let state = app.state::<AppState>();
+            state.start_runtime(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -31,6 +35,7 @@ pub fn run() {
             commands::reset_configuration,
             commands::diagnostics,
             commands::export_diagnostics,
+            commands::discover_sonos,
             commands::test_volume
         ])
         .run(tauri::generate_context!())
