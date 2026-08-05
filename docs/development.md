@@ -8,6 +8,6 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-Windows Core Audio, macOS Core Audio, Sonos networking, Tauri, and the mock
-Sonos server are intentionally not part of Phase 1.
-
+Windows Core Audio, macOS Core Audio, Tauri, and the production GENA callback
+listener are intentionally not part of Phase 2. The `test-support` crate has a
+small local RenderingControl mock server for integration tests.

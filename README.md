@@ -7,9 +7,10 @@ communicate with one another directly.
 
 ## Project status
 
-Phase 1 is in progress: the pure Rust domain model and synchronization policy
-are implemented with unit tests. Native audio control, Sonos local-network protocol,
-Tauri UI, packaging, and release artifacts are deliberately not yet present.
+Phase 2 is in progress: the pure Rust domain model, synchronization policy, and
+local Sonos discovery/RenderingControl client have unit and integration tests.
+Native audio control, Tauri UI, subscription callback listener, packaging, and
+release artifacts are deliberately not yet present.
 
 ## Safety and privacy
 

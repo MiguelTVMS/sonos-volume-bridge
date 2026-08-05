@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<root>
+  <device>
+    <friendlyName>Living Room</friendlyName>
+    <modelName>Sonos Ray</modelName>
+    <modelNumber>S36</modelNumber>
+    <UDN>uuid:RINCON_00000000000101400</UDN>
+    <serviceList>
+      <service>
+        <serviceType>urn:schemas-upnp-org:service:RenderingControl:1</serviceType>
+        <controlURL>/MediaRenderer/RenderingControl/Control</controlURL>
+        <eventSubURL>/MediaRenderer/RenderingControl/Event</eventSubURL>
+      </service>
+    </serviceList>
+  </device>
+</root>

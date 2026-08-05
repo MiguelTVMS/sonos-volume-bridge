@@ -14,3 +14,10 @@ Future adapters will serialize side effects, coalesce volume commands, and use
 bounded channels. The policy core never connects peer computers: every instance
 only observes and commands the same selected Sonos speaker.
 
+## Local Sonos protocol adapter
+
+The Phase 2 `sonos` crate owns SSDP discovery, private-address validation,
+device-description parsing, RenderingControl SOAP requests, and GENA
+`LastChange` parsing. It is still independent of Tauri and native audio.
+It does not run an HTTP callback listener yet; subscription lifecycle and the
+listener are deferred to Phase 5, where they can be connected to synchronization.

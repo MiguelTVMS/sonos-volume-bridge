@@ -1,0 +1,23 @@
+[package]
+name = "sonos-volume-bridge-sonos"
+description = "Local-network Sonos UPnP client for SonosVolumeBridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+quick-xml.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+sonos-volume-bridge-domain = { path = "../domain" }
+thiserror.workspace = true
+tokio.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+sonos-volume-bridge-test-support = { path = "../test-support" }
+
+[lints]
+workspace = true

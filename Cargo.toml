@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/domain", "crates/synchronization"]
+members = [
+    "crates/domain",
+    "crates/sonos",
+    "crates/synchronization",
+    "crates/test-support",
+]
 resolver = "2"
 
 [workspace.package]
@@ -12,6 +17,10 @@ repository = "https://github.com/migueltvms/sonos-volume-bridge"
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
+quick-xml = "0.41"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt", "sync", "time"] }
+url = "2"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -21,4 +30,3 @@ all = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
 module_name_repetitions = "allow"
 must_use_candidate = "allow"
-

@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<root>
+  <device>
+    <friendlyName>Office</friendlyName>
+    <modelName>Sonos One</modelName>
+    <UDN>uuid:RINCON_00000000000201400</UDN>
+    <serviceList>
+      <service>
+        <serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType>
+        <controlURL>/MediaRenderer/AVTransport/Control</controlURL>
+        <eventSubURL>/MediaRenderer/AVTransport/Event</eventSubURL>
+      </service>
+      <service>
+        <serviceType>urn:schemas-upnp-org:service:RenderingControl:1</serviceType>
+        <controlURL>/MediaRenderer/RenderingControl/Control</controlURL>
+        <eventSubURL>/MediaRenderer/RenderingControl/Event</eventSubURL>
+      </service>
+    </serviceList>
+  </device>
+</root>
