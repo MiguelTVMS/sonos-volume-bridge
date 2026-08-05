@@ -31,3 +31,10 @@ npm --prefix ui run build
 npm --prefix ui run lint
 npm --prefix ui run format
 ```
+
+## Phase tracking
+
+Each implementation phase has a GitHub issue. Create the issue before changing
+code, post concise progress and validation updates while working, then commit,
+push `develop`, and close it when the phase is complete. Create the next phase's
+issue before stopping and wait for explicit approval before implementing it.
