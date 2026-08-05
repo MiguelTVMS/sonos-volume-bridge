@@ -49,6 +49,47 @@ pub struct DiscoveredSonos {
     pub location: String,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AvailableAudioOutput {
+    pub id: String,
+    pub name: String,
+    pub writable_volume: bool,
+}
+
+pub fn available_audio_outputs() -> Result<Vec<AvailableAudioOutput>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        sonos_volume_bridge_platform_audio::macos::list_output_devices()
+            .map(|devices| {
+                devices
+                    .into_iter()
+                    .map(|device| AvailableAudioOutput {
+                        id: device.id,
+                        name: device.name,
+                        writable_volume: device.writable_volume,
+                    })
+                    .collect()
+            })
+            .map_err(|_| "Unable to list local output devices.".to_owned())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(Vec::new())
+    }
+}
+
+/// Removes the implementation suffix emitted by some AirPlay renderer names.
+/// The stable UDN remains the identity used by the application.
+fn display_speaker_name(name: &str) -> String {
+    name.split_once(" - Sonos ")
+        .filter(|(_, suffix)| suffix.contains("Media Renderer") && suffix.contains("RINCON"))
+        .map_or_else(
+            || name.to_owned(),
+            |(room_name, _)| room_name.trim().to_owned(),
+        )
+}
+
 /// Performs bounded local-network discovery for the settings application service.
 pub async fn discover_available() -> Result<Vec<DiscoveredSonos>, String> {
     let client = SonosClient::builder()
@@ -63,7 +104,7 @@ pub async fn discover_available() -> Result<Vec<DiscoveredSonos>, String> {
         if let Ok(found) = client.retrieve_device(location.clone()).await {
             devices.push(DiscoveredSonos {
                 id: found.device.id.as_str().to_owned(),
-                friendly_name: found.device.friendly_name,
+                friendly_name: display_speaker_name(&found.device.friendly_name),
                 location: location.to_string(),
             });
         }
@@ -167,7 +208,11 @@ async fn run_supervisor(
         if *shutdown.borrow() {
             return;
         }
-        let status = match result {
+        let integration_error = match &result {
+            Err(RuntimeError::Integration(message)) => Some(message.as_str()),
+            _ => None,
+        };
+        let status = match &result {
             Ok(()) => UiStatus::Connecting,
             Err(RuntimeError::Local(PlatformAudioError::UnsupportedDevice)) => {
                 UiStatus::UnsupportedLocalDevice
@@ -175,10 +220,12 @@ async fn run_supervisor(
             Err(RuntimeError::Local(_)) => UiStatus::LocalAudioUnavailable,
             Err(RuntimeError::SonosUnavailable) => UiStatus::SonosUnavailable,
             Err(RuntimeError::Cancelled) => return,
-            Err(RuntimeError::Integration) => UiStatus::Error,
+            Err(RuntimeError::Integration(_)) => UiStatus::Error,
         };
         warn!(
             kind = status_name(&status),
+            error = ?result,
+            integration_error,
             "runtime session stopped; reconnecting with bounded backoff"
         );
         update_snapshot(&snapshot, &app, generation, status, None);
@@ -205,13 +252,16 @@ async fn run_session(
         .build()
         .map_err(|_| RuntimeError::SonosUnavailable)?;
     let device = resolve_device(&client, configuration).await?;
+    tracing::info!("resolved selected Sonos speaker");
+    let speaker_name = display_speaker_name(&device.friendly_name);
     let audio = create_audio(configuration)?;
+    tracing::info!("attached selected local audio output");
     let machine = Synchronizer::new(
         configuration.mapping.clone(),
         configuration.maximum_sonos_volume,
         configuration.synchronize_mute,
     )
-    .map_err(|_| RuntimeError::Integration)?;
+    .map_err(|error| RuntimeError::Integration(error.to_string()))?;
     let sonos = DeviceSonosPort {
         client: client.clone(),
         device: device.clone(),
@@ -226,7 +276,7 @@ async fn run_session(
         generation,
         UiStatus::Connecting,
         Some(SnapshotValues {
-            name: &device.friendly_name,
+            name: &speaker_name,
             sonos_volume: None,
             local_volume: None,
             muted: None,
@@ -236,6 +286,7 @@ async fn run_session(
         .reconcile_startup()
         .await
         .map_err(RuntimeError::from)?;
+    tracing::info!("reconciled initial Sonos state to local audio");
     let confirmed_volume = client
         .get_volume(&device)
         .await
@@ -245,13 +296,14 @@ async fn run_session(
         .await
         .map_err(|_| RuntimeError::SonosUnavailable)?;
     let local_state = audio.current_state().await.map_err(RuntimeError::Local)?;
+    tracing::info!("read current local audio state");
     update_snapshot(
         snapshot,
         app,
         generation,
         UiStatus::SubscriptionDegraded,
         Some(SnapshotValues {
-            name: &device.friendly_name,
+            name: &speaker_name,
             sonos_volume: None,
             local_volume: Some(local_state.volume.get()),
             muted: Some(local_state.muted.0),
@@ -263,12 +315,17 @@ async fn run_session(
     let mut listener = CallbackListener::bind(bind, peer.ip())
         .await
         .map_err(|_| RuntimeError::SonosUnavailable)?;
+    tracing::info!("started local Sonos event listener");
     let gena =
         GenaClient::new(SONOS_TIMEOUT, 64 * 1024).map_err(|_| RuntimeError::SonosUnavailable)?;
     let mut subscription = gena
         .subscribe(&device, listener.callback_url(), REQUESTED_SUBSCRIPTION)
         .await
         .ok();
+    tracing::info!(
+        subscribed = subscription.is_some(),
+        "requested Sonos event subscription"
+    );
     if let Some(value) = subscription.as_ref() {
         listener.set_subscription(value);
     }
@@ -282,7 +339,7 @@ async fn run_session(
             UiStatus::SubscriptionDegraded
         },
         Some(SnapshotValues {
-            name: &device.friendly_name,
+            name: &speaker_name,
             sonos_volume: Some(confirmed_volume.get()),
             local_volume: Some(local_state.volume.get()),
             muted: Some(confirmed_mute.0),
@@ -306,14 +363,14 @@ async fn run_session(
                 if let Some(event) = event {
                     coordinator.on_sonos_event(event.state.volume, event.state.muted).await.map_err(RuntimeError::from)?;
                     let local_state = audio.current_state().await.map_err(RuntimeError::Local)?;
-                    update_snapshot(snapshot, app, generation, UiStatus::Synchronized, Some(SnapshotValues { name: &device.friendly_name, sonos_volume: Some(event.state.volume.get()), local_volume: Some(local_state.volume.get()), muted: Some(event.state.muted.0) }));
+                    update_snapshot(snapshot, app, generation, UiStatus::Synchronized, Some(SnapshotValues { name: &speaker_name, sonos_volume: Some(event.state.volume.get()), local_volume: Some(local_state.volume.get()), muted: Some(event.state.muted.0) }));
                 }
             }
             received = audio_events.recv() => match received {
                 Ok(SystemAudioEvent::StateChanged { state, origin }) => {
                     let mute_changed = last_local.is_none_or(|previous| previous.muted != state.muted);
                     last_local = Some(state);
-                    update_snapshot(snapshot, app, generation, UiStatus::WaitingForSonosConfirmation, Some(SnapshotValues { name: &device.friendly_name, sonos_volume: None, local_volume: Some(state.volume.get()), muted: Some(state.muted.0) }));
+                    update_snapshot(snapshot, app, generation, UiStatus::WaitingForSonosConfirmation, Some(SnapshotValues { name: &speaker_name, sonos_volume: None, local_volume: Some(state.volume.get()), muted: Some(state.muted.0) }));
                     coordinator.on_local_event(state, origin, mute_changed).await.map_err(RuntimeError::from)?;
                     if !mute_changed && origin != LocalOrigin::Application {
                         coordinator.run_local_once().await.map_err(RuntimeError::from)?;
@@ -495,10 +552,14 @@ impl LocalAudioPort for DeviceAudioPort {
             .set_volume(state.volume, LocalOrigin::Application)
             .await
             .map_err(|error| IntegrationError::Audio(error.to_string()))?;
-        self.0
+        match self
+            .0
             .set_muted(state.muted.0, LocalOrigin::Application)
             .await
-            .map_err(|error| IntegrationError::Audio(error.to_string()))
+        {
+            Ok(()) | Err(PlatformAudioError::MuteUnavailable) => Ok(()),
+            Err(error) => Err(IntegrationError::Audio(error.to_string())),
+        }
     }
 }
 
@@ -506,13 +567,12 @@ impl LocalAudioPort for DeviceAudioPort {
 enum RuntimeError {
     SonosUnavailable,
     Local(PlatformAudioError),
-    Integration,
+    Integration(String),
     Cancelled,
 }
 impl From<IntegrationError> for RuntimeError {
     fn from(value: IntegrationError) -> Self {
-        let _ = value;
-        Self::Integration
+        Self::Integration(value.to_string())
     }
 }
 
@@ -572,6 +632,77 @@ fn status_name(status: &UiStatus) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sonos_volume_bridge_domain::NormalizedVolume;
+    use tokio::sync::broadcast;
+
+    struct MuteUnavailableAudio {
+        events: broadcast::Sender<SystemAudioEvent>,
+        applied_volume: Arc<Mutex<Option<NormalizedVolume>>>,
+    }
+
+    #[async_trait]
+    impl SystemAudioController for MuteUnavailableAudio {
+        async fn current_state(&self) -> Result<LocalAudioState, PlatformAudioError> {
+            Ok(LocalAudioState {
+                volume: NormalizedVolume::new(20).expect("valid test volume"),
+                muted: MuteState(false),
+            })
+        }
+
+        async fn set_volume(
+            &self,
+            volume: NormalizedVolume,
+            _: LocalOrigin,
+        ) -> Result<(), PlatformAudioError> {
+            *self.applied_volume.lock().expect("test mutex") = Some(volume);
+            Ok(())
+        }
+
+        async fn set_muted(&self, _: bool, _: LocalOrigin) -> Result<(), PlatformAudioError> {
+            Err(PlatformAudioError::MuteUnavailable)
+        }
+
+        fn subscribe(&self) -> broadcast::Receiver<SystemAudioEvent> {
+            self.events.subscribe()
+        }
+    }
+
+    #[tokio::test]
+    async fn unsupported_mute_does_not_block_volume_application() {
+        let (events, _) = broadcast::channel(1);
+        let applied_volume = Arc::new(Mutex::new(None));
+        let port = DeviceAudioPort(Arc::new(MuteUnavailableAudio {
+            events,
+            applied_volume: Arc::clone(&applied_volume),
+        }));
+        let state = LocalAudioState {
+            volume: NormalizedVolume::new(42).expect("valid test volume"),
+            muted: MuteState(false),
+        };
+
+        port.apply(state)
+            .await
+            .expect("volume application succeeds");
+
+        assert_eq!(
+            *applied_volume.lock().expect("test mutex"),
+            Some(state.volume)
+        );
+    }
+
+    #[test]
+    fn renderer_suffix_is_hidden_from_speaker_name() {
+        assert_eq!(
+            display_speaker_name("Office - Sonos Ray Media Renderer - RINCON_38420BBDB00301400"),
+            "Office"
+        );
+    }
+
+    #[test]
+    fn ordinary_speaker_name_is_preserved() {
+        assert_eq!(display_speaker_name("Living Room"), "Living Room");
+    }
+
     #[test]
     fn renewal_happens_before_subscription_expiry() {
         let subscription = sonos_volume_bridge_sonos::Subscription {

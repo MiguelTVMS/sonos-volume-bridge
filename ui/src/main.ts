@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import './style.css';
 
 type MappingPoint = { local: number; sonos: number };
+type SettingsPage = 'devices' | 'volume' | 'general' | 'diagnostics';
 type Configuration = {
   schemaVersion: number;
   selectedSonosId: string | null;
@@ -27,55 +28,316 @@ type Snapshot = {
   muted: boolean | null;
 };
 type DiscoveredSonos = { id: string; friendlyName: string; location: string };
+type AudioOutput = { id: string; name: string; writableVolume: boolean };
+type Diagnostics = {
+  configurationPresent: boolean;
+  sanitized: boolean;
+  message: string;
+  status: string;
+  speakerName: string | null;
+  selectedSonosId: string | null;
+  lastKnownSonosAddress: string | null;
+  sonosVolume: number | null;
+  localVolume: number | null;
+  muted: boolean | null;
+  followsSystemOutput: boolean;
+  fixedAudioDeviceId: string | null;
+  synchronizeMute: boolean;
+  fallbackPolling: boolean;
+};
 
 const root = document.querySelector<HTMLDivElement>('#app');
 if (!root) throw new Error('Missing application root.');
 const app: HTMLDivElement = root;
+let snapshot: Snapshot | null = null;
+let discoveredSonos: DiscoveredSonos[] = [];
+let audioOutputs: AudioOutput[] = [];
+let activePage: SettingsPage = 'devices';
+let discoveryStatus = 'Not checked yet';
+let saveTimeout: number | undefined;
+let saveRevision = 0;
+let statusPoll: number | undefined;
+let diagnosticDetailsVisible = false;
 
-function input(label: string, name: string, value: string, type = 'text'): string {
-  return `<label>${label}<input name="${name}" type="${type}" value="${value}" /></label>`;
+const statusLabels: Record<string, string> = {
+  discovering: 'Looking for your speaker…',
+  connecting: 'Connecting…',
+  synchronized: 'Up to date',
+  waitingForSonosConfirmation: 'Updating speaker…',
+  subscriptionDegraded: 'Keeping an eye on the connection…',
+  pollingFallback: 'Checking for changes…',
+  sonosUnavailable: 'Speaker is not available',
+  localAudioUnavailable: 'This Mac audio is not available',
+  unsupportedLocalDevice: 'This output cannot control volume',
+  configurationRequired: 'Choose a speaker to get started',
+  error: 'Something needs attention',
+};
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 }
-function render(snapshot: Snapshot): void {
-  const c = snapshot.configuration;
-  app.innerHTML = `<header><h1>SonosVolumeBridge</h1><p class="status">${snapshot.status}</p></header><section class="summary"><span>Sonos: ${snapshot.sonosName ?? 'Not selected'} (${snapshot.sonosVolume ?? '—'}%)</span><span>Local: ${snapshot.localVolume ?? '—'}%</span><span>Mute: ${snapshot.muted ? 'On' : 'Off'}</span></section><form id="settings"><h2>Connection</h2>${input('Sonos UDN', 'selectedSonosId', c.selectedSonosId ?? '')}${input('Cached Sonos address', 'lastKnownSonosAddress', c.lastKnownSonosAddress ?? '')}<button type="button" id="discover">Discover Sonos devices</button><h2>Audio</h2><label><input type="checkbox" name="followDefaultAudioDevice" ${c.followDefaultAudioDevice ? 'checked' : ''}/> Follow default output device</label>${input('Fixed output device ID', 'fixedAudioDeviceId', c.fixedAudioDeviceId ?? '')}<label><input type="checkbox" name="synchronizeMute" ${c.synchronizeMute ? 'checked' : ''}/> Synchronize mute</label><h2>Volume safety</h2>${input('Maximum Sonos volume', 'maximumSonosVolume', String(c.maximumSonosVolume), 'number')}<label>Mapping<select name="mapping"><option value="piecewise" selected>Piecewise (default)</option><option value="linear">Linear</option><option value="capped_linear">Capped linear</option></select></label><p class="hint">Default curve: 0→0, 20→5, 40→12, 60→23, 80→40, 100→55.</p><h2>Runtime</h2><label><input type="checkbox" name="startAtLogin" ${c.startAtLogin ? 'checked' : ''}/> Start at login</label><label><input type="checkbox" name="fallbackPolling" ${c.fallbackPolling ? 'checked' : ''}/> Enable fallback polling</label><footer><button type="submit">Save settings</button><button type="button" id="test">Test volume control</button><button type="button" id="diagnostics">Diagnostics</button><button type="button" id="export">Export diagnostics</button><button type="button" id="reset">Reset configuration</button></footer><output id="notice"></output></form>`;
-  document.querySelector<HTMLFormElement>('#settings')?.addEventListener('submit', save);
+
+function option(value: string, label: string, selected = false): string {
+  return `<option value="${escapeHtml(value)}"${selected ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+}
+
+function mappingOptions(configuration: Configuration): string {
+  return [
+    option('piecewise', 'Balanced', configuration.mapping.type === 'piecewise'),
+    option('linear', 'Direct', configuration.mapping.type === 'linear'),
+    option('capped_linear', 'Direct with limit', configuration.mapping.type === 'capped_linear'),
+  ].join('');
+}
+
+function sonosOptions(configuration: Configuration): string {
+  const selected = configuration.selectedSonosId;
+  const devices = [...discoveredSonos];
+  if (selected && !devices.some((device) => device.id === selected)) {
+    devices.unshift({
+      id: selected,
+      friendlyName: 'Previously chosen speaker (not nearby)',
+      location: configuration.lastKnownSonosAddress ?? '',
+    });
+  }
+  return [
+    option('', 'Select a Sonos speaker', !selected),
+    ...devices.map((device) => option(device.id, device.friendlyName, device.id === selected)),
+  ].join('');
+}
+
+function outputLabel(name: string): string {
+  if (name.includes('Media Renderer') && name.includes('RINCON')) {
+    return name.split(' - ')[0].trim();
+  }
+  return name;
+}
+
+function outputOptions(configuration: Configuration): string {
+  const selected = configuration.followDefaultAudioDevice
+    ? 'default'
+    : (configuration.fixedAudioDeviceId ?? 'default');
+  const writableOutputs = audioOutputs.filter((output) => output.writableVolume);
+  if (selected !== 'default' && !writableOutputs.some((output) => output.id === selected)) {
+    writableOutputs.unshift({
+      id: selected,
+      name: 'Previously chosen output (not available)',
+      writableVolume: true,
+    });
+  }
+  return [
+    option('default', 'Follow system output', selected === 'default'),
+    ...writableOutputs.map((output) =>
+      option(output.id, outputLabel(output.name), output.id === selected),
+    ),
+  ].join('');
+}
+
+function selectedOutputName(configuration: Configuration): string {
+  if (configuration.followDefaultAudioDevice) return 'Follow system output';
+  const selected = audioOutputs.find((output) => output.id === configuration.fixedAudioDeviceId);
+  return selected ? outputLabel(selected.name) : 'Selected output is unavailable';
+}
+
+function volumeText(volume: number | null): string {
+  return volume === null ? '—' : `${volume}%`;
+}
+
+function muteText(muted: boolean | null): string {
+  return muted === null ? '—' : muted ? 'Muted' : 'On';
+}
+
+function knownSonosAddress(configuration: Configuration): string {
+  const selected = discoveredSonos.find((device) => device.id === configuration.selectedSonosId);
+  return selected?.location ?? configuration.lastKnownSonosAddress ?? '';
+}
+
+function pageButton(page: SettingsPage, label: string): string {
+  return `<button class="page-button${activePage === page ? ' active' : ''}" type="button" data-page="${page}"${activePage === page ? ' aria-current="page"' : ''}>${label}</button>`;
+}
+
+function panel(page: SettingsPage, content: string): string {
+  return `<section class="panel" data-panel="${page}"${activePage === page ? '' : ' hidden'}>${content}</section>`;
+}
+
+function render(nextSnapshot: Snapshot): void {
+  snapshot = nextSnapshot;
+  const c = nextSnapshot.configuration;
+  const speakerName = nextSnapshot.sonosName ?? 'No speaker selected';
+  const status = statusLabels[nextSnapshot.status] ?? 'Checking status…';
+  app.innerHTML = `
+    <div class="settings-shell">
+      <aside class="sidebar">
+        <div class="app-heading"><h1>Sonos Volume Bridge</h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
+        <nav aria-label="Settings sections">
+          ${pageButton('devices', 'Devices')}
+          ${pageButton('volume', 'Volume')}
+          ${pageButton('general', 'General')}
+          ${pageButton('diagnostics', 'Diagnostics')}
+        </nav>
+        <div class="sidebar-speaker"><span>Speaker</span><b id="runtime-speaker">${escapeHtml(speakerName)}</b></div>
+      </aside>
+      <form id="settings" class="content">
+        ${panel(
+          'devices',
+          `<div class="panel-heading"><h2>Devices</h2><p>Choose the speaker and Mac output to keep in step.</p></div>
+          <div class="settings-group">
+            <div class="control-field"><label for="sonos-device">Sonos speaker</label><div class="field-row"><select name="selectedSonosId" id="sonos-device">${sonosOptions(c)}</select><button class="secondary icon-button" type="button" id="discover" title="Refresh Sonos speakers" aria-label="Refresh Sonos speakers">↻</button></div></div>
+            <input type="hidden" name="lastKnownSonosAddress" value="${escapeHtml(knownSonosAddress(c))}" />
+            <div class="control-field"><label for="audio-output">Follow</label><div class="field-row"><select name="audioOutputMode" id="audio-output">${outputOptions(c)}</select><button class="secondary icon-button" type="button" id="outputs" title="Refresh local outputs" aria-label="Refresh local outputs">↻</button></div></div>
+            <label class="toggle"><input type="checkbox" name="synchronizeMute" ${c.synchronizeMute ? 'checked' : ''}/><span>Synchronize mute</span></label>
+          </div>`,
+        )}
+        ${panel(
+          'volume',
+          `<div class="panel-heading"><h2>Volume</h2><p>Control how your Mac volume changes the speaker.</p></div>
+          <div class="settings-group">
+            <label>Highest speaker volume <output class="range-value" id="maximum-value">${c.maximumSonosVolume}%</output><input name="maximumSonosVolume" id="maximum-volume" type="range" min="0" max="100" step="1" value="${c.maximumSonosVolume}" /></label>
+            <label>Volume feel<select name="mapping">${mappingOptions(c)}</select></label>
+            <details class="help"><summary>What do these options mean?</summary><dl><div><dt>Balanced</dt><dd>Gives you more control at lower volumes and rises more gently.</dd></div><div><dt>Direct</dt><dd>Keeps the speaker volume closely matched to your Mac volume.</dd></div><div><dt>Direct with limit</dt><dd>Matches your Mac volume, but never goes above the highest speaker volume you chose.</dd></div></dl></details>
+            <button class="secondary test-button" type="button" id="test">Test speaker volume</button>
+          </div>`,
+        )}
+        ${panel(
+          'general',
+          `<div class="panel-heading"><h2>General</h2><p>Choose how the app behaves in the background.</p></div>
+          <div class="settings-group">
+            <label class="toggle"><input type="checkbox" name="startAtLogin" ${c.startAtLogin ? 'checked' : ''}/><span>Start at login</span></label>
+            <label class="toggle"><input type="checkbox" name="fallbackPolling" ${c.fallbackPolling ? 'checked' : ''}/><span>Keep checking if updates are missed</span></label>
+          </div>`,
+        )}
+        ${panel(
+          'diagnostics',
+          `<div class="panel-heading"><h2>Diagnostics</h2><p>Live information about the speaker and Mac output.</p></div>
+          <dl class="status-list"><div><dt>Connection</dt><dd id="diagnostic-connection">${escapeHtml(status)}</dd></div><div><dt>Speaker</dt><dd id="diagnostic-speaker">${escapeHtml(speakerName)}</dd></div><div><dt>Speaker volume</dt><dd id="diagnostic-sonos-volume">${volumeText(nextSnapshot.sonosVolume)}</dd></div><div><dt>Selected output</dt><dd id="diagnostic-output">${escapeHtml(selectedOutputName(c))}</dd></div><div><dt>Output volume</dt><dd id="diagnostic-local-volume">${volumeText(nextSnapshot.localVolume)}</dd></div><div><dt>Mute</dt><dd id="diagnostic-mute">${muteText(nextSnapshot.muted)}</dd></div><div><dt>Speaker search</dt><dd>${escapeHtml(discoveryStatus)}</dd></div></dl>
+          <details class="technical-details" id="technical-details"${diagnosticDetailsVisible ? ' open' : ''}><summary>Technical speaker details</summary><p>Shows the saved speaker identity and local endpoint for troubleshooting.</p><pre id="diagnostic-payload">${diagnosticDetailsVisible ? 'Loading…' : ''}</pre></details>
+          <div class="diagnostics-actions"><button class="secondary" type="button" id="diagnostics">${diagnosticDetailsVisible ? 'Refresh technical details' : 'Show technical details'}</button><button class="secondary" type="button" id="export">Export diagnostics</button><button class="danger" type="button" id="reset">Reset settings</button></div>`,
+        )}
+        <output id="notice" aria-live="polite"></output>
+      </form>
+    </div>`;
+  const form = document.querySelector<HTMLFormElement>('#settings');
+  form?.addEventListener('input', scheduleSave);
+  form?.addEventListener('change', scheduleSave);
+  document.querySelectorAll<HTMLButtonElement>('[data-page]').forEach((button) => {
+    button.addEventListener('click', () => activatePage(button.dataset.page as SettingsPage));
+  });
   document.querySelector('#test')?.addEventListener('click', testVolume);
   document.querySelector('#diagnostics')?.addEventListener('click', showDiagnostics);
   document.querySelector('#export')?.addEventListener('click', exportDiagnostics);
   document.querySelector('#reset')?.addEventListener('click', reset);
   document.querySelector('#discover')?.addEventListener('click', discoverSonos);
+  document.querySelector('#outputs')?.addEventListener('click', refreshAudioOutputs);
+  document
+    .querySelector<HTMLSelectElement>('#sonos-device')
+    ?.addEventListener('change', syncSelectedSonosAddress);
+  document
+    .querySelector<HTMLInputElement>('#maximum-volume')
+    ?.addEventListener('input', updateMaximumValue);
 }
-async function discoverSonos(): Promise<void> {
+
+function activatePage(page: SettingsPage): void {
+  activePage = page;
+  document.querySelectorAll<HTMLElement>('[data-panel]').forEach((element) => {
+    element.hidden = element.dataset.panel !== page;
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-page]').forEach((button) => {
+    const active = button.dataset.page === page;
+    button.classList.toggle('active', active);
+    button.toggleAttribute('aria-current', active);
+  });
+}
+
+function refreshRuntimeStatus(nextSnapshot: Snapshot): void {
+  snapshot = nextSnapshot;
+  const status = statusLabels[nextSnapshot.status] ?? 'Checking status…';
+  const speaker = nextSnapshot.sonosName ?? 'No speaker selected';
+  const targets: Array<[string, string]> = [
+    ['#runtime-status', status],
+    ['#runtime-speaker', speaker],
+    ['#diagnostic-connection', status],
+    ['#diagnostic-speaker', speaker],
+    ['#diagnostic-sonos-volume', volumeText(nextSnapshot.sonosVolume)],
+    ['#diagnostic-local-volume', volumeText(nextSnapshot.localVolume)],
+    ['#diagnostic-mute', muteText(nextSnapshot.muted)],
+  ];
+  for (const [selector, value] of targets) {
+    const element = document.querySelector<HTMLElement>(selector);
+    if (element) element.textContent = value;
+  }
+}
+
+function startStatusPolling(): void {
+  if (statusPoll !== undefined) return;
+  statusPoll = window.setInterval(() => {
+    void invoke<Snapshot>('get_snapshot')
+      .then(refreshRuntimeStatus)
+      .catch(() => undefined);
+  }, 1_000);
+}
+
+function syncSelectedSonosAddress(): void {
+  const select = document.querySelector<HTMLSelectElement>('#sonos-device');
+  const selected = discoveredSonos.find((device) => device.id === select?.value);
+  const address = select?.value
+    ? (selected?.location ?? snapshot?.configuration.lastKnownSonosAddress ?? '')
+    : '';
+  const hidden = document.querySelector<HTMLInputElement>('input[name="lastKnownSonosAddress"]');
+  if (hidden) hidden.value = address;
+}
+
+function updateMaximumValue(event: Event): void {
+  const input = event.currentTarget as HTMLInputElement;
+  const output = document.querySelector<HTMLOutputElement>('#maximum-value');
+  if (output) output.value = `${input.value}%`;
+}
+
+async function refreshAudioOutputs(): Promise<void> {
   try {
-    const devices = await invoke<DiscoveredSonos[]>('discover_sonos');
-    if (devices.length === 0) {
-      notice('No Sonos devices were found on the selected local network.');
-      return;
-    }
-    const device = devices[0];
-    const form = document.querySelector<HTMLFormElement>('#settings');
-    const id = form?.elements.namedItem('selectedSonosId') as HTMLInputElement | null;
-    const address = form?.elements.namedItem('lastKnownSonosAddress') as HTMLInputElement | null;
-    if (id) id.value = device.id;
-    if (address) address.value = device.location;
-    notice(`Selected ${device.friendlyName}. Save settings to connect.`);
+    audioOutputs = await invoke<AudioOutput[]>('list_audio_outputs');
+    if (snapshot) render(snapshot);
   } catch (error) {
     notice(String(error));
   }
 }
+
+async function discoverSonos(): Promise<void> {
+  try {
+    discoveredSonos = await invoke<DiscoveredSonos[]>('discover_sonos');
+    if (discoveredSonos.length === 0) {
+      discoveryStatus = 'No speakers found';
+      if (snapshot) render(snapshot);
+      return;
+    }
+    discoveryStatus = `Found ${discoveredSonos.length} speaker${discoveredSonos.length === 1 ? '' : 's'}`;
+    if (snapshot) {
+      render(snapshot);
+      syncSelectedSonosAddress();
+    }
+  } catch {
+    discoveryStatus = 'Unable to search this network';
+    if (snapshot) render(snapshot);
+  }
+}
+
 function notice(value: string): void {
   const output = document.querySelector<HTMLOutputElement>('#notice');
   if (output) output.value = value;
 }
+
 function formConfiguration(form: HTMLFormElement): Configuration {
   const values = new FormData(form);
   const mapping = String(values.get('mapping')) as Configuration['mapping']['type'];
+  const output = String(values.get('audioOutputMode') ?? 'default');
   return {
     schemaVersion: 1,
     selectedSonosId: String(values.get('selectedSonosId') ?? '') || null,
     lastKnownSonosAddress: String(values.get('lastKnownSonosAddress') ?? '') || null,
-    followDefaultAudioDevice: values.has('followDefaultAudioDevice'),
-    fixedAudioDeviceId: String(values.get('fixedAudioDeviceId') ?? '') || null,
+    followDefaultAudioDevice: output === 'default',
+    fixedAudioDeviceId: output === 'default' ? null : output,
     synchronizeMute: values.has('synchronizeMute'),
     startAtLogin: values.has('startAtLogin'),
     fallbackPolling: values.has('fallbackPolling'),
@@ -98,14 +360,27 @@ function formConfiguration(form: HTMLFormElement): Configuration {
           : { type: mapping, maximum: Number(values.get('maximumSonosVolume')) },
   };
 }
-async function save(event: SubmitEvent): Promise<void> {
-  event.preventDefault();
-  const snapshot = await invoke<Snapshot>('save_configuration', {
-    configuration: formConfiguration(event.currentTarget as HTMLFormElement),
-  });
-  render(snapshot);
-  notice('Settings saved.');
+
+function scheduleSave(): void {
+  if (saveTimeout !== undefined) window.clearTimeout(saveTimeout);
+  const revision = ++saveRevision;
+  saveTimeout = window.setTimeout(() => {
+    const form = document.querySelector<HTMLFormElement>('#settings');
+    if (form) void saveConfiguration(formConfiguration(form), revision);
+  }, 350);
 }
+
+async function saveConfiguration(configuration: Configuration, revision: number): Promise<void> {
+  try {
+    const nextSnapshot = await invoke<Snapshot>('save_configuration', { configuration });
+    if (revision !== saveRevision) return;
+    render(nextSnapshot);
+    notice('Saved.');
+  } catch (error) {
+    if (revision === saveRevision) notice(`Could not save: ${String(error)}`);
+  }
+}
+
 async function testVolume(): Promise<void> {
   try {
     await invoke('test_volume');
@@ -115,17 +390,36 @@ async function testVolume(): Promise<void> {
   }
 }
 async function showDiagnostics(): Promise<void> {
-  notice(JSON.stringify(await invoke('diagnostics')));
+  try {
+    const diagnostics = await invoke<Diagnostics>('diagnostics');
+    diagnosticDetailsVisible = true;
+    const details = document.querySelector<HTMLDetailsElement>('#technical-details');
+    const payload = document.querySelector<HTMLPreElement>('#diagnostic-payload');
+    if (details) details.open = true;
+    if (payload) payload.textContent = JSON.stringify(diagnostics, null, 2);
+    const button = document.querySelector<HTMLButtonElement>('#diagnostics');
+    if (button) button.textContent = 'Refresh technical details';
+    notice('Technical details refreshed.');
+  } catch (error) {
+    notice(`Could not load diagnostics: ${String(error)}`);
+  }
 }
 async function exportDiagnostics(): Promise<void> {
   notice(await invoke<string>('export_diagnostics'));
 }
 async function reset(): Promise<void> {
   render(await invoke<Snapshot>('reset_configuration'));
-  notice('Configuration reset.');
+  notice('Settings reset.');
 }
+
 invoke<Snapshot>('get_snapshot')
-  .then(render)
+  .then((nextSnapshot) => {
+    render(nextSnapshot);
+    startStatusPolling();
+    void refreshAudioOutputs();
+    discoveryStatus = 'Searching…';
+    void discoverSonos();
+  })
   .catch((error: unknown) => {
     app.textContent = `Unable to load settings: ${String(error)}`;
   });

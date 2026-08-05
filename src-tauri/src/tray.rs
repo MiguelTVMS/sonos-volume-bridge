@@ -1,12 +1,14 @@
 use crate::state::AppState;
 use tauri::{
-    AppHandle, Manager, Runtime,
+    AppHandle, Manager, Runtime, Theme,
+    image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
 };
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
-    let title = MenuItem::with_id(app, "title", "SonosVolumeBridge", false, None::<&str>)?;
+    let icon = icon_for(theme(app));
+    let title = MenuItem::with_id(app, "title", "Sonos Volume Bridge", false, None::<&str>)?;
     let status = MenuItem::with_id(
         app,
         "status",
@@ -23,8 +25,10 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         &[&title, &status, &separator, &settings, &diagnostics, &quit],
     )?;
     TrayIconBuilder::with_id("main-tray")
+        .icon(icon)
+        .icon_as_template(true)
         .menu(&menu)
-        .tooltip("SonosVolumeBridge")
+        .tooltip("Sonos Volume Bridge")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "settings" | "diagnostics" => show_settings(app),
             "quit" => {
@@ -38,6 +42,26 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .build(app)?;
     refresh(app);
     Ok(())
+}
+
+pub fn update_icon_for_theme<R: Runtime>(app: &AppHandle<R>, theme: Theme) {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let _ = tray.set_icon_with_as_template(Some(icon_for(theme)), true);
+    }
+}
+
+fn theme<R: Runtime>(app: &AppHandle<R>) -> Theme {
+    app.get_webview_window("main")
+        .and_then(|window| window.theme().ok())
+        .unwrap_or(Theme::Light)
+}
+
+fn icon_for(theme: Theme) -> Image<'static> {
+    let bytes: &[u8] = match theme {
+        Theme::Light => include_bytes!("../icons/tray-icon-light.png"),
+        _ => include_bytes!("../icons/tray-icon-dark.png"),
+    };
+    Image::from_bytes(bytes).expect("embedded tray icon must be a valid PNG")
 }
 
 pub fn refresh<R: Runtime>(app: &AppHandle<R>) {

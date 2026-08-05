@@ -71,6 +71,8 @@ pub struct Coordinator<S, A> {
     local_tx: mpsc::Sender<SyncEvent>,
     local_rx: mpsc::Receiver<SyncEvent>,
     last_command: Option<Instant>,
+    last_sent_volume: Option<SonosVolume>,
+    last_sent_mute: Option<MuteState>,
     metrics: TimingMetrics,
 }
 
@@ -91,6 +93,8 @@ impl<S: SonosPort, A: LocalAudioPort> Coordinator<S, A> {
             local_tx,
             local_rx,
             last_command: None,
+            last_sent_volume: None,
+            last_sent_mute: None,
             metrics: TimingMetrics::default(),
         }
     }
@@ -105,6 +109,7 @@ impl<S: SonosPort, A: LocalAudioPort> Coordinator<S, A> {
     }
     pub async fn reconcile_startup(&mut self) -> Result<(), IntegrationError> {
         let (volume, muted) = self.sonos.current_state().await?;
+        self.record_confirmation(volume, muted);
         self.handle(SyncEvent::SonosConfirmed {
             volume,
             muted,
@@ -119,6 +124,7 @@ impl<S: SonosPort, A: LocalAudioPort> Coordinator<S, A> {
         muted: MuteState,
     ) -> Result<(), IntegrationError> {
         self.health = Health::Healthy;
+        self.record_confirmation(volume, muted);
         self.handle(SyncEvent::SonosConfirmed {
             volume,
             muted,
@@ -132,6 +138,7 @@ impl<S: SonosPort, A: LocalAudioPort> Coordinator<S, A> {
     }
     pub async fn poll_once(&mut self) -> Result<(), IntegrationError> {
         let (volume, muted) = self.sonos.current_state().await?;
+        self.record_confirmation(volume, muted);
         self.handle(SyncEvent::SonosConfirmed {
             volume,
             muted,
@@ -182,6 +189,9 @@ impl<S: SonosPort, A: LocalAudioPort> Coordinator<S, A> {
             origin,
             at_ms: now_ms(),
         };
+        if origin == LocalOrigin::Application {
+            return self.handle(event).await;
+        }
         if mute_changed {
             self.handle(event).await
         } else {
@@ -200,15 +210,33 @@ impl<S: SonosPort, A: LocalAudioPort> Coordinator<S, A> {
         }
         Ok(())
     }
+    fn record_confirmation(&mut self, volume: SonosVolume, muted: MuteState) {
+        if self.last_sent_volume.is_some_and(|sent| sent != volume) {
+            self.last_sent_volume = None;
+        }
+        if self.last_sent_mute.is_some_and(|sent| sent != muted) {
+            self.last_sent_mute = None;
+        }
+    }
     async fn apply(&mut self, effect: Effect) -> Result<(), IntegrationError> {
         match effect {
             Effect::RequestSonosVolume(volume) => {
+                if self.last_sent_volume == Some(volume) {
+                    return Ok(());
+                }
                 self.last_command = Some(Instant::now());
-                self.sonos.set_volume(volume).await
+                self.sonos.set_volume(volume).await?;
+                self.last_sent_volume = Some(volume);
+                Ok(())
             }
             Effect::RequestSonosMute(muted) => {
+                if self.last_sent_mute == Some(muted) {
+                    return Ok(());
+                }
                 self.last_command = Some(Instant::now());
-                self.sonos.set_mute(muted).await
+                self.sonos.set_mute(muted).await?;
+                self.last_sent_mute = Some(muted);
+                Ok(())
             }
             Effect::ApplyLocal(state) => {
                 self.metrics.last_command_to_confirmation =
@@ -328,5 +356,67 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(coordinator.health(), Health::Healthy);
+    }
+
+    #[tokio::test]
+    async fn duplicate_sonos_commands_are_suppressed_until_state_changes() {
+        let state = Arc::new(Mutex::new((volume(20), MuteState(false))));
+        let applied = Arc::new(Mutex::new(Vec::new()));
+        let machine = Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true).unwrap();
+        let mut coordinator = Coordinator::new(
+            machine,
+            Sonos(Arc::clone(&state)),
+            Audio(applied),
+            SynchronizationPolicy::default(),
+        );
+
+        coordinator
+            .apply(Effect::RequestSonosVolume(volume(15)))
+            .await
+            .unwrap();
+        coordinator
+            .apply(Effect::RequestSonosVolume(volume(15)))
+            .await
+            .unwrap();
+        assert_eq!(state.lock().unwrap().0, volume(15));
+
+        coordinator
+            .on_sonos_event(volume(22), MuteState(false))
+            .await
+            .unwrap();
+        coordinator
+            .apply(Effect::RequestSonosVolume(volume(15)))
+            .await
+            .unwrap();
+        assert_eq!(state.lock().unwrap().0, volume(15));
+    }
+
+    #[tokio::test]
+    async fn application_callbacks_do_not_fill_the_user_volume_queue() {
+        let state = Arc::new(Mutex::new((volume(20), MuteState(false))));
+        let applied = Arc::new(Mutex::new(Vec::new()));
+        let machine = Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true).unwrap();
+        let mut coordinator = Coordinator::new(
+            machine,
+            Sonos(Arc::clone(&state)),
+            Audio(applied),
+            SynchronizationPolicy::default(),
+        );
+        let local_state = LocalAudioState {
+            volume: NormalizedVolume::new(42).unwrap(),
+            muted: MuteState(false),
+        };
+
+        coordinator
+            .on_local_event(local_state, LocalOrigin::Application, false)
+            .await
+            .unwrap();
+        coordinator
+            .on_local_event(local_state, LocalOrigin::User, false)
+            .await
+            .unwrap();
+        coordinator.run_local_once().await.unwrap();
+
+        assert_eq!(state.lock().unwrap().0, volume(42));
     }
 }

@@ -1,4 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="SonosVolumeBridge">
-  <rect width="128" height="128" rx="28" fill="#111827"/>
-  <path d="M30 76V52l28-18v60L30 76Zm36 6V46l12-7v50l-12-7Zm20 12V34l12-7v74l-12-7Z" fill="#38bdf8"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Sonos Volume Bridge">
+  <defs>
+    <linearGradient id="background" x1="20" y1="12" x2="108" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#172554"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="bridge" x1="32" y1="35" x2="96" y2="93" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7dd3fc"/>
+      <stop offset="1" stop-color="#0ea5e9"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#background)"/>
+  <path d="M32 68c0-20 14-34 32-34s32 14 32 34" fill="none" stroke="url(#bridge)" stroke-linecap="round" stroke-width="10"/>
+  <path d="M32 68v9c0 8 6 14 14 14h36c8 0 14-6 14-14v-9" fill="none" stroke="url(#bridge)" stroke-linecap="round" stroke-width="10"/>
+  <rect x="44" y="66" width="11" height="16" rx="5.5" fill="#f8fafc"/>
+  <rect x="59" y="57" width="11" height="25" rx="5.5" fill="#f8fafc"/>
+  <rect x="74" y="48" width="11" height="34" rx="5.5" fill="#f8fafc"/>
 </svg>

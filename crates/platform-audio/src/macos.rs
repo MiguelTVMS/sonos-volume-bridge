@@ -26,7 +26,7 @@ use std::{
     sync::{
         Arc, Mutex,
         atomic::{AtomicU64, Ordering},
-        mpsc::{self, Receiver, SyncSender},
+        mpsc::{self, Receiver, RecvTimeoutError, SyncSender},
     },
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -241,7 +241,12 @@ fn run_worker(
             return;
         }
     };
-    while let Ok(command) = receiver.recv_timeout(Duration::from_millis(250)) {
+    loop {
+        let command = match receiver.recv_timeout(Duration::from_millis(250)) {
+            Ok(command) => command,
+            Err(RecvTimeoutError::Timeout) => continue,
+            Err(RecvTimeoutError::Disconnected) => break,
+        };
         match command {
             Command::Current(response) => {
                 let _ = response.send(unsafe { endpoint.state() }.map_err(map_error));
@@ -250,7 +255,7 @@ fn run_worker(
                 let _ = response.send(unsafe { endpoint.set_volume(volume) }.map_err(map_error));
             }
             Command::SetMuted { muted, response } => {
-                let _ = response.send(unsafe { endpoint.set_muted(muted) }.map_err(map_error));
+                let _ = response.send(unsafe { endpoint.set_muted(muted) });
             }
             Command::Reattach if selection == AudioDeviceSelection::FollowDefault => match unsafe {
                 Endpoint::attach(&selection, Arc::clone(&context))
@@ -347,16 +352,17 @@ impl Endpoint {
         }
         Ok(())
     }
-    unsafe fn set_muted(&self, muted: bool) -> Result<(), OSStatus> {
+    unsafe fn set_muted(&self, muted: bool) -> Result<(), PlatformAudioError> {
         if !self.has_mute {
-            return Err(-1);
+            return Err(PlatformAudioError::MuteUnavailable);
         }
         let state = LocalAudioState {
-            volume: unsafe { self.state()? }.volume,
+            volume: unsafe { self.state().map_err(map_error)? }.volume,
             muted: MuteState(muted),
         };
         self.expect(state);
         unsafe { set_boolean(self.id, address(MUTE, SCOPE_OUTPUT, ELEMENT_MASTER), muted) }
+            .map_err(map_error)
     }
     fn expect(&self, state: LocalAudioState) {
         let generation = self.context.generation.fetch_add(1, Ordering::Relaxed) + 1;

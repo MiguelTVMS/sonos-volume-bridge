@@ -42,6 +42,8 @@ pub enum PlatformAudioError {
     DeviceUnavailable,
     #[error("the selected output device does not expose writable software volume")]
     UnsupportedDevice,
+    #[error("the selected output device does not expose software mute")]
+    MuteUnavailable,
     #[error("platform audio operation failed: {0}")]
     Platform(String),
 }
