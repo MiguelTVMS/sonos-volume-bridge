@@ -85,7 +85,9 @@ jobs:
           else:
               raise SystemExit(f"Unsupported version increment: {bump}")
           version = f"{major}.{minor}.{patch}"
-          manifest.write_text(contents[:match.start(1)] + version + contents[match.end(1):])
+          manifest.write_text(
+              contents[:match.start()] + f'version = "{version}"' + contents[match.end():]
+          )
           print(version)
           PY
           )"
