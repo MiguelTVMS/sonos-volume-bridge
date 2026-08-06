@@ -207,7 +207,7 @@ function render(nextSnapshot: Snapshot): void {
   app.innerHTML = `
     <div class="settings-shell">
       <aside class="sidebar">
-        <div class="app-heading"><h1>Sonos Volume Bridge</h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
+        <div class="app-heading"><h1><span class="sonos-name">SONOS</span><span>Volume Bridge</span></h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
         <nav aria-label="Settings sections">
           ${pageButton('devices', 'Devices')}
           ${pageButton('volume', 'Volume')}
