@@ -228,10 +228,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
         run: |
+          mapfile -t release_assets < <(find release-assets -type f -print)
+          test "${#release_assets[@]}" -gt 0
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" release-assets/* --clobber
+            gh release upload "$RELEASE_TAG" "${release_assets[@]}" --clobber
           else
-            gh release create "$RELEASE_TAG" release-assets/* \
+            gh release create "$RELEASE_TAG" "${release_assets[@]}" \
               --title "Sonos Volume Bridge $RELEASE_TAG" \
               --generate-notes
           fi
