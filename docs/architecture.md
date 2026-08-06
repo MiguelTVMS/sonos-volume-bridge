@@ -1,8 +1,7 @@
 # Architecture
 
-Phase 1 establishes the policy core. The `domain` crate owns values, mappings,
-confirmed state, pending intent, and expected-write suppression. The
-`synchronization` crate accepts normalized events and emits side effects.
+The workspace keeps policy, protocol, platform, integration, and application
+concerns separate.
 
 ```text
 Native audio adapter ──events──> Synchronizer ──effects──> Sonos adapter
@@ -10,60 +9,37 @@ Native audio adapter ──events──> Synchronizer ──effects──> Sonos
        └──────── apply confirmed state ─┴──── Sonos confirmed ────┘
 ```
 
-Future adapters will serialize side effects, coalesce volume commands, and use
-bounded channels. The policy core never connects peer computers: every instance
-only observes and commands the same selected Sonos speaker.
+The `domain` crate owns values, mappings, confirmed state, pending intent, and
+expected-write suppression. The `synchronization` crate accepts normalized
+events and emits side effects. The `integration` coordinator serializes those
+effects, coalesces volume commands through a bounded channel, and never lets
+computers communicate with one another directly.
 
-## Local Sonos protocol adapter
+## Adapters
 
-The Phase 2 `sonos` crate owns SSDP discovery, private-address validation,
+The `sonos` crate owns local SSDP discovery, private-address validation,
 device-description parsing, RenderingControl SOAP requests, and GENA
-`LastChange` parsing. It remains independent of Tauri and native audio.
+subscription/callback support. It has no Tauri or native-audio dependency.
 
-## Windows platform adapter
+The `platform-audio` crate defines the shared controller interface. Its Windows
+adapter keeps Core Audio COM objects on a dedicated worker thread, forwards
+callbacks through a bounded broadcast channel, and follows default multimedia
+render endpoint replacement. Its macOS adapter observes default-output, mute,
+and volume properties, suppresses expected local writes deterministically, and
+uses output-channel controls when master volume is unavailable.
 
-The Phase 3 `platform-audio` crate defines the shared controller interface and
-contains a Windows-only Core Audio implementation. It keeps COM objects on a
-dedicated worker thread, maps Core Audio callbacks to bounded broadcast events,
-and handles default multimedia render endpoint replacement. It is not wired to
-the synchronization state machine yet.
+## Runtime and application shell
 
-## Integration and GENA lifecycle
+`src-tauri` is a thin composition root. It owns the tray, hidden settings
+window, versioned per-user configuration, autostart, and restricted commands.
+The TypeScript frontend has no direct filesystem or network permission; it
+receives snapshots and sends validated settings through backend commands.
 
-Phase 5 adds an `integration` crate with explicit asynchronous ports for Sonos
-and local audio. It debounces only user-originated volume changes, immediately
-passes mute changes, and sends local writes through the Sonos-confirmation rule.
-The Sonos crate owns GENA SUBSCRIBE/renew/UNSUBSCRIBE and a local callback
-listener. Healthy event delivery uses a slow health poll; subscription failure
-switches to one-second polling until events recover.
-
-## Tauri application shell
-
-The Phase 6 `src-tauri` application is a thin composition root. It owns the
-tray, hidden settings window, versioned per-user configuration, autostart, and
-restricted commands. The vanilla TypeScript UI has no direct filesystem or
-network permission; it receives a status snapshot and sends validated settings
-through explicit backend commands.
-
-## macOS platform adapter
-
-The Phase 4 macOS implementation in `platform-audio` calls the system CoreAudio
-framework through focused FFI. It observes default-output, mute, and volume
-properties; uses deterministic expected-write suppression; and falls back from
-master volume to output-channel controls when necessary. It remains independent
-of Sonos, Tauri, and synchronization wiring.
-
-## Supervised runtime composition
-
-Phase 8 makes the Tauri process the composition root without moving protocol or
-platform work into commands. A cancellable runtime generation resolves the
-selected UDN through its cached description URL or bounded SSDP discovery,
-creates the selected local audio adapter, binds the GENA callback listener to
-the local interface selected for the speaker, and owns the coordinator.
-
-Configuration replacement cancels the old generation before starting the new
-one. Shutdown unsubscribes when a subscription exists. Subscription renewal is
-scheduled at 80 percent of the advertised lifetime; failures use bounded retry
-and the existing conservative polling fallback. Runtime errors are reduced to
-status categories and structured, redacted logs rather than exposing peer
-addresses or protocol payloads to the frontend.
+Each configuration change cancels the previous runtime generation before
+starting another. The runtime resolves the selected UDN through its cached
+description URL or bounded SSDP discovery, creates the selected local adapter,
+and binds a random-path GENA callback listener to the local interface used to
+reach the speaker. It renews subscriptions at 80 percent of their lifetime,
+uses bounded reconnect backoff, and switches to polling only while event
+delivery is unavailable or stale. Runtime failures become redacted status and
+log records instead of exposing protocol payloads to the frontend.

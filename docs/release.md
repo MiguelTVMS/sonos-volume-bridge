@@ -14,10 +14,12 @@ choose one increment:
 - `Major` increases the major number and resets the minor and patch numbers.
 
 The workflow validates `develop`, commits the version bump to `develop`, builds
-both platform packages from that exact commit, then creates and pushes its
-`vX.Y.Z` tag before creating or updating the GitHub Release with downloadable
-assets. It never merges branches. Merge `develop` into `main` only after the
-release workflow succeeds.
+both platform packages from that exact commit, creates and pushes its annotated
+`vX.Y.Z` tag with the GitHub Actions bot identity, then creates or updates the
+GitHub Release with downloadable assets. It never merges branches. Merge
+`develop` into `main` only after the release workflow succeeds.
+
+The current published release is [v0.1.1](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/tag/v0.1.1).
 
 The release assets are explicitly unsigned until the protected signing and
 notarization step replaces them. Gatekeeper and SmartScreen may warn in the

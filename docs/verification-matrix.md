@@ -2,6 +2,8 @@
 
 Run this matrix for every release candidate on a private local network with one
 supported Sonos speaker and one physical output device per operating system.
+The v0.1.1 packages are unsigned; complete this matrix before treating them as
+ready for general use.
 Record the operating-system version, Sonos firmware version, speaker model, and
 result in the release issue. Do not record device serial numbers, LAN addresses,
 or diagnostic payloads.

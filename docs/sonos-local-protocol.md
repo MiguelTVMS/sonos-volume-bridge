@@ -13,18 +13,20 @@ address. Host names and public addresses are rejected to avoid treating an
 untrusted device description as an SSRF instruction.
 
 The crate parses GENA `LastChange` property payloads into Master volume and mute
-events. It deliberately does not start a callback server or subscribe yet.
-Subscription renewal, callback binding, source validation, and polling fallback
-belong to Phase 5.
+events. The application runtime starts a callback listener on the local network
+interface selected to reach the speaker, uses a random callback path, and
+forwards only notifications with the active subscription ID from the selected
+Sonos peer.
 
 ## GENA lifecycle
 
-The Phase 5 client sends `SUBSCRIBE` to RenderingControl's event endpoint with
-a callback URL and requested timeout. It records the returned SID and renews
-with the SID before expiry; `UNSUBSCRIBE` ends the lifecycle. The callback
-listener has a random path, binds only to an address selected by the host, and
-accepts notifications only from the selected Sonos IP with the active SID.
+The client sends `SUBSCRIBE` to RenderingControl's event endpoint with a
+callback URL and requested timeout. It records the returned SID and renews with
+the SID before expiry; `UNSUBSCRIBE` ends the lifecycle. If events are missing
+or renewal fails, the integration runtime switches to conservative polling and
+returns to event-driven operation after delivery recovers.
 
 Sonos grouping discovery is represented by the selected player's own stable UDN.
-The client does not yet choose a group coordinator; Phase 5 must make the target
-behavior explicit for home-theater and grouped playback.
+The client targets the selected player rather than automatically choosing a
+group coordinator; grouped and home-theater behavior should be verified for the
+specific local Sonos setup before relying on it.
