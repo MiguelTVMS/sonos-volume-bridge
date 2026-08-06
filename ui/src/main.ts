@@ -1,8 +1,9 @@
+import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import './style.css';
 
 type MappingPoint = { local: number; sonos: number };
-type SettingsPage = 'devices' | 'volume' | 'general' | 'diagnostics';
+type SettingsPage = 'devices' | 'volume' | 'general' | 'diagnostics' | 'about';
 type Configuration = {
   schemaVersion: number;
   selectedSonosId: string | null;
@@ -58,7 +59,42 @@ let saveTimeout: number | undefined;
 let saveRevision = 0;
 let statusPoll: number | undefined;
 let diagnosticDetailsVisible = false;
+let appVersion = 'Loading…';
 
+const repositoryUrl = 'https://github.com/MiguelTVMS/sonos-volume-bridge';
+const sonosDisclaimer =
+  'Sonos Volume Bridge is an independent, community-developed project. It is not affiliated with, sponsored by, endorsed by, or supported by Sonos. This application contains no Sonos source code. “Sonos” and related product names are trademarks of their respective owners and are used only to identify compatibility with Sonos products.';
+const mitLicense = `MIT License
+
+Copyright (c) 2026 João Miguel Tabosa Vaz Marques Silva
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`;
+
+void getVersion()
+  .then((version) => {
+    appVersion = version;
+    if (snapshot) render(snapshot);
+  })
+  .catch(() => {
+    appVersion = 'Unavailable';
+    if (snapshot) render(snapshot);
+  });
 const statusLabels: Record<string, string> = {
   discovering: 'Looking for your speaker…',
   connecting: 'Connecting…',
@@ -67,7 +103,7 @@ const statusLabels: Record<string, string> = {
   subscriptionDegraded: 'Keeping an eye on the connection…',
   pollingFallback: 'Checking for changes…',
   sonosUnavailable: 'Speaker is not available',
-  localAudioUnavailable: 'This Mac audio is not available',
+  localAudioUnavailable: 'This computer audio is not available',
   unsupportedLocalDevice: 'This output cannot control volume',
   configurationRequired: 'Choose a speaker to get started',
   error: 'Something needs attention',
@@ -89,7 +125,7 @@ function mappingOptions(configuration: Configuration): string {
   return [
     option('piecewise', 'Balanced', configuration.mapping.type === 'piecewise'),
     option('linear', 'Direct', configuration.mapping.type === 'linear'),
-    option('capped_linear', 'Direct with limit', configuration.mapping.type === 'capped_linear'),
+    option('capped_linear', 'Scaled', configuration.mapping.type === 'capped_linear'),
   ].join('');
 }
 
@@ -177,13 +213,14 @@ function render(nextSnapshot: Snapshot): void {
           ${pageButton('volume', 'Volume')}
           ${pageButton('general', 'General')}
           ${pageButton('diagnostics', 'Diagnostics')}
+          ${pageButton('about', 'About')}
         </nav>
         <div class="sidebar-speaker"><span>Speaker</span><b id="runtime-speaker">${escapeHtml(speakerName)}</b></div>
       </aside>
       <form id="settings" class="content">
         ${panel(
           'devices',
-          `<div class="panel-heading"><h2>Devices</h2><p>Choose the speaker and Mac output to keep in step.</p></div>
+          `<div class="panel-heading"><h2>Devices</h2><p>Choose the speaker and audio output to keep in step.</p></div>
           <div class="settings-group">
             <div class="control-field"><label for="sonos-device">Sonos speaker</label><div class="field-row"><select name="selectedSonosId" id="sonos-device">${sonosOptions(c)}</select><button class="secondary icon-button" type="button" id="discover" title="Refresh Sonos speakers" aria-label="Refresh Sonos speakers">↻</button></div></div>
             <input type="hidden" name="lastKnownSonosAddress" value="${escapeHtml(knownSonosAddress(c))}" />
@@ -193,11 +230,11 @@ function render(nextSnapshot: Snapshot): void {
         )}
         ${panel(
           'volume',
-          `<div class="panel-heading"><h2>Volume</h2><p>Control how your Mac volume changes the speaker.</p></div>
+          `<div class="panel-heading"><h2>Volume</h2><p>Control how your computer volume changes the speaker.</p></div>
           <div class="settings-group">
             <label>Highest speaker volume <output class="range-value" id="maximum-value">${c.maximumSonosVolume}%</output><input name="maximumSonosVolume" id="maximum-volume" type="range" min="0" max="100" step="1" value="${c.maximumSonosVolume}" /></label>
             <label>Volume feel<select name="mapping">${mappingOptions(c)}</select></label>
-            <details class="help"><summary>What do these options mean?</summary><dl><div><dt>Balanced</dt><dd>Gives you more control at lower volumes and rises more gently.</dd></div><div><dt>Direct</dt><dd>Keeps the speaker volume closely matched to your Mac volume.</dd></div><div><dt>Direct with limit</dt><dd>Matches your Mac volume, but never goes above the highest speaker volume you chose.</dd></div></dl></details>
+            <details class="help"><summary>What do these options mean?</summary><dl><div><dt>Balanced</dt><dd>Gives you more control at lower volumes and rises more gently.</dd></div><div><dt>Direct</dt><dd>Keeps the speaker volume closely matched to your computer volume.</dd></div><div><dt>Scaled</dt><dd>Scales the full system volume range to the highest speaker volume you chose.</dd></div></dl></details>
             <button class="secondary test-button" type="button" id="test">Test speaker volume</button>
           </div>`,
         )}
@@ -211,10 +248,16 @@ function render(nextSnapshot: Snapshot): void {
         )}
         ${panel(
           'diagnostics',
-          `<div class="panel-heading"><h2>Diagnostics</h2><p>Live information about the speaker and Mac output.</p></div>
+          `<div class="panel-heading"><h2>Diagnostics</h2><p>Live information about the speaker and audio output.</p></div>
           <dl class="status-list"><div><dt>Connection</dt><dd id="diagnostic-connection">${escapeHtml(status)}</dd></div><div><dt>Speaker</dt><dd id="diagnostic-speaker">${escapeHtml(speakerName)}</dd></div><div><dt>Speaker volume</dt><dd id="diagnostic-sonos-volume">${volumeText(nextSnapshot.sonosVolume)}</dd></div><div><dt>Selected output</dt><dd id="diagnostic-output">${escapeHtml(selectedOutputName(c))}</dd></div><div><dt>Output volume</dt><dd id="diagnostic-local-volume">${volumeText(nextSnapshot.localVolume)}</dd></div><div><dt>Mute</dt><dd id="diagnostic-mute">${muteText(nextSnapshot.muted)}</dd></div><div><dt>Speaker search</dt><dd>${escapeHtml(discoveryStatus)}</dd></div></dl>
           <details class="technical-details" id="technical-details"${diagnosticDetailsVisible ? ' open' : ''}><summary>Technical speaker details</summary><p>Shows the saved speaker identity and local endpoint for troubleshooting.</p><pre id="diagnostic-payload">${diagnosticDetailsVisible ? 'Loading…' : ''}</pre></details>
           <div class="diagnostics-actions"><button class="secondary" type="button" id="diagnostics">${diagnosticDetailsVisible ? 'Refresh technical details' : 'Show technical details'}</button><button class="secondary" type="button" id="export">Export diagnostics</button><button class="danger" type="button" id="reset">Reset settings</button></div>`,
+        )}
+        ${panel(
+          'about',
+          `<div class="panel-heading"><h2>About</h2><p>Version, licensing, and project information.</p></div>
+          <dl class="status-list about-list"><div><dt>Version</dt><dd>${escapeHtml(appVersion)}</dd></div><div><dt>Source code</dt><dd><a href="${repositoryUrl}" target="_blank" rel="noopener noreferrer">github.com/MiguelTVMS/sonos-volume-bridge</a></dd></div><div><dt>License</dt><dd>MIT License © 2026 João Miguel Tabosa Vaz Marques Silva</dd></div></dl>
+          <section class="settings-group about-disclaimer" aria-labelledby="sonos-notice-title"><h3 id="sonos-notice-title">Sonos trademark and independence notice</h3><p>${escapeHtml(sonosDisclaimer)}</p></section><details class="technical-details about-license"><summary>Read the MIT License</summary><pre>${escapeHtml(mitLicense)}</pre></details>`,
         )}
         <output id="notice" aria-live="polite"></output>
       </form>

@@ -1,16 +1,24 @@
 # SonosVolumeBridge
 
-SonosVolumeBridge is a lightweight Windows and macOS menu-bar/tray application
+SonosVolumeBridge is a lightweight desktop menu-bar/tray application
 that keeps a selected Sonos speaker's volume and, optionally, mute state in
 step with one system audio output. Sonos is the confirmed source of truth:
 computers never communicate with one another directly.
 
+## Sonos trademark and independence notice
+
+Sonos Volume Bridge is an independent, community-developed project. It is not
+affiliated with, sponsored by, endorsed by, or supported by Sonos. This
+repository contains no Sonos source code. “Sonos” and related product names
+are trademarks of their respective owners and are used only to identify
+compatibility with Sonos products.
+
 ## Project status
 
-Version 0.1.1 is published with unsigned macOS and Windows packages. The local
-Sonos client, Windows and macOS audio adapters, synchronization runtime,
-settings shell, CI, and GitHub Release workflow are implemented. Physical
-Windows/macOS and Sonos verification remains the release gate; see the
+Version 0.1.1 is published with unsigned desktop packages. The local Sonos
+client, platform audio adapters, synchronization runtime, settings shell, CI,
+and GitHub Release workflow are implemented. Physical computer and Sonos
+verification remains the release gate; see the
 [hardware verification matrix](docs/verification-matrix.md).
 
 ## What it does

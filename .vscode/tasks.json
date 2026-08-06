@@ -1,0 +1,71 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "UI: install dependencies",
+      "type": "process",
+      "command": "pnpm",
+      "args": ["--dir", "ui", "install", "--frozen-lockfile"],
+      "problemMatcher": []
+    },
+    {
+      "label": "UI: dev server",
+      "type": "process",
+      "command": "pnpm",
+      "args": ["--dir", "ui", "run", "dev"],
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": [{ "regexp": "^$" }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^\\s*VITE v",
+          "endsPattern": "^\\s*➜\\s+Local:"
+        }
+      }
+    },
+    {
+      "label": "Tauri: build debug",
+      "type": "process",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "call \"${config:sonosVolumeBridge.vsDevCmd}\" -arch=x64 -host_arch=x64 && \"${env:USERPROFILE}\\.cargo\\bin\\cargo.exe\" build -p sonos-volume-bridge"
+      ],
+      "dependsOn": "UI: dev server",
+      "problemMatcher": "$rustc",
+      "group": "build"
+    },
+    {
+      "label": "Rust: verify workspace",
+      "type": "process",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "call \"${config:sonosVolumeBridge.vsDevCmd}\" -arch=x64 -host_arch=x64 && \"${env:USERPROFILE}\\.cargo\\bin\\cargo.exe\" fmt --check && \"${env:USERPROFILE}\\.cargo\\bin\\cargo.exe\" clippy --workspace --all-targets -- -D warnings && \"${env:USERPROFILE}\\.cargo\\bin\\cargo.exe\" test --workspace"
+      ],
+      "problemMatcher": "$rustc",
+      "group": "test"
+    },
+    {
+      "label": "UI: verify",
+      "type": "process",
+      "command": "pnpm",
+      "args": ["--dir", "ui", "run", "build"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Windows: audio probe",
+      "type": "process",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "call \"${config:sonosVolumeBridge.vsDevCmd}\" -arch=x64 -host_arch=x64 && \"${env:USERPROFILE}\\.cargo\\bin\\cargo.exe\" run -p sonos-volume-bridge-platform-audio --example windows_audio_probe"
+      ],
+      "problemMatcher": "$rustc"
+    }
+  ]
+}

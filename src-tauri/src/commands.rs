@@ -6,6 +6,21 @@ use crate::{
 use serde::Serialize;
 use tauri::{AppHandle, State};
 use tauri_plugin_autostart::ManagerExt;
+fn is_missing_autostart_entry(error: &str) -> bool {
+    error.contains("(os error 2)")
+}
+
+fn update_autostart(app: &AppHandle, start_at_login: bool) -> Result<(), String> {
+    if start_at_login {
+        app.autolaunch().enable().map_err(|error| error.to_string())
+    } else {
+        match app.autolaunch().disable() {
+            Ok(()) => Ok(()),
+            Err(error) if is_missing_autostart_entry(&error.to_string()) => Ok(()),
+            Err(error) => Err(error.to_string()),
+        }
+    }
+}
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri injects managed state by value.
@@ -28,15 +43,7 @@ pub fn save_configuration(
         .store
         .save(&configuration)
         .map_err(|error| error.to_string())?;
-    if configuration.start_at_login {
-        app.autolaunch()
-            .enable()
-            .map_err(|error| error.to_string())?;
-    } else {
-        app.autolaunch()
-            .disable()
-            .map_err(|error| error.to_string())?;
-    }
+    update_autostart(&app, configuration.start_at_login)?;
     state.replace_configuration(configuration);
     state.start_runtime(app);
     get_snapshot(state)
@@ -135,4 +142,23 @@ pub async fn test_volume(state: State<'_, AppState>) -> Result<(), String> {
         return Err("Select a Sonos device before testing volume.".to_owned());
     }
     runtime::test_selected_device(configuration).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_missing_autostart_entry;
+
+    #[test]
+    fn identifies_a_missing_autostart_entry() {
+        assert!(is_missing_autostart_entry(
+            "The system cannot find the file specified. (os error 2)"
+        ));
+    }
+
+    #[test]
+    fn does_not_ignore_other_autostart_errors() {
+        assert!(!is_missing_autostart_entry(
+            "Access is denied. (os error 5)"
+        ));
+    }
 }

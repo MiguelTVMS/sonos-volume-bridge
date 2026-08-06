@@ -57,29 +57,41 @@ pub struct AvailableAudioOutput {
     pub writable_volume: bool,
 }
 
-#[cfg_attr(not(target_os = "macos"), allow(clippy::unnecessary_wraps))]
+fn map_audio_outputs(
+    devices: Vec<sonos_volume_bridge_platform_audio::AudioOutputDevice>,
+) -> Vec<AvailableAudioOutput> {
+    devices
+        .into_iter()
+        .map(|device| AvailableAudioOutput {
+            id: device.id,
+            name: device.name,
+            writable_volume: device.writable_volume,
+        })
+        .collect()
+}
+
+#[cfg_attr(
+    not(any(windows, target_os = "macos")),
+    allow(clippy::unnecessary_wraps)
+)]
 pub fn available_audio_outputs() -> Result<Vec<AvailableAudioOutput>, String> {
+    #[cfg(windows)]
+    {
+        sonos_volume_bridge_platform_audio::windows::list_output_devices()
+            .map(map_audio_outputs)
+            .map_err(|_| "Unable to list local output devices.".to_owned())
+    }
     #[cfg(target_os = "macos")]
     {
         sonos_volume_bridge_platform_audio::macos::list_output_devices()
-            .map(|devices| {
-                devices
-                    .into_iter()
-                    .map(|device| AvailableAudioOutput {
-                        id: device.id,
-                        name: device.name,
-                        writable_volume: device.writable_volume,
-                    })
-                    .collect()
-            })
+            .map(map_audio_outputs)
             .map_err(|_| "Unable to list local output devices.".to_owned())
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         Ok(Vec::new())
     }
 }
-
 /// Removes the implementation suffix emitted by some AirPlay renderer names.
 /// The stable UDN remains the identity used by the application.
 fn display_speaker_name(name: &str) -> String {

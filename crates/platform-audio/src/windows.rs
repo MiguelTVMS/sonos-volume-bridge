@@ -12,20 +12,24 @@
     clippy::ref_as_ptr
 )]
 
-use crate::{AudioDeviceSelection, PlatformAudioError, SystemAudioController, SystemAudioEvent};
+use crate::{
+    AudioDeviceSelection, AudioOutputDevice, PlatformAudioError, SystemAudioController,
+    SystemAudioEvent,
+};
 use async_trait::async_trait;
 use sonos_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, NormalizedVolume};
 use std::{
-    sync::mpsc::{self, Receiver, SyncSender},
+    sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender},
     thread,
     time::Duration,
 };
 use tokio::sync::{broadcast, oneshot};
 use windows::{
     Win32::{
+        Devices::FunctionDiscovery::PKEY_Device_FriendlyName,
         Foundation::PROPERTYKEY,
         Media::Audio::{
-            AUDIO_VOLUME_NOTIFICATION_DATA, DEVICE_STATE, EDataFlow, ERole,
+            AUDIO_VOLUME_NOTIFICATION_DATA, DEVICE_STATE, DEVICE_STATE_ACTIVE, EDataFlow, ERole,
             Endpoints::{
                 IAudioEndpointVolume, IAudioEndpointVolumeCallback,
                 IAudioEndpointVolumeCallback_Impl,
@@ -34,15 +38,100 @@ use windows::{
             MMDeviceEnumerator, eMultimedia, eRender,
         },
         System::Com::{
-            CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize,
+            CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree,
+            CoUninitialize, STGM_READ,
+            StructuredStorage::{PropVariantClear, PropVariantToString},
         },
     },
-    core::{GUID, HSTRING, PCWSTR, implement},
+    core::{GUID, HRESULT, HSTRING, PCWSTR, implement},
 };
 
 /// Stable GUID attached to every bridge-initiated Core Audio write.
 pub const APPLICATION_EVENT_CONTEXT: GUID = GUID::from_u128(0x8d0c6f84_7e52_41cb_9d4f_f5e39708d3a0);
 
+/// Lists active Windows playback endpoints using the same stable IDs accepted by
+/// [`AudioDeviceSelection::Fixed`].
+pub fn list_output_devices() -> Result<Vec<AudioOutputDevice>, PlatformAudioError> {
+    let worker = thread::Builder::new()
+        .name("sonos-volume-bridge-output-enumeration".to_owned())
+        .spawn(list_output_devices_on_worker)
+        .map_err(|error| PlatformAudioError::Platform(error.to_string()))?;
+    worker.join().map_err(|_| {
+        PlatformAudioError::Platform("output enumeration worker panicked".to_owned())
+    })?
+}
+
+fn list_output_devices_on_worker() -> Result<Vec<AudioOutputDevice>, PlatformAudioError> {
+    // SAFETY: this thread owns its COM initialization and uninitializes exactly once.
+    if !unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.is_ok() {
+        return Err(PlatformAudioError::Platform(
+            "unable to initialize Windows Core Audio".to_owned(),
+        ));
+    }
+    let result = enumerate_active_render_devices()
+        .map_err(|error| PlatformAudioError::Platform(error.to_string()));
+    // SAFETY: `CoInitializeEx` succeeded on this thread above.
+    unsafe { CoUninitialize() };
+    result
+}
+
+fn enumerate_active_render_devices() -> windows::core::Result<Vec<AudioOutputDevice>> {
+    let enumerator: IMMDeviceEnumerator =
+        unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
+    let devices = unsafe { enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)? };
+    let count = unsafe { devices.GetCount()? };
+    let mut outputs = Vec::with_capacity(count as usize);
+    for index in 0..count {
+        let device = unsafe { devices.Item(index)? };
+        let id = device_id(&device)?;
+        let name = device_name(&device).unwrap_or_else(|| format!("Audio output {id}"));
+        outputs.push(AudioOutputDevice {
+            writable_volume: endpoint_volume_is_available(&device),
+            id,
+            name,
+        });
+    }
+    outputs.sort_by(|left, right| left.name.cmp(&right.name).then(left.id.cmp(&right.id)));
+    Ok(outputs)
+}
+
+fn device_id(device: &windows::Win32::Media::Audio::IMMDevice) -> windows::core::Result<String> {
+    let id = unsafe { device.GetId()? };
+    let result = unsafe { id.to_string() };
+    // SAFETY: `IMMDevice::GetId` returns a CoTaskMem allocation owned by this caller.
+    unsafe { CoTaskMemFree(Some(id.0.cast())) };
+    result.map_err(|_| {
+        windows::core::Error::new(
+            HRESULT(-2_147_024_809),
+            "output device identifier is not valid UTF-16",
+        )
+    })
+}
+
+fn device_name(device: &windows::Win32::Media::Audio::IMMDevice) -> Option<String> {
+    let store = unsafe { device.OpenPropertyStore(STGM_READ) }.ok()?;
+    let mut value = unsafe { store.GetValue(&PKEY_Device_FriendlyName) }.ok()?;
+    let mut buffer = [0_u16; 256];
+    let result = unsafe { PropVariantToString(&value, &mut buffer) }
+        .ok()
+        .map(|()| string_from_utf16z(&buffer))
+        .filter(|name| !name.is_empty());
+    // SAFETY: `IPropertyStore::GetValue` transfers the PROPVARIANT contents to this caller.
+    let _ = unsafe { PropVariantClear(&mut value) };
+    result
+}
+
+fn endpoint_volume_is_available(device: &windows::Win32::Media::Audio::IMMDevice) -> bool {
+    unsafe { device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) }.is_ok()
+}
+
+fn string_from_utf16z(value: &[u16]) -> String {
+    let length = value
+        .iter()
+        .position(|unit| *unit == 0)
+        .unwrap_or(value.len());
+    String::from_utf16_lossy(&value[..length])
+}
 #[derive(Clone)]
 pub struct WindowsAudioController {
     commands: SyncSender<Command>,
@@ -146,7 +235,16 @@ fn worker_loop(
         enumerator.RegisterEndpointNotificationCallback(&default_callback)?;
     }
     let mut endpoint = attach_endpoint(&enumerator, &selection, &events)?;
-    while let Ok(command) = receiver.recv_timeout(Duration::from_millis(250)) {
+    loop {
+        let command = match receiver.recv_timeout(Duration::from_millis(250)) {
+            Ok(command) => command,
+            Err(error) => {
+                if worker_continues_after(error) {
+                    continue;
+                }
+                break;
+            }
+        };
         match command {
             Command::Current(response) => {
                 let _ = response.send(
@@ -184,6 +282,9 @@ fn worker_loop(
     Ok(())
 }
 
+fn worker_continues_after(error: RecvTimeoutError) -> bool {
+    matches!(error, RecvTimeoutError::Timeout)
+}
 struct EndpointRegistration {
     volume: IAudioEndpointVolume,
     callback: IAudioEndpointVolumeCallback,
@@ -314,6 +415,13 @@ fn normalized(value: f32) -> NormalizedVolume {
 mod tests {
     use super::*;
     #[test]
+    fn strings_stop_at_the_first_utf16_null() {
+        assert_eq!(
+            string_from_utf16z(&[79, 102, 102, 105, 99, 101, 0, 120]),
+            "Office"
+        );
+    }
+    #[test]
     fn application_event_context_is_stable_and_non_null() {
         assert_ne!(APPLICATION_EVENT_CONTEXT, GUID::default());
     }
@@ -322,4 +430,9 @@ mod tests {
         assert_eq!(normalized(0.0), NormalizedVolume::MIN);
         assert_eq!(normalized(1.0), NormalizedVolume::MAX);
     }
+}
+#[test]
+fn worker_stays_attached_after_command_timeout() {
+    assert!(worker_continues_after(RecvTimeoutError::Timeout));
+    assert!(!worker_continues_after(RecvTimeoutError::Disconnected));
 }

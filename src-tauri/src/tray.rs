@@ -3,7 +3,7 @@ use tauri::{
     AppHandle, Manager, Runtime, Theme,
     image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
-    tray::TrayIconBuilder,
+    tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
 };
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
@@ -38,6 +38,13 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
                 app.exit(0);
             }
             _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::DoubleClick { button, .. } = event
+                && opens_settings_on_double_click(button)
+            {
+                show_settings(tray.app_handle());
+            }
         })
         .build(app)?;
     refresh(app);
@@ -89,5 +96,21 @@ fn show_settings<R: Runtime>(app: &AppHandle<R>) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.set_focus();
+    }
+}
+
+fn opens_settings_on_double_click(button: MouseButton) -> bool {
+    button == MouseButton::Left
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_left_double_click_opens_settings() {
+        assert!(opens_settings_on_double_click(MouseButton::Left));
+        assert!(!opens_settings_on_double_click(MouseButton::Right));
+        assert!(!opens_settings_on_double_click(MouseButton::Middle));
     }
 }

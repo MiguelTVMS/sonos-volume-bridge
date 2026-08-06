@@ -16,6 +16,7 @@ sonos-volume-bridge-domain = { path = "../domain" }
 thiserror.workspace = true
 tokio.workspace = true
 url.workspace = true
+if-addrs = "0.14"
 
 [dev-dependencies]
 sonos-volume-bridge-test-support = { path = "../test-support" }

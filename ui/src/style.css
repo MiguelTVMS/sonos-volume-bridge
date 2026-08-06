@@ -53,6 +53,7 @@ main {
 }
 h1,
 h2,
+h3,
 p {
   margin: 0;
 }
@@ -376,4 +377,18 @@ button.icon-button {
   .content {
     padding: 24px 18px 16px;
   }
+}
+
+.about-list dd a {
+  color: var(--accent);
+}
+.about-disclaimer {
+  gap: 8px;
+}
+.about-disclaimer h3 {
+  font-size: 13px;
+}
+.about-disclaimer p {
+  color: var(--secondary-text);
+  line-height: 1.45;
 }

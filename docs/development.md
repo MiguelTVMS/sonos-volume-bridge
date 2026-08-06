@@ -20,6 +20,23 @@ pnpm --dir ui install
 cargo tauri dev
 ```
 
+## Visual Studio Code on Windows
+
+Open the repository root in VS Code and accept the recommended extensions. The
+workspace includes Rust, Tauri, ESLint, Prettier, TOML, and debugger extension
+recommendations, plus LF line-ending and format-on-save settings.
+
+1. Run the **UI: install dependencies** task once.
+2. Choose **Tauri: Debug desktop app** from Run and Debug and press F5.
+
+The launch configuration starts the Vite development server, builds the Rust
+application through the Visual Studio Build Tools environment, and attaches
+the Windows debugger. If Visual Studio Build Tools are installed elsewhere,
+update `sonosVolumeBridge.vsDevCmd` in `.vscode/settings.json`.
+
+Additional tasks are available for the Rust workspace verification suite, the
+UI production build, and the Windows Core Audio probe.
+
 Exercise the native adapters on their respective platforms:
 
 ```sh

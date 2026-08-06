@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Tauri: Debug desktop app",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\target\\debug\\sonos-volume-bridge.exe",
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Tauri: build debug",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    }
+  ]
+}
