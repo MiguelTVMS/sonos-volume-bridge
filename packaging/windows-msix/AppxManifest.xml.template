@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap10 desktop rescap">
+  <Identity
+    Name="Miguel.MS.SonosVolumeBridge"
+    Publisher="CN=7D58CCC9-6311-4A59-95A9-FF7375C0ECDC"
+    Version="{{VERSION}}"
+    ProcessorArchitecture="x64" />
+  <Properties>
+    <DisplayName>Sonos Volume Bridge</DisplayName>
+    <PublisherDisplayName>Miguel.MS</PublisherDisplayName>
+    <Description>Keep a Sonos speaker's volume synchronized with this computer.</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Resources>
+    <Resource Language="en-US" />
+  </Resources>
+  <Dependencies>
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.19041.0"
+      MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+  <Applications>
+    <Application
+      Id="SonosVolumeBridge"
+      Executable="sonos-volume-bridge.exe"
+      uap10:RuntimeBehavior="packagedClassicApp"
+      uap10:TrustLevel="mediumIL">
+      <uap:VisualElements
+        DisplayName="Sonos Volume Bridge"
+        Description="Keep a Sonos speaker's volume synchronized with this computer."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+      <Extensions>
+        <desktop:Extension
+          Category="windows.startupTask"
+          Executable="sonos-volume-bridge.exe"
+          EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask
+            TaskId="SonosVolumeBridgeStartup"
+            Enabled="false"
+            DisplayName="Sonos Volume Bridge" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>

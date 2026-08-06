@@ -39,6 +39,19 @@ certificate only through CI secrets; never commit certificates, private keys, or
 passwords. Verify install, autostart, tray behavior, upgrade, and uninstall in a
 non-administrator Windows account.
 
+The NSIS installer remains the direct-download artifact. Microsoft Store
+distribution uses a separate x64 MSIX with the reserved Partner Center identity.
+Run the `Microsoft Store Package` workflow on `develop`, download the
+`microsoft-store-msix` artifact, and upload its `.msix` file to the draft Store
+submission. The Store signs accepted packages and delivers their updates. The
+MSIX declares `en-US`, so its upload enables the English Store listing.
+
+Before submitting, verify the tray, Settings window, local-network discovery,
+Windows audio control, single-instance behavior, settings persistence, startup
+task, upgrade, and clean uninstall from a development-signed package. The
+package version is derived from the workspace semantic version as
+`major.minor.patch.0`; every Store update must increase it.
+
 ## macOS packaging
 
 Build on Apple Silicon at minimum. The release workflow packages the notarized

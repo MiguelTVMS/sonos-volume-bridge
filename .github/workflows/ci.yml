@@ -60,6 +60,28 @@ jobs:
       - run: pnpm --dir ui run lint
       - run: pnpm --dir ui run build
 
+  msix:
+    name: Microsoft Store MSIX
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: cargo install tauri-cli --version '^2' --locked
+      - run: cargo tauri build --no-bundle
+      - name: Build and validate the MSIX package
+        shell: pwsh
+        run: ./scripts/build-msix.ps1
+
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest

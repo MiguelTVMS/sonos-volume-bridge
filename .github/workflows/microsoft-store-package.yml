@@ -1,0 +1,39 @@
+name: Microsoft Store Package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: microsoft-store-package-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  msix:
+    name: Build Microsoft Store MSIX
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: cargo install tauri-cli --version '^2' --locked
+      - run: cargo tauri build --no-bundle
+      - name: Build and validate the MSIX package
+        shell: pwsh
+        run: ./scripts/build-msix.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: microsoft-store-msix
+          path: target/release/bundle/msix/*.msix
+          if-no-files-found: error

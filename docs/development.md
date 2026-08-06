@@ -44,6 +44,22 @@ cargo run -p sonos-volume-bridge-platform-audio --example windows_audio_probe
 cargo run -p sonos-volume-bridge-platform-audio --example macos_audio_probe
 ```
 
+## Microsoft Store package
+
+The Store package is an additional Windows artifact; it does not replace the
+NSIS installer used for direct downloads. Build and validate it on Windows with
+the Windows SDK installed:
+
+```powershell
+cargo tauri build --no-bundle
+./scripts/build-msix.ps1
+```
+
+The unsigned Partner Center package is written to
+`target/release/bundle/msix`. Local installation requires a trusted development
+signature whose subject exactly matches the Store publisher in the manifest.
+Never commit a certificate or private key.
+
 The `test-support` crate provides a local RenderingControl mock server and
 recorded XML fixtures for protocol and integration tests. Application logs are
 written as daily rolling files in the application log directory. Use `info` by

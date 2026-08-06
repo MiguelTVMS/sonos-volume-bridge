@@ -1,3 +1,4 @@
+mod autostart;
 mod commands;
 mod config;
 mod logging;
