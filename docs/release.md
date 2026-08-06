@@ -16,7 +16,7 @@ choose one increment:
 The workflow validates `develop`, commits the version bump to `develop`, builds
 both platform packages from that exact commit, creates and pushes its annotated
 `vX.Y.Z` tag with the GitHub Actions bot identity, then creates or updates the
-GitHub Release with downloadable assets. It never merges branches. Merge
+GitHub Release with downloadable assets, a channel-aware installation and signing summary, and GitHub-generated change notes. Pull requests with `feature`, `enhancement`, `bug`, `fix`, `maintenance`, `refactor`, or `documentation` labels are grouped in those notes. It never merges branches. Merge
 `develop` into `main` only after the release workflow succeeds.
 
 The current published release is [v0.1.1](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/tag/v0.1.1).

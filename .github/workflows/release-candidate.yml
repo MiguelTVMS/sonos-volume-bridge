@@ -246,16 +246,45 @@ jobs:
         run: |
           mapfile -t release_assets < <(find release-assets -type f -print)
           test "${#release_assets[@]}" -gt 0
+          release_flags=()
+          case "$RELEASE_CHANNEL" in
+            GA)
+              channel_message="This is the generally available release."
+              ;;
+            Beta)
+              release_flags+=(--prerelease)
+              channel_message="This beta release is ready for broader testing but may still change before general availability."
+              ;;
+            Alpha)
+              release_flags+=(--prerelease)
+              channel_message="This alpha release is an early preview intended for testing."
+              ;;
+            *) echo "Unsupported release channel: $RELEASE_CHANNEL" >&2; exit 1 ;;
+          esac
+          release_intro="$(cat <<EOF
+          ## Sonos Volume Bridge $RELEASE_TAG
+
+          **Release channel:** $RELEASE_CHANNEL
+
+          $channel_message
+
+          ### Downloads
+
+          - **Windows:** Download and run the Windows installer.
+          - **macOS:** Download the macOS archive, then move the app to Applications.
+
+          ### Important
+
+          These packages are currently unsigned. Windows SmartScreen or macOS Gatekeeper may ask you to confirm that you want to open the app.
+
+          The generated change list follows this summary.
+          EOF
+          )"
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" "${release_assets[@]}" --clobber
           else
-            release_flags=()
-            case "$RELEASE_CHANNEL" in
-              GA) ;;
-              Alpha|Beta) release_flags+=(--prerelease) ;;
-              *) echo "Unsupported release channel: $RELEASE_CHANNEL" >&2; exit 1 ;;
-            esac
             gh release create "$RELEASE_TAG" "${release_assets[@]}" "${release_flags[@]}" \
               --title "Sonos Volume Bridge $RELEASE_TAG" \
+              --notes "$release_intro" \
               --generate-notes
           fi
