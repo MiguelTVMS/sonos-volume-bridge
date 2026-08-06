@@ -1,5 +1,6 @@
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
+import { connectionLabel } from './connection';
 import { diagnosticsDisclosureState } from './diagnostics';
 import './style.css';
 
@@ -98,20 +99,6 @@ void getVersion()
     appVersion = 'Unavailable';
     if (snapshot) render(snapshot);
   });
-const statusLabels: Record<string, string> = {
-  discovering: 'Looking for your speaker…',
-  connecting: 'Connecting…',
-  synchronized: 'Up to date',
-  waitingForSonosConfirmation: 'Updating speaker…',
-  subscriptionDegraded: 'Keeping an eye on the connection…',
-  pollingFallback: 'Checking for changes…',
-  sonosUnavailable: 'Speaker is not available',
-  localAudioUnavailable: 'This computer audio is not available',
-  unsupportedLocalDevice: 'This output cannot control volume',
-  configurationRequired: 'Choose a speaker to get started',
-  error: 'Something needs attention',
-};
-
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -206,7 +193,7 @@ function render(nextSnapshot: Snapshot): void {
   snapshot = nextSnapshot;
   const c = nextSnapshot.configuration;
   const speakerName = nextSnapshot.sonosName ?? 'No speaker selected';
-  const status = statusLabels[nextSnapshot.status] ?? 'Checking status…';
+  const status = connectionLabel(nextSnapshot.status);
   app.innerHTML = `
     <div class="settings-shell">
       <aside class="sidebar">
@@ -300,7 +287,7 @@ function activatePage(page: SettingsPage): void {
 
 function refreshRuntimeStatus(nextSnapshot: Snapshot): void {
   snapshot = nextSnapshot;
-  const status = statusLabels[nextSnapshot.status] ?? 'Checking status…';
+  const status = connectionLabel(nextSnapshot.status);
   const speaker = nextSnapshot.sonosName ?? 'No speaker selected';
   const targets: Array<[string, string]> = [
     ['#runtime-status', status],
