@@ -292,7 +292,8 @@ mod tests {
     async fn startup_reconciles_from_sonos_without_writing_back() {
         let state = Arc::new(Mutex::new((volume(24), MuteState(false))));
         let applied = Arc::new(Mutex::new(Vec::new()));
-        let machine = Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true).unwrap();
+        let machine =
+            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true).unwrap();
         let mut coordinator = Coordinator::new(
             machine,
             Sonos(Arc::clone(&state)),
@@ -307,10 +308,40 @@ mod tests {
         assert_eq!(*state.lock().unwrap(), (volume(24), MuteState(false)));
     }
     #[tokio::test]
+    async fn one_way_startup_keeps_local_state_and_accepts_local_commands() {
+        let state = Arc::new(Mutex::new((volume(24), MuteState(false))));
+        let applied = Arc::new(Mutex::new(Vec::new()));
+        let machine =
+            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, false).unwrap();
+        let mut coordinator = Coordinator::new(
+            machine,
+            Sonos(Arc::clone(&state)),
+            Audio(Arc::clone(&applied)),
+            SynchronizationPolicy::default(),
+        );
+
+        coordinator.reconcile_startup().await.unwrap();
+        assert!(applied.lock().unwrap().is_empty());
+
+        coordinator
+            .on_local_event(
+                LocalAudioState {
+                    volume: NormalizedVolume::new(42).unwrap(),
+                    muted: MuteState(false),
+                },
+                LocalOrigin::User,
+                true,
+            )
+            .await
+            .unwrap();
+        assert_eq!(state.lock().unwrap().0, volume(42));
+    }
+    #[tokio::test]
     async fn later_sonos_confirmation_wins_over_local_intent() {
         let state = Arc::new(Mutex::new((volume(20), MuteState(false))));
         let applied = Arc::new(Mutex::new(Vec::new()));
-        let machine = Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true).unwrap();
+        let machine =
+            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true).unwrap();
         let mut coordinator = Coordinator::new(
             machine,
             Sonos(Arc::clone(&state)),
@@ -341,7 +372,8 @@ mod tests {
     async fn lost_subscription_uses_fast_polling_until_event_recovers() {
         let state = Arc::new(Mutex::new((volume(20), MuteState(false))));
         let applied = Arc::new(Mutex::new(Vec::new()));
-        let machine = Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true).unwrap();
+        let machine =
+            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true).unwrap();
         let mut coordinator = Coordinator::new(
             machine,
             Sonos(state),
@@ -362,7 +394,8 @@ mod tests {
     async fn duplicate_sonos_commands_are_suppressed_until_state_changes() {
         let state = Arc::new(Mutex::new((volume(20), MuteState(false))));
         let applied = Arc::new(Mutex::new(Vec::new()));
-        let machine = Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true).unwrap();
+        let machine =
+            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true).unwrap();
         let mut coordinator = Coordinator::new(
             machine,
             Sonos(Arc::clone(&state)),
@@ -395,7 +428,8 @@ mod tests {
     async fn application_callbacks_do_not_fill_the_user_volume_queue() {
         let state = Arc::new(Mutex::new((volume(20), MuteState(false))));
         let applied = Arc::new(Mutex::new(Vec::new()));
-        let machine = Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true).unwrap();
+        let machine =
+            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true).unwrap();
         let mut coordinator = Coordinator::new(
             machine,
             Sonos(Arc::clone(&state)),

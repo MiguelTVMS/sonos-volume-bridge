@@ -25,6 +25,7 @@ verification remains the release gate; see the
 
 - Discovers local-network Sonos speakers and stores selection by stable UDN.
 - Follows the system default output or a selected fixed output device.
+- Supports two-way synchronization or one-way computer-to-Sonos volume control.
 - Applies a configurable volume mapping and maximum Sonos-volume cap.
 - Debounces/coalesces local volume changes; mute changes bypass the debounce.
 - Receives Sonos GENA events, renews subscriptions, and falls back to

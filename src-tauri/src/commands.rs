@@ -78,6 +78,7 @@ pub struct Diagnostics {
     pub follows_system_output: bool,
     pub fixed_audio_device_id: Option<String>,
     pub synchronize_mute: bool,
+    pub two_way_synchronization: bool,
     pub fallback_polling: bool,
 }
 
@@ -111,6 +112,7 @@ pub fn diagnostics(state: State<'_, AppState>) -> Diagnostics {
         follows_system_output: configuration.follow_default_audio_device,
         fixed_audio_device_id: configuration.fixed_audio_device_id,
         synchronize_mute: configuration.synchronize_mute,
+        two_way_synchronization: configuration.two_way_synchronization,
         fallback_polling: configuration.fallback_polling,
     }
 }

@@ -40,6 +40,7 @@ pub struct Synchronizer {
     mapping: VolumeMapping,
     maximum: SonosVolume,
     synchronize_mute: bool,
+    two_way_synchronization: bool,
     confirmed: Option<ConfirmedSonosState>,
     pending_volume: Option<PendingIntent>,
     pending_mute: Option<PendingIntent>,
@@ -51,12 +52,14 @@ impl Synchronizer {
         mapping: VolumeMapping,
         maximum: SonosVolume,
         synchronize_mute: bool,
+        two_way_synchronization: bool,
     ) -> Result<Self, MappingError> {
         mapping.validate()?;
         Ok(Self {
             mapping,
             maximum,
             synchronize_mute,
+            two_way_synchronization,
             confirmed: None,
             pending_volume: None,
             pending_mute: None,
@@ -141,10 +144,14 @@ impl Synchronizer {
         self.pending_volume = None;
         self.pending_mute = None;
         self.state = SyncState::Synchronized;
-        Ok(vec![Effect::ApplyLocal(LocalAudioState {
-            volume: self.mapping.to_local(volume)?,
-            muted,
-        })])
+        if self.two_way_synchronization {
+            Ok(vec![Effect::ApplyLocal(LocalAudioState {
+                volume: self.mapping.to_local(volume)?,
+                muted,
+            })])
+        } else {
+            Ok(vec![])
+        }
     }
 
     pub fn classify_expected_local_callback(
@@ -174,7 +181,7 @@ mod tests {
         }
     }
     fn sync() -> Synchronizer {
-        Synchronizer::new(VolumeMapping::Linear, s(55), true).unwrap()
+        Synchronizer::new(VolumeMapping::Linear, s(55), true, true).unwrap()
     }
     #[test]
     fn startup_confirmation_only_applies_sonos_state() {
@@ -272,5 +279,20 @@ mod tests {
             })
             .unwrap();
         assert_eq!(effects, vec![Effect::SuppressedLocalCallback]);
+    }
+    #[test]
+    fn one_way_mode_observes_sonos_without_applying_it_locally() {
+        let mut machine = Synchronizer::new(VolumeMapping::Linear, s(55), true, false).unwrap();
+        let effects = machine
+            .handle(SyncEvent::SonosConfirmed {
+                volume: s(35),
+                muted: MuteState(false),
+                source: SonosObservationSource::Event,
+                at_ms: 2,
+            })
+            .unwrap();
+        assert!(effects.is_empty());
+        assert_eq!(machine.confirmed().unwrap().volume, s(35));
+        assert_eq!(machine.state(), SyncState::Synchronized);
     }
 }

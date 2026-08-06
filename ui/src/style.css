@@ -229,16 +229,44 @@ input[type='range'] {
 }
 
 .toggle {
-  grid-template-columns: auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 9px;
+  width: 100%;
   cursor: pointer;
 }
-input[type='checkbox'] {
-  width: 16px;
-  height: 16px;
+.toggle input[type='checkbox'] {
+  position: relative;
+  width: 30px;
+  height: 18px;
   margin: 0;
-  accent-color: var(--accent);
+  appearance: none;
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  background: var(--control);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+.toggle input[type='checkbox']::after {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface-strong);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 22%);
+  content: '';
+  transition: transform 120ms ease;
+}
+.toggle input[type='checkbox']:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.toggle input[type='checkbox']:checked::after {
+  transform: translateX(12px);
 }
 
 button {

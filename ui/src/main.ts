@@ -12,6 +12,7 @@ type Configuration = {
   followDefaultAudioDevice: boolean;
   fixedAudioDeviceId: string | null;
   synchronizeMute: boolean;
+  twoWaySynchronization: boolean;
   startAtLogin: boolean;
   fallbackPolling: boolean;
   maximumSonosVolume: number;
@@ -45,6 +46,7 @@ type Diagnostics = {
   followsSystemOutput: boolean;
   fixedAudioDeviceId: string | null;
   synchronizeMute: boolean;
+  twoWaySynchronization: boolean;
   fallbackPolling: boolean;
 };
 
@@ -226,13 +228,14 @@ function render(nextSnapshot: Snapshot): void {
             <div class="control-field"><label for="sonos-device">Sonos speaker</label><div class="field-row"><select name="selectedSonosId" id="sonos-device">${sonosOptions(c)}</select><button class="secondary icon-button" type="button" id="discover" title="Refresh Sonos speakers" aria-label="Refresh Sonos speakers">↻</button></div></div>
             <input type="hidden" name="lastKnownSonosAddress" value="${escapeHtml(knownSonosAddress(c))}" />
             <div class="control-field"><label for="audio-output">Follow</label><div class="field-row"><select name="audioOutputMode" id="audio-output">${outputOptions(c)}</select><button class="secondary icon-button" type="button" id="outputs" title="Refresh local outputs" aria-label="Refresh local outputs">↻</button></div></div>
-            <label class="toggle"><input type="checkbox" name="synchronizeMute" ${c.synchronizeMute ? 'checked' : ''}/><span>Synchronize mute</span></label>
+            <label class="toggle"><span>Synchronize mute</span><input type="checkbox" role="switch" name="synchronizeMute" ${c.synchronizeMute ? 'checked' : ''}/></label>
           </div>`,
         )}
         ${panel(
           'volume',
           `<div class="panel-heading"><h2>Volume</h2><p>Control how your computer volume changes the speaker.</p></div>
           <div class="settings-group">
+            <label class="toggle"><span>Two-way synchronization</span><input type="checkbox" role="switch" name="twoWaySynchronization" ${c.twoWaySynchronization ? 'checked' : ''}/></label>
             <label>Highest speaker volume <output class="range-value" id="maximum-value">${c.maximumSonosVolume}%</output><input name="maximumSonosVolume" id="maximum-volume" type="range" min="0" max="100" step="1" value="${c.maximumSonosVolume}" /></label>
             <label>Volume feel<select name="mapping">${mappingOptions(c)}</select></label>
             <details class="help"><summary>What do these options mean?</summary><dl><div><dt>Balanced</dt><dd>Gives you more control at lower volumes and rises more gently.</dd></div><div><dt>Direct</dt><dd>Keeps the speaker volume closely matched to your computer volume.</dd></div><div><dt>Scaled</dt><dd>Scales the full system volume range to the highest speaker volume you chose.</dd></div></dl></details>
@@ -243,8 +246,8 @@ function render(nextSnapshot: Snapshot): void {
           'general',
           `<div class="panel-heading"><h2>General</h2><p>Choose how the app behaves in the background.</p></div>
           <div class="settings-group">
-            <label class="toggle"><input type="checkbox" name="startAtLogin" ${c.startAtLogin ? 'checked' : ''}/><span>Start at login</span></label>
-            <label class="toggle"><input type="checkbox" name="fallbackPolling" ${c.fallbackPolling ? 'checked' : ''}/><span>Keep checking if updates are missed</span></label>
+            <label class="toggle"><span>Start at login</span><input type="checkbox" role="switch" name="startAtLogin" ${c.startAtLogin ? 'checked' : ''}/></label>
+            <label class="toggle"><span>Keep checking if updates are missed</span><input type="checkbox" role="switch" name="fallbackPolling" ${c.fallbackPolling ? 'checked' : ''}/></label>
           </div>`,
         )}
         ${panel(
@@ -383,6 +386,7 @@ function formConfiguration(form: HTMLFormElement): Configuration {
     followDefaultAudioDevice: output === 'default',
     fixedAudioDeviceId: output === 'default' ? null : output,
     synchronizeMute: values.has('synchronizeMute'),
+    twoWaySynchronization: values.has('twoWaySynchronization'),
     startAtLogin: values.has('startAtLogin'),
     fallbackPolling: values.has('fallbackPolling'),
     maximumSonosVolume: Number(values.get('maximumSonosVolume')),

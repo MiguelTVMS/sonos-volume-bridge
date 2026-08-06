@@ -274,6 +274,7 @@ async fn run_session(
         configuration.mapping.clone(),
         configuration.maximum_sonos_volume,
         configuration.synchronize_mute,
+        configuration.two_way_synchronization,
     )
     .map_err(|error| RuntimeError::Integration(error.to_string()))?;
     let sonos = DeviceSonosPort {
@@ -300,7 +301,11 @@ async fn run_session(
         .reconcile_startup()
         .await
         .map_err(RuntimeError::from)?;
-    tracing::info!("reconciled initial Sonos state to local audio");
+    if configuration.two_way_synchronization {
+        tracing::info!("reconciled initial Sonos state to local audio");
+    } else {
+        tracing::info!("observed initial Sonos state without changing local audio");
+    }
     let confirmed_volume = client
         .get_volume(&device)
         .await
@@ -311,6 +316,13 @@ async fn run_session(
         .map_err(|_| RuntimeError::SonosUnavailable)?;
     let local_state = audio.current_state().await.map_err(RuntimeError::Local)?;
     tracing::info!("read current local audio state");
+    if !configuration.two_way_synchronization {
+        coordinator
+            .on_local_event(local_state, LocalOrigin::User, true)
+            .await
+            .map_err(RuntimeError::from)?;
+        tracing::info!("applied initial local audio state to Sonos in one-way mode");
+    }
     update_snapshot(
         snapshot,
         app,

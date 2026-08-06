@@ -18,6 +18,8 @@ pub struct AppConfiguration {
     pub follow_default_audio_device: bool,
     pub fixed_audio_device_id: Option<String>,
     pub synchronize_mute: bool,
+    #[serde(default = "default_two_way_synchronization")]
+    pub two_way_synchronization: bool,
     pub start_at_login: bool,
     pub fallback_polling: bool,
     #[serde(default)]
@@ -46,6 +48,7 @@ impl Default for AppConfiguration {
             follow_default_audio_device: true,
             fixed_audio_device_id: None,
             synchronize_mute: true,
+            two_way_synchronization: true,
             start_at_login: false,
             fallback_polling: true,
             log_level: LogLevel::default(),
@@ -69,6 +72,10 @@ impl AppConfiguration {
             .validate()
             .map_err(|_| ConfigError::Invalid("mapping"))
     }
+}
+
+const fn default_two_way_synchronization() -> bool {
+    true
 }
 
 fn default_points() -> Vec<MappingPoint> {
@@ -152,5 +159,15 @@ mod tests {
     #[test]
     fn default_configuration_is_valid() {
         AppConfiguration::default().validate().unwrap();
+    }
+    #[test]
+    fn configuration_without_direction_setting_defaults_to_two_way() {
+        let mut value = serde_json::to_value(AppConfiguration::default()).unwrap();
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("twoWaySynchronization");
+        let configuration: AppConfiguration = serde_json::from_value(value).unwrap();
+        assert!(configuration.two_way_synchronization);
     }
 }
