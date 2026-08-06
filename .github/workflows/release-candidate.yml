@@ -292,9 +292,39 @@ jobs:
           path: sonos-volume-bridge-*-windows-unsigned.exe
           if-no-files-found: error
 
+  windows-store-package:
+    name: Build Microsoft Store MSIX
+    needs: prepare-version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare-version.outputs.commit }}
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: cargo install tauri-cli --version '^2' --locked
+      - run: cargo tauri build --no-bundle
+      - name: Build and validate the MSIX package
+        shell: pwsh
+        run: ./scripts/build-msix.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: microsoft-store-msix-${{ needs.prepare-version.outputs.tag }}
+          path: target/release/bundle/msix/*.msix
+          if-no-files-found: error
+
   publish-release:
     name: Publish GitHub Release
-    needs: [prepare-version, macos-signed, windows-installer]
+    needs: [prepare-version, macos-signed, windows-installer, windows-store-package]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -374,3 +404,46 @@ jobs:
               --notes "$release_intro" \
               --generate-notes
           fi
+
+  publish-microsoft-store:
+    name: Submit GA release to Microsoft Store
+    if: ${{ inputs.channel == 'GA' }}
+    needs: [prepare-version, windows-store-package, publish-release]
+    runs-on: windows-latest
+    environment: microsoft-store
+    env:
+      MICROSOFT_STORE_PRODUCT_ID: 9N7JKGXCMST0
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: microsoft-store-msix-${{ needs.prepare-version.outputs.tag }}
+          path: microsoft-store-msix
+      - name: Configure Microsoft Store Developer CLI
+        uses: microsoft/microsoft-store-apppublisher@v1.1
+      - name: Authenticate with Partner Center
+        shell: pwsh
+        env:
+          AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+          SELLER_ID: ${{ secrets.SELLER_ID }}
+          AZURE_AD_APPLICATION_CLIENT_ID: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          AZURE_AD_APPLICATION_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+        run: |
+          msstore reconfigure `
+            --tenantId $env:AZURE_AD_TENANT_ID `
+            --sellerId $env:SELLER_ID `
+            --clientId $env:AZURE_AD_APPLICATION_CLIENT_ID `
+            --clientSecret $env:AZURE_AD_APPLICATION_SECRET
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Microsoft Store authentication failed.'
+          }
+      - name: Submit the package to Microsoft Store
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem 'microsoft-store-msix' -Filter '*.msix')
+          if ($packages.Count -ne 1) {
+            throw "Expected exactly one MSIX package, found $($packages.Count)."
+          }
+          msstore publish $packages[0].FullName -id $env:MICROSOFT_STORE_PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Microsoft Store submission failed.'
+          }

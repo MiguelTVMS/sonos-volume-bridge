@@ -46,6 +46,26 @@ Run the `Microsoft Store Package` workflow on `develop`, download the
 submission. The Store signs accepted packages and delivers their updates. The
 MSIX declares `en-US`, so its upload enables the English Store listing.
 
+After the first Store submission is certified and live, the `Release` workflow
+builds and validates the MSIX from the same versioned commit as the other
+platform packages. For a GA release, it publishes the GitHub Release first and
+then submits the MSIX to Store product `9N7JKGXCMST0`. Alpha and Beta releases
+still build the MSIX for validation but intentionally skip Store submission.
+
+Create a GitHub environment named `microsoft-store` and configure these secrets
+before publishing the next GA release:
+
+- `AZURE_AD_TENANT_ID`
+- `AZURE_AD_APPLICATION_CLIENT_ID`
+- `AZURE_AD_APPLICATION_SECRET`
+- `SELLER_ID`
+
+The Microsoft Entra application must be associated with the Partner Center
+account and assigned the Manager role. Never commit these credentials. If an
+automatic submission fails, correct the environment configuration and rerun the
+failed workflow. The manual `Microsoft Store Package` workflow remains the
+recovery path for building an uploadable package without submitting it.
+
 Before submitting, verify the tray, Settings window, local-network discovery,
 Windows audio control, single-instance behavior, settings persistence, startup
 task, upgrade, and clean uninstall from a development-signed package. The
