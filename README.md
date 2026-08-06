@@ -74,7 +74,7 @@ window and leave the app running from the menu bar or system tray.
 Sonos Volume Bridge works directly between your computer and Sonos speaker on
 your local network. It does not require an online account or send your volume
 activity to a cloud service. Internet access is not needed for everyday volume
-synchronization.
+synchronization. See the [Privacy Policy](PRIVACY.md) for complete details.
 
 ## Project status
 
