@@ -6,9 +6,9 @@ on:
       bump:
         description: Version increment for the final release
         required: true
-        default: fix
+        default: Fix
         type: choice
-        options: [fix, minor, major]
+        options: [Fix, Minor, Major]
       channel:
         description: Publication channel
         required: true
@@ -87,7 +87,7 @@ jobs:
           if match is None:
               raise SystemExit("The workspace version was not found.")
           major, minor, patch = (int(part) for part in match.groups())
-          bump = os.environ["BUMP"]
+          bump = os.environ["BUMP"].lower()
           if bump == "fix":
               patch += 1
           elif bump == "minor":
