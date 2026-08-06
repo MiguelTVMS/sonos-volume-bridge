@@ -9,6 +9,12 @@ on:
         default: fix
         type: choice
         options: [fix, minor, major]
+      channel:
+        description: Publication channel
+        required: true
+        default: Beta
+        type: choice
+        options: [GA, Beta, Alpha]
 
 permissions:
   contents: read
@@ -231,13 +237,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
         run: |
           mapfile -t release_assets < <(find release-assets -type f -print)
           test "${#release_assets[@]}" -gt 0
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" "${release_assets[@]}" --clobber
           else
-            gh release create "$RELEASE_TAG" "${release_assets[@]}" \
+            release_flags=()
+            case "$RELEASE_CHANNEL" in
+              GA) ;;
+              Alpha|Beta) release_flags+=(--prerelease) ;;
+              *) echo "Unsupported release channel: $RELEASE_CHANNEL" >&2; exit 1 ;;
+            esac
+            gh release create "$RELEASE_TAG" "${release_assets[@]}" "${release_flags[@]}" \
               --title "Sonos Volume Bridge $RELEASE_TAG" \
               --generate-notes
           fi
