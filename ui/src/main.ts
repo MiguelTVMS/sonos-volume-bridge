@@ -443,7 +443,6 @@ async function refreshDiagnostics(event: Event): Promise<void> {
     const diagnostics = await invoke<Diagnostics>('diagnostics');
     const payload = document.querySelector<HTMLPreElement>('#diagnostic-payload');
     if (payload) payload.textContent = JSON.stringify(diagnostics, null, 2);
-    notice('Technical details refreshed.');
   } catch (error) {
     notice(`Could not load diagnostics: ${String(error)}`);
   }
