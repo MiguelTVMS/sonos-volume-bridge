@@ -34,13 +34,18 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       commit: ${{ steps.commit.outputs.commit }}
     steps:
+      - name: Require a develop dispatch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/develop" ]; then
+            echo "Release workflow must be dispatched from develop; received $GITHUB_REF." >&2
+            exit 1
+          fi
       - uses: actions/checkout@v7
         with:
           ref: develop
           fetch-depth: 0
           persist-credentials: true
-      - name: Require the develop branch
-        run: test "$GITHUB_REF" = refs/heads/develop
+
       - name: Install and cache Linux desktop build dependencies
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
