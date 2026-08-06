@@ -2,8 +2,9 @@
 
 Run this matrix for every release candidate on a private local network with one
 supported Sonos speaker and one physical output device per operating system.
-The v0.1.1 packages are unsigned; complete this matrix before treating them as
-ready for general use.
+Complete this matrix before treating a release as ready for general use. The
+macOS package is Developer ID signed and notarized; the Windows installer is
+currently unsigned.
 Record the operating-system version, Sonos firmware version, speaker model, and
 result in the release issue. Do not record device serial numbers, LAN addresses,
 or diagnostic payloads.
@@ -34,7 +35,9 @@ or diagnostic payloads.
 
 | Check | Expected result |
 | --- | --- |
-| Bundle signature | `codesign --verify --deep --strict` succeeds for the downloaded app bundle. |
+| Bundle signature | `codesign --verify --deep --strict --verbose=4` succeeds for the downloaded app bundle and reports the expected Developer ID identity. |
+| Notarization ticket | `xcrun stapler validate` succeeds for the downloaded app bundle. |
+| Gatekeeper assessment | `spctl --assess --type execute --verbose=4` accepts the downloaded app bundle. |
 | Default output replacement | Change the default output device and confirm safe listener replacement and recovery. |
 | Master/channel volume | Test a device with master volume and, where available, a channel-only device. Both apply the expected local value. |
 | Expected-write suppression | Sonos-confirmed local writes within configured tolerance do not produce a second Sonos command. |

@@ -21,12 +21,16 @@ GitHub Release with downloadable assets, a channel-aware installation and signin
 
 The current published release is [v0.1.1](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/tag/v0.1.1).
 
-The release assets are explicitly unsigned until the protected signing and
-notarization step replaces them. The macOS job ad-hoc-signs and strictly
-verifies the complete bundle so it is not distributed as a malformed app, but
-Gatekeeper will still require an explicit user override until Developer ID
-signing and notarization are configured. SmartScreen may likewise warn for the
-unsigned Windows installer.
+The protected macOS release job imports the Developer ID identity into an
+ephemeral keychain, signs the application with Hardened Runtime, submits it to
+Apple for notarization, staples the ticket, and verifies the result before the
+archive is published. The Windows installer remains unsigned, so SmartScreen
+may still warn before installation.
+
+Run the manual `Verify macOS Signing` workflow from `develop` after rotating an
+Apple certificate or notarization key. It exercises the same protected signing,
+notarization, stapling, and verification path without changing the version,
+creating a tag, or publishing a release.
 
 ## Windows packaging
 
@@ -37,9 +41,10 @@ non-administrator Windows account.
 
 ## macOS packaging
 
-Build on Apple Silicon at minimum. The release workflow packages the app as a
-ZIP preserving the `.app` bundle. Use a Developer ID certificate and notarize
-through protected CI secrets in a later workflow. Verify menu-bar behavior, no
+Build on Apple Silicon at minimum. The release workflow packages the notarized
+app as a ZIP preserving the `.app` bundle. Apple credentials are scoped to the
+protected `apple-signing` GitHub environment and are materialized only in the
+macOS signing job's temporary files and keychain. Verify menu-bar behavior, no
 Dock icon in normal background operation, autostart, wake/reconnect, and
 uninstall.
 
@@ -52,7 +57,8 @@ uninstall.
 - README, architecture, protocol, development, and release notes are current.
 - Run the manual [hardware verification matrix](verification-matrix.md) and
   attach the redacted results to the release issue.
+- Approve the protected `apple-signing` environment when the signing job is
+  ready to start.
 - Run the `Release` workflow from `develop`, then merge `develop` into `main`
-  after its GitHub Release and downloads have been verified. Signing and
-  notarization are intentionally separate protected CI steps; do not add
+  after its GitHub Release and downloads have been verified. Do not add Apple
   credentials to this repository.

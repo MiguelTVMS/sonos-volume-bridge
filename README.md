@@ -64,9 +64,10 @@ Your settings are saved automatically. After setup, you can close the settings
 window and leave the app running from the menu bar or system tray.
 
 > [!IMPORTANT]
-> Current downloads are not yet digitally signed. Windows SmartScreen or macOS
-> Gatekeeper may therefore show a warning even when the package was downloaded
-> from this project's official GitHub release page.
+> macOS downloads are signed with Developer ID and notarized by Apple. The
+> Windows installer is not yet digitally signed, so Windows SmartScreen may
+> show a warning even when it was downloaded from this project's official
+> GitHub release page.
 
 ## Privacy
 
