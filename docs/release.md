@@ -22,8 +22,11 @@ GitHub Release with downloadable assets. It never merges branches. Merge
 The current published release is [v0.1.1](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/tag/v0.1.1).
 
 The release assets are explicitly unsigned until the protected signing and
-notarization step replaces them. Gatekeeper and SmartScreen may warn in the
-meantime.
+notarization step replaces them. The macOS job ad-hoc-signs and strictly
+verifies the complete bundle so it is not distributed as a malformed app, but
+Gatekeeper will still require an explicit user override until Developer ID
+signing and notarization are configured. SmartScreen may likewise warn for the
+unsigned Windows installer.
 
 ## Windows packaging
 

@@ -34,6 +34,7 @@ or diagnostic payloads.
 
 | Check | Expected result |
 | --- | --- |
+| Bundle signature | `codesign --verify --deep --strict` succeeds for the downloaded app bundle. |
 | Default output replacement | Change the default output device and confirm safe listener replacement and recovery. |
 | Master/channel volume | Test a device with master volume and, where available, a channel-only device. Both apply the expected local value. |
 | Expected-write suppression | Sonos-confirmed local writes within configured tolerance do not produce a second Sonos command. |

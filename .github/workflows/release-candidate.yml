@@ -135,6 +135,14 @@ jobs:
           test "$RELEASE_VERSION" = "$application_version"
       - run: cargo tauri build --bundles app
       - run: test -d 'target/release/bundle/macos/Sonos Volume Bridge.app'
+      - name: Ad-hoc sign the complete app bundle
+        run: |
+          codesign --force --deep --sign - --timestamp=none \
+            'target/release/bundle/macos/Sonos Volume Bridge.app'
+      - name: Verify the app bundle signature
+        run: |
+          codesign --verify --deep --strict --verbose=4 \
+            'target/release/bundle/macos/Sonos Volume Bridge.app'
       - name: Archive the app bundle
         env:
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
