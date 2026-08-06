@@ -1,4 +1,5 @@
 use crate::state::{AppState, UiStatus};
+use std::sync::Mutex;
 use tauri::{
     AppHandle, Manager, Runtime, Theme,
     image::Image,
@@ -6,13 +7,21 @@ use tauri::{
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
 };
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ConnectionState {
+    Connected,
+    Disconnected,
+}
+
 struct TrayMenuItems<R: Runtime> {
     speaker: MenuItem<R>,
     status: MenuItem<R>,
+    connection: Mutex<ConnectionState>,
 }
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
-    let icon = icon_for(theme(app));
+    let connection = app_connection(app);
+    let icon = icon_for(theme(app), connection);
     let title = MenuItem::with_id(app, "title", "Sonos Volume Bridge", false, None::<&str>)?;
     let status = MenuItem::with_id(
         app,
@@ -46,7 +55,7 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     )?;
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
-        .icon_as_template(true)
+        .icon_as_template(connection == ConnectionState::Connected)
         .menu(&menu)
         .tooltip("Sonos Volume Bridge")
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -67,14 +76,22 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             }
         })
         .build(app)?;
-    let _ = app.manage(TrayMenuItems { speaker, status });
+    let _ = app.manage(TrayMenuItems {
+        speaker,
+        status,
+        connection: Mutex::new(connection),
+    });
     refresh(app);
     Ok(())
 }
 
 pub fn update_icon_for_theme<R: Runtime>(app: &AppHandle<R>, theme: Theme) {
+    let connection = app_connection(app);
     if let Some(tray) = app.tray_by_id("main-tray") {
-        let _ = tray.set_icon_with_as_template(Some(icon_for(theme)), true);
+        let _ = tray.set_icon_with_as_template(
+            Some(icon_for(theme, connection)),
+            connection == ConnectionState::Connected,
+        );
     }
 }
 
@@ -84,10 +101,18 @@ fn theme<R: Runtime>(app: &AppHandle<R>) -> Theme {
         .unwrap_or(Theme::Light)
 }
 
-fn icon_for(theme: Theme) -> Image<'static> {
-    let bytes: &[u8] = match theme {
-        Theme::Light => include_bytes!("../icons/tray-icon-light.png"),
-        _ => include_bytes!("../icons/tray-icon-dark.png"),
+fn icon_for(theme: Theme, connection: ConnectionState) -> Image<'static> {
+    let bytes: &[u8] = match (theme, connection) {
+        (Theme::Light, ConnectionState::Connected) => {
+            include_bytes!("../icons/tray-icon-light.png")
+        }
+        (Theme::Light, ConnectionState::Disconnected) => {
+            include_bytes!("../icons/tray-icon-light-disconnected.png")
+        }
+        (_, ConnectionState::Connected) => include_bytes!("../icons/tray-icon-dark.png"),
+        (_, ConnectionState::Disconnected) => {
+            include_bytes!("../icons/tray-icon-dark-disconnected.png")
+        }
     };
     Image::from_bytes(bytes).expect("embedded tray icon must be a valid PNG")
 }
@@ -99,7 +124,8 @@ pub fn refresh<R: Runtime>(app: &AppHandle<R>) {
     let Ok(snapshot) = state.snapshot.lock() else {
         return;
     };
-    let status = format!("State: {}", status_label(&snapshot.status));
+    let connection = connection_state(&snapshot.status);
+    let status = format!("State: {}", connection_label(connection));
     let speaker = speaker_label(snapshot.sonos_name.as_deref(), snapshot.sonos_volume);
     let tooltip = format!(
         "SonosVolumeBridge\n{status}\n{speaker}\nLocal: {}",
@@ -109,29 +135,61 @@ pub fn refresh<R: Runtime>(app: &AppHandle<R>) {
     );
     drop(snapshot);
 
+    let mut update_icon = false;
     if let Some(items) = app.try_state::<TrayMenuItems<R>>() {
         let _ = items.status.set_text(status);
         let _ = items.speaker.set_text(speaker);
+        if let Ok(mut current) = items.connection.lock()
+            && *current != connection
+        {
+            *current = connection;
+            update_icon = true;
+        }
     }
     if let Some(tray) = app.tray_by_id("main-tray") {
         let _ = tray.set_tooltip(Some(tooltip));
+        if update_icon {
+            let _ = tray.set_icon_with_as_template(
+                Some(icon_for(theme(app), connection)),
+                connection == ConnectionState::Connected,
+            );
+        }
     }
 }
 
-fn status_label(status: &UiStatus) -> &'static str {
+fn connection_state(status: &UiStatus) -> ConnectionState {
     match status {
-        UiStatus::Discovering => "Looking for speaker…",
-        UiStatus::Connecting => "Connecting…",
-        UiStatus::Synchronized => "Up to date",
-        UiStatus::WaitingForSonosConfirmation => "Updating speaker…",
-        UiStatus::SubscriptionDegraded => "Connection degraded",
-        UiStatus::PollingFallback => "Checking for changes…",
-        UiStatus::SonosUnavailable => "Speaker unavailable",
-        UiStatus::LocalAudioUnavailable => "Computer audio unavailable",
-        UiStatus::UnsupportedLocalDevice => "Output cannot control volume",
-        UiStatus::ConfigurationRequired => "Configuration required",
-        UiStatus::Error => "Needs attention",
+        UiStatus::Synchronized
+        | UiStatus::WaitingForSonosConfirmation
+        | UiStatus::SubscriptionDegraded
+        | UiStatus::PollingFallback => ConnectionState::Connected,
+        UiStatus::Discovering
+        | UiStatus::Connecting
+        | UiStatus::SonosUnavailable
+        | UiStatus::LocalAudioUnavailable
+        | UiStatus::UnsupportedLocalDevice
+        | UiStatus::ConfigurationRequired
+        | UiStatus::Error => ConnectionState::Disconnected,
     }
+}
+
+const fn connection_label(connection: ConnectionState) -> &'static str {
+    match connection {
+        ConnectionState::Connected => "Connected",
+        ConnectionState::Disconnected => "Disconnected",
+    }
+}
+
+fn app_connection<R: Runtime>(app: &AppHandle<R>) -> ConnectionState {
+    app.try_state::<AppState>()
+        .and_then(|state| {
+            state
+                .snapshot
+                .lock()
+                .ok()
+                .map(|snapshot| connection_state(&snapshot.status))
+        })
+        .unwrap_or(ConnectionState::Disconnected)
 }
 
 fn speaker_label(name: Option<&str>, volume: Option<u8>) -> String {
@@ -165,8 +223,35 @@ mod tests {
     }
 
     #[test]
-    fn synchronized_status_is_user_facing() {
-        assert_eq!(status_label(&UiStatus::Synchronized), "Up to date");
+    fn connected_states_remain_stable_during_normal_runtime_activity() {
+        for status in [
+            UiStatus::Synchronized,
+            UiStatus::WaitingForSonosConfirmation,
+            UiStatus::SubscriptionDegraded,
+            UiStatus::PollingFallback,
+        ] {
+            assert_eq!(connection_state(&status), ConnectionState::Connected);
+        }
+        assert_eq!(connection_label(ConnectionState::Connected), "Connected");
+    }
+
+    #[test]
+    fn unavailable_states_are_disconnected() {
+        for status in [
+            UiStatus::Discovering,
+            UiStatus::Connecting,
+            UiStatus::SonosUnavailable,
+            UiStatus::LocalAudioUnavailable,
+            UiStatus::UnsupportedLocalDevice,
+            UiStatus::ConfigurationRequired,
+            UiStatus::Error,
+        ] {
+            assert_eq!(connection_state(&status), ConnectionState::Disconnected);
+        }
+        assert_eq!(
+            connection_label(ConnectionState::Disconnected),
+            "Disconnected"
+        );
     }
 
     #[test]
