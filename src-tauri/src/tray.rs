@@ -1,10 +1,15 @@
-use crate::state::AppState;
+use crate::state::{AppState, UiStatus};
 use tauri::{
     AppHandle, Manager, Runtime, Theme,
     image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
 };
+
+struct TrayMenuItems<R: Runtime> {
+    speaker: MenuItem<R>,
+    status: MenuItem<R>,
+}
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let icon = icon_for(theme(app));
@@ -16,13 +21,28 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         false,
         None::<&str>,
     )?;
+    let speaker = MenuItem::with_id(
+        app,
+        "speaker",
+        "Speaker: No speaker selected",
+        false,
+        None::<&str>,
+    )?;
     let settings = MenuItem::with_id(app, "settings", "Open settings", true, None::<&str>)?;
     let diagnostics = MenuItem::with_id(app, "diagnostics", "Diagnostics", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
         app,
-        &[&title, &status, &separator, &settings, &diagnostics, &quit],
+        &[
+            &title,
+            &speaker,
+            &status,
+            &separator,
+            &settings,
+            &diagnostics,
+            &quit,
+        ],
     )?;
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
@@ -47,6 +67,7 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             }
         })
         .build(app)?;
+    let _ = app.manage(TrayMenuItems { speaker, status });
     refresh(app);
     Ok(())
 }
@@ -78,17 +99,46 @@ pub fn refresh<R: Runtime>(app: &AppHandle<R>) {
     let Ok(snapshot) = state.snapshot.lock() else {
         return;
     };
+    let status = format!("State: {}", status_label(&snapshot.status));
+    let speaker = speaker_label(snapshot.sonos_name.as_deref(), snapshot.sonos_volume);
+    let tooltip = format!(
+        "SonosVolumeBridge\n{status}\n{speaker}\nLocal: {}",
+        snapshot
+            .local_volume
+            .map_or_else(|| "—".to_owned(), |volume| format!("{volume}%"))
+    );
+    drop(snapshot);
+
+    if let Some(items) = app.try_state::<TrayMenuItems<R>>() {
+        let _ = items.status.set_text(status);
+        let _ = items.speaker.set_text(speaker);
+    }
     if let Some(tray) = app.tray_by_id("main-tray") {
-        let _ = tray.set_tooltip(Some(format!(
-            "SonosVolumeBridge\nState: {:?}\nSonos: {}\nLocal: {}",
-            snapshot.status,
-            snapshot
-                .sonos_volume
-                .map_or_else(|| "—".to_owned(), |volume| format!("{volume}%")),
-            snapshot
-                .local_volume
-                .map_or_else(|| "—".to_owned(), |volume| format!("{volume}%"))
-        )));
+        let _ = tray.set_tooltip(Some(tooltip));
+    }
+}
+
+fn status_label(status: &UiStatus) -> &'static str {
+    match status {
+        UiStatus::Discovering => "Looking for speaker…",
+        UiStatus::Connecting => "Connecting…",
+        UiStatus::Synchronized => "Up to date",
+        UiStatus::WaitingForSonosConfirmation => "Updating speaker…",
+        UiStatus::SubscriptionDegraded => "Connection degraded",
+        UiStatus::PollingFallback => "Checking for changes…",
+        UiStatus::SonosUnavailable => "Speaker unavailable",
+        UiStatus::LocalAudioUnavailable => "Computer audio unavailable",
+        UiStatus::UnsupportedLocalDevice => "Output cannot control volume",
+        UiStatus::ConfigurationRequired => "Configuration required",
+        UiStatus::Error => "Needs attention",
+    }
+}
+
+fn speaker_label(name: Option<&str>, volume: Option<u8>) -> String {
+    match (name, volume) {
+        (Some(name), Some(volume)) => format!("Speaker: {name} ({volume}%)"),
+        (Some(name), None) => format!("Speaker: {name}"),
+        (None, _) => "Speaker: No speaker selected".to_owned(),
     }
 }
 
@@ -112,5 +162,23 @@ mod tests {
         assert!(opens_settings_on_double_click(MouseButton::Left));
         assert!(!opens_settings_on_double_click(MouseButton::Right));
         assert!(!opens_settings_on_double_click(MouseButton::Middle));
+    }
+
+    #[test]
+    fn synchronized_status_is_user_facing() {
+        assert_eq!(status_label(&UiStatus::Synchronized), "Up to date");
+    }
+
+    #[test]
+    fn speaker_label_includes_cached_volume() {
+        assert_eq!(
+            speaker_label(Some("Office"), Some(37)),
+            "Speaker: Office (37%)"
+        );
+        assert_eq!(speaker_label(Some("Office"), None), "Speaker: Office");
+        assert_eq!(
+            speaker_label(None, Some(37)),
+            "Speaker: No speaker selected"
+        );
     }
 }
