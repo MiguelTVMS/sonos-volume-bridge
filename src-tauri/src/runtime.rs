@@ -57,6 +57,7 @@ pub struct AvailableAudioOutput {
     pub writable_volume: bool,
 }
 
+#[cfg(any(windows, target_os = "macos"))]
 fn map_audio_outputs(
     devices: Vec<sonos_volume_bridge_platform_audio::AudioOutputDevice>,
 ) -> Vec<AvailableAudioOutput> {
