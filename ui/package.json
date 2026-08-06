@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "test": "node --test src/*.test.mjs",
     "lint": "eslint src --max-warnings=0",
     "format": "prettier --check ."
   },

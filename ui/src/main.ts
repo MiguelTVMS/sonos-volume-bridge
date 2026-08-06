@@ -1,5 +1,6 @@
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
+import { diagnosticsDisclosureState } from './diagnostics';
 import './style.css';
 
 type MappingPoint = { local: number; sonos: number };
@@ -250,8 +251,8 @@ function render(nextSnapshot: Snapshot): void {
           'diagnostics',
           `<div class="panel-heading"><h2>Diagnostics</h2><p>Live information about the speaker and audio output.</p></div>
           <dl class="status-list"><div><dt>Connection</dt><dd id="diagnostic-connection">${escapeHtml(status)}</dd></div><div><dt>Speaker</dt><dd id="diagnostic-speaker">${escapeHtml(speakerName)}</dd></div><div><dt>Speaker volume</dt><dd id="diagnostic-sonos-volume">${volumeText(nextSnapshot.sonosVolume)}</dd></div><div><dt>Selected output</dt><dd id="diagnostic-output">${escapeHtml(selectedOutputName(c))}</dd></div><div><dt>Output volume</dt><dd id="diagnostic-local-volume">${volumeText(nextSnapshot.localVolume)}</dd></div><div><dt>Mute</dt><dd id="diagnostic-mute">${muteText(nextSnapshot.muted)}</dd></div><div><dt>Speaker search</dt><dd>${escapeHtml(discoveryStatus)}</dd></div></dl>
-          <details class="technical-details" id="technical-details"${diagnosticDetailsVisible ? ' open' : ''}><summary>Technical speaker details</summary><p>Shows the saved speaker identity and local endpoint for troubleshooting.</p><pre id="diagnostic-payload">${diagnosticDetailsVisible ? 'Loading…' : ''}</pre></details>
-          <div class="diagnostics-actions"><button class="secondary" type="button" id="diagnostics">${diagnosticDetailsVisible ? 'Refresh technical details' : 'Show technical details'}</button><button class="secondary" type="button" id="export">Export diagnostics</button><button class="danger" type="button" id="reset">Reset settings</button></div>`,
+          <details class="technical-details" id="technical-details"${diagnosticDetailsVisible ? ' open' : ''}><summary>Speaker technical details</summary><p>Shows the saved speaker identity and local endpoint for troubleshooting.</p><pre id="diagnostic-payload">${diagnosticDetailsVisible ? 'Loading…' : ''}</pre></details>
+          <div class="diagnostics-actions"><button class="secondary" type="button" id="export">Export diagnostics</button><button class="danger" type="button" id="reset">Reset settings</button></div>`,
         )}
         ${panel(
           'about',
@@ -269,7 +270,7 @@ function render(nextSnapshot: Snapshot): void {
     button.addEventListener('click', () => activatePage(button.dataset.page as SettingsPage));
   });
   document.querySelector('#test')?.addEventListener('click', testVolume);
-  document.querySelector('#diagnostics')?.addEventListener('click', showDiagnostics);
+  document.querySelector('#technical-details')?.addEventListener('toggle', refreshDiagnostics);
   document.querySelector('#export')?.addEventListener('click', exportDiagnostics);
   document.querySelector('#reset')?.addEventListener('click', reset);
   document.querySelector('#discover')?.addEventListener('click', discoverSonos);
@@ -432,16 +433,16 @@ async function testVolume(): Promise<void> {
     notice(String(error));
   }
 }
-async function showDiagnostics(): Promise<void> {
+async function refreshDiagnostics(event: Event): Promise<void> {
+  const details = event.currentTarget as HTMLDetailsElement;
+  const disclosureState = diagnosticsDisclosureState(details.open);
+  diagnosticDetailsVisible = disclosureState.visible;
+  if (!disclosureState.shouldRefresh) return;
+
   try {
     const diagnostics = await invoke<Diagnostics>('diagnostics');
-    diagnosticDetailsVisible = true;
-    const details = document.querySelector<HTMLDetailsElement>('#technical-details');
     const payload = document.querySelector<HTMLPreElement>('#diagnostic-payload');
-    if (details) details.open = true;
     if (payload) payload.textContent = JSON.stringify(diagnostics, null, 2);
-    const button = document.querySelector<HTMLButtonElement>('#diagnostics');
-    if (button) button.textContent = 'Refresh technical details';
     notice('Technical details refreshed.');
   } catch (error) {
     notice(`Could not load diagnostics: ${String(error)}`);
