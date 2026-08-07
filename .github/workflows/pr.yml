@@ -4,11 +4,16 @@ on:
   pull_request:
     paths-ignore:
       - "**/*.md"
+      - "README*"
       - "docs/**"
       - ".vscode/**"
       - "AGENTS.md"
       - "LICENSE"
       - ".github/dependabot.yml"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/FUNDING.md"
+      - "Cargo.lock"
+
 permissions:
   contents: read
   pull-requests: write
@@ -247,4 +252,3 @@ EOF
         with:
           name: external-pr-frontend-build-logs-${{ github.run_id }}
           path: .ci-artifacts
-

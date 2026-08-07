@@ -4,11 +4,15 @@ on:
   pull_request:
     paths-ignore:
       - "**/*.md"
+      - "README*"
       - "docs/**"
       - ".vscode/**"
       - "AGENTS.md"
       - "LICENSE"
       - ".github/dependabot.yml"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/FUNDING.md"
+      - "Cargo.lock"
 
 permissions:
   contents: read
