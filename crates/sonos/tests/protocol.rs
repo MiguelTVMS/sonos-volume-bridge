@@ -74,7 +74,7 @@ fn accepts_replayed_events_with_changed_sequence_number() {
     let event = parse_last_change(include_bytes!("fixtures/last-change.xml"), Some(7)).unwrap();
     let replay = GenaEvent {
         sequence: Some(8),
-        state: event.state.clone(),
+        state: event.state,
     };
     let mut deduplicator = EventDeduplicator::default();
     assert!(deduplicator.accept(event));

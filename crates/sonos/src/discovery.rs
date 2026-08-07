@@ -146,6 +146,7 @@ pub(crate) fn validate_local_url(url: &Url) -> Result<(), SonosError> {
     }
     let host = url.host_str().ok_or(SonosError::MissingHost)?;
     let address = host
+        .trim_matches(|c| c == '[' || c == ']')
         .parse::<std::net::IpAddr>()
         .map_err(|_| SonosError::NonLocalHost(host.to_owned()))?;
     let allowed = match address {

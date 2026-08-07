@@ -114,10 +114,13 @@ mod tests {
 
     #[test]
     fn diagnostics_redacts_identity_and_endpoint() {
-        let mut configuration = AppConfiguration::default();
-        configuration.selected_sonos_id = Some("uuid:1234".to_owned());
-        configuration.last_known_sonos_address =
-            Some("http://192.168.1.42:1400/xml/device_description.xml".to_owned());
+        let configuration = AppConfiguration {
+            selected_sonos_id: Some("uuid:1234".to_owned()),
+            last_known_sonos_address: Some(
+                "http://192.168.1.42:1400/xml/device_description.xml".to_owned(),
+            ),
+            ..AppConfiguration::default()
+        };
 
         let snapshot = UiSnapshot {
             runtime_generation: 1,
