@@ -1,0 +1,17 @@
+{
+  "name": "sonos-volume-bridge-dev",
+  "private": true,
+  "scripts": {
+    "precommit": "sh ./scripts/pre-commit.sh",
+    "ci:rustfmt": "cargo fmt --check",
+    "ci:clippy": "cargo clippy --workspace --all-targets -- -D warnings",
+    "ci:test": "cargo test --workspace",
+    "ci:rust": "pnpm run ci:rustfmt && pnpm run ci:clippy && pnpm run ci:test",
+    "ci:ui-format": "pnpm --dir ui run format",
+    "ci:ui-lint": "pnpm --dir ui run lint",
+    "ci:ui-build": "pnpm --dir ui run build",
+    "ci:frontend": "pnpm run ci:ui-format && pnpm run ci:ui-lint",
+    "ci:frontend-build": "pnpm run ci:ui-build",
+    "ci:all": "pnpm run ci:rust && pnpm run ci:frontend && pnpm run ci:frontend-build"
+  }
+}
