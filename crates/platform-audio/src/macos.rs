@@ -25,10 +25,10 @@ use std::{
     ffi::c_void,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc::{self, Receiver, RecvTimeoutError, SyncSender},
     },
-    thread,
+    thread::{self, JoinHandle},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::{broadcast, oneshot};
@@ -134,8 +134,28 @@ pub fn list_output_devices() -> Result<Vec<AudioOutputDevice>, PlatformAudioErro
 
 #[derive(Clone)]
 pub struct MacosAudioController {
-    commands: SyncSender<Command>,
+    worker: Arc<WorkerHandle>,
     events: broadcast::Sender<SystemAudioEvent>,
+}
+
+struct WorkerHandle {
+    commands: SyncSender<Command>,
+    shutdown: Arc<AtomicBool>,
+    thread: Mutex<Option<JoinHandle<()>>>,
+}
+
+impl Drop for WorkerHandle {
+    fn drop(&mut self) {
+        self.shutdown.store(true, Ordering::Release);
+        let thread = self
+            .thread
+            .get_mut()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
+        if let Some(thread) = thread {
+            let _ = thread.join();
+        }
+    }
 }
 
 impl MacosAudioController {
@@ -147,7 +167,9 @@ impl MacosAudioController {
         let (events, _) = broadcast::channel(64);
         let worker_events = events.clone();
         let worker_commands = commands.clone();
-        thread::Builder::new()
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let worker_shutdown = Arc::clone(&shutdown);
+        let thread = thread::Builder::new()
             .name("sonos-volume-bridge-core-audio".to_owned())
             .spawn(move || {
                 run_worker(
@@ -156,10 +178,18 @@ impl MacosAudioController {
                     receiver,
                     worker_commands,
                     worker_events,
+                    &worker_shutdown,
                 )
             })
             .map_err(|error| PlatformAudioError::Platform(error.to_string()))?;
-        Ok(Self { commands, events })
+        Ok(Self {
+            worker: Arc::new(WorkerHandle {
+                commands,
+                shutdown,
+                thread: Mutex::new(Some(thread)),
+            }),
+            events,
+        })
     }
 
     async fn request<T>(
@@ -167,7 +197,7 @@ impl MacosAudioController {
         command: impl FnOnce(oneshot::Sender<Result<T, PlatformAudioError>>) -> Command,
     ) -> Result<T, PlatformAudioError> {
         let (response, receiver) = oneshot::channel();
-        self.commands
+        self.worker.commands
             .try_send(command(response))
             .map_err(|_| PlatformAudioError::DeviceUnavailable)?;
         receiver
@@ -225,6 +255,7 @@ fn run_worker(
     receiver: Receiver<Command>,
     commands: SyncSender<Command>,
     events: broadcast::Sender<SystemAudioEvent>,
+    shutdown: &AtomicBool,
 ) {
     let context = Arc::new(CallbackContext {
         events: events.clone(),
@@ -242,6 +273,9 @@ fn run_worker(
         }
     };
     loop {
+        if shutdown.load(Ordering::Acquire) {
+            break;
+        }
         let command = match receiver.recv_timeout(Duration::from_millis(250)) {
             Ok(command) => command,
             Err(RecvTimeoutError::Timeout) => continue,
@@ -788,3 +822,4 @@ mod tests {
         );
     }
 }
+

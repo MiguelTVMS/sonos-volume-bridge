@@ -2,7 +2,7 @@ use sonos_volume_bridge_domain::{MuteState, SonosVolume};
 use sonos_volume_bridge_sonos::{
     EventDeduplicator, SonosError, parse_device_description, parse_last_change, parse_ssdp_response,
 };
-use sonos_volume_bridge_sonos::{RenderingControlService, SonosClient, SonosDevice, SonosId};
+use sonos_volume_bridge_sonos::{RenderingControlService, SonosClient, SonosDevice, SonosId, GenaEvent};
 use sonos_volume_bridge_test_support::{MockSonosServer, MockSonosState};
 use url::Url;
 
@@ -65,6 +65,18 @@ fn deduplicates_replayed_gena_notifications() {
     let mut deduplicator = EventDeduplicator::default();
     assert!(deduplicator.accept(event.clone()));
     assert!(!deduplicator.accept(event));
+}
+
+#[test]
+fn accepts_replayed_events_with_changed_sequence_number() {
+    let event = parse_last_change(include_bytes!("fixtures/last-change.xml"), Some(7)).unwrap();
+    let replay = GenaEvent {
+        sequence: Some(8),
+        state: event.state.clone(),
+    };
+    let mut deduplicator = EventDeduplicator::default();
+    assert!(deduplicator.accept(event));
+    assert!(deduplicator.accept(replay));
 }
 
 #[test]

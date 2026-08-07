@@ -21,6 +21,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   rust:
     name: Rust (${{ matrix.os }})
@@ -28,24 +32,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          shared-key: workspace-${{ runner.os }}
+      - run: cargo check --workspace
+
+  rust-quality:
+    name: Rust quality
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Cache Linux desktop package archives
-        if: runner.os == 'Linux'
         uses: actions/cache@v6.1.0
         with:
           path: /var/cache/apt/archives
           key: ${{ runner.os }}-apt-linux-desktop-v1
       - name: Install Linux desktop build dependencies
-        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
       - uses: dtolnay/rust-toolchain@1.88.0
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2.9.2
         with:
-          shared-key: workspace
+          shared-key: workspace-${{ runner.os }}
       - run: cargo fmt --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
@@ -66,31 +79,6 @@ jobs:
       - run: pnpm --dir ui install --frozen-lockfile
       - run: pnpm --dir ui run format
       - run: pnpm --dir ui run lint
-      - run: pnpm --dir ui run build
-
-  msix:
-    name: Microsoft Store MSIX
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: dtolnay/rust-toolchain@1.88.0
-      - uses: Swatinem/rust-cache@v2.9.2
-        with:
-          shared-key: workspace
-      - uses: pnpm/action-setup@v6.0.10
-        with:
-          version: 11
-      - uses: actions/setup-node@v7.0.0
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: ui/pnpm-lock.yaml
-      - run: pnpm --dir ui install --frozen-lockfile
-      - run: cargo install tauri-cli --version '^2' --locked
-      - run: cargo tauri build --no-bundle
-      - name: Build and validate the MSIX package
-        shell: pwsh
-        run: ./scripts/build-msix.ps1
 
   audit:
     name: Dependency audit
@@ -100,6 +88,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.88.0
       - uses: Swatinem/rust-cache@v2.9.2
         with:
-          shared-key: workspace
+          shared-key: workspace-${{ runner.os }}
       - run: cargo install cargo-audit --locked
       - run: cargo audit

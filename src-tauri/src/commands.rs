@@ -82,23 +82,65 @@ pub fn diagnostics(state: State<'_, AppState>) -> Diagnostics {
         },
         |snapshot| snapshot.clone(),
     );
-    let configuration = snapshot.configuration;
+    build_diagnostics(state.store.path().exists(), &snapshot)
+}
+
+fn build_diagnostics(configuration_present: bool, snapshot: &UiSnapshot) -> Diagnostics {
+    let configuration = &snapshot.configuration;
     Diagnostics {
-        configuration_present: state.store.path().exists(),
+        configuration_present,
         sanitized: true,
-        message: "This report contains the saved local speaker endpoint and stable speaker identity. It excludes protocol payloads and host paths.".to_owned(),
+        message:
+            "This report intentionally redacts local speaker identity and endpoint information. It excludes protocol payloads and host paths."
+                .to_owned(),
         status: format!("{:?}", snapshot.status),
-        speaker_name: snapshot.sonos_name,
-        selected_sonos_id: configuration.selected_sonos_id,
-        last_known_sonos_address: configuration.last_known_sonos_address,
+        speaker_name: snapshot.sonos_name.clone(),
+        selected_sonos_id: None,
+        last_known_sonos_address: None,
         sonos_volume: snapshot.sonos_volume,
         local_volume: snapshot.local_volume,
         muted: snapshot.muted,
         follows_system_output: configuration.follow_default_audio_device,
-        fixed_audio_device_id: configuration.fixed_audio_device_id,
+        fixed_audio_device_id: configuration.fixed_audio_device_id.clone(),
         synchronize_mute: configuration.synchronize_mute,
         two_way_synchronization: configuration.two_way_synchronization,
         fallback_polling: configuration.fallback_polling,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn diagnostics_redacts_identity_and_endpoint() {
+        let mut configuration = AppConfiguration::default();
+        configuration.selected_sonos_id = Some("uuid:1234".to_owned());
+        configuration.last_known_sonos_address =
+            Some("http://192.168.1.42:1400/xml/device_description.xml".to_owned());
+
+        let snapshot = UiSnapshot {
+            runtime_generation: 1,
+            configuration,
+            status: crate::state::UiStatus::Synchronized,
+            sonos_name: Some("Office".to_owned()),
+            sonos_volume: Some(40),
+            local_volume: Some(20),
+            muted: Some(false),
+        };
+
+        let diagnostics = build_diagnostics(true, &snapshot);
+
+        assert!(diagnostics.sanitized);
+        assert!(diagnostics.message.contains("redacts"));
+        assert!(diagnostics.configuration_present);
+        assert_eq!(diagnostics.status, "Synchronized");
+        assert_eq!(diagnostics.speaker_name, Some("Office".to_owned()));
+        assert_eq!(diagnostics.selected_sonos_id, None);
+        assert_eq!(diagnostics.last_known_sonos_address, None);
+        assert_eq!(diagnostics.sonos_volume, Some(40));
+        assert_eq!(diagnostics.local_volume, Some(20));
+        assert_eq!(diagnostics.muted, Some(false));
     }
 }
 

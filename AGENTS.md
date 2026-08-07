@@ -1,51 +1,72 @@
 # SonosVolumeBridge contribution guide
 
-Keep the domain crate free of Tauri, operating-system APIs and networking. The
-synchronization crate depends only on domain abstractions; adapters belong in
-future crates. Add tests with every behavior change and run `cargo fmt --check`,
-`cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace`.
+## Project constraints
 
-## Phase tracking workflow
+- Keep the domain crate free of Tauri, OS APIs, and networking details.
+- The synchronization crate must depend only on domain abstractions; adapters belong in platform crates.
+- For each behavior change, add/adjust tests.
+- Before merging, run:
+  - `cargo fmt --check`
+  - `cargo clippy --workspace --all-targets -- -D warnings`
+  - `cargo test --workspace`
 
-Every implementation phase must be tracked by a GitHub issue in this repository.
+## Development from a personal fork
 
-1. Create the phase issue before making implementation changes.
-2. Keep that issue updated with concise progress, decisions, validation results,
-   and blockers while the phase is in progress.
-3. Keep all issue text, code, documentation, tests, and commit messages in English.
-4. At phase completion, commit and push `develop`, then close the current issue
-   with a completion summary.
-5. Create the issue for the next phase before stopping.
-6. Stop at that phase boundary and ask the user for explicit approval before
-   beginning implementation of the next phase.
+Contributions are expected to be done from a fork and synchronized through pull requests.
 
-### GitHub issue security hygiene
+1. Keep your fork configured:
+   - `git remote -v` should show `origin` (your fork) and `upstream` (the canonical repository).
+   - Sync before each new phase: `git fetch upstream`.
+2. Branch policy:
+   - Create short, descriptive branches from `upstream/develop` using Gitflow names such as `feat/<topic>` or `fix/<topic>`.
+3. Before starting work:
+   - Rebase onto latest upstream: `git switch develop`, `git reset --hard upstream/develop`, `git checkout <your-branch>` and `git rebase upstream/develop` (or create branch from the freshly updated local `develop`).
+4. During development:
+   - Keep branch scoped to one phase or one clear behavior change.
+   - Make incremental, reviewable commits.
+5. Push discipline:
+   - Push to your fork with normal pushes by default.
+   - Avoid force push after reviewers start; if needed, explain clearly in PR notes.
+6. PR readiness:
+   - Open PR to the upstream `develop` branch.
+   - Explain changes clearly in the PR description: what changed, why it changed, and expected impact.
+   - Include concise summary, test commands, and notable tradeoffs.
+   - Mention any deferred cleanup explicitly.
+   - Any code that will reach `develop` or `main` must be merged through an approved PR.
 
-Treat every GitHub issue title, body, comment, attachment, and linked evidence as
-public. Before creating or updating an issue, remove all security information and
-all identifier values. They must not exist in issue content, even when they are
-believed to be non-secret, revoked, temporary, or already visible elsewhere.
+## Gitflow is the project workflow
 
-Never include credentials, keys, tokens, secret values or secret-presence status;
-tenant, client, seller, store, team, publisher, certificate, signing-key, request,
-correlation, session, process, device, endpoint, account, or user identifiers;
-UDNs, IP or MAC addresses, hostnames, personal device names, local paths, commit
-hashes, workflow run IDs, package hashes or fingerprints; raw logs, diagnostics,
-crash dumps, manifests, screenshots, or security-control configuration. Do not
-describe reviewer identities, administrative roles, approval rules, recovery
-accounts, credential rotation state, or other details of the security posture.
+- This project uses Gitflow.
+- Primary long-lived branches are `develop` and `main`.
+- Feature and fix branches use:
+  - `feat/<topic>` for new capabilities.
+  - `fix/<topic>` for bug fixes.
+  - `chore/<topic>` for housekeeping tasks.
+- Release branches use `release/<version>` and are merged into `main` when ready.
+- Hot fixes use `hotfix/<topic>` and are merged into both `main` and `develop`.
+- Use merge flow that keeps `main` stable and `develop` the integration branch for next work.
 
-Use short, non-sensitive pass/fail summaries and generic placeholders instead.
-Keep necessary evidence only in an approved private location, and refer to it
-without copying its identifier into the issue. Review attachments and links as
-carefully as text because their names, URLs, metadata, and visible content can
-contain identifiers.
+## Optional GitHub issue path
 
-If prohibited information is found in an existing or draft issue, do not quote or
-copy it elsewhere. Stop issue updates, alert the user here with only the issue
-number and risk category, and handle issues one at a time. Redact or remove the
-content and rotate or revoke affected credentials when applicable before
-continuing the phase workflow.
+This project can use issues, but it is optional.
 
-Use `gh` for GitHub issue operations when it is available. Preserve historical
-phases as closed issues if issue tracking starts after implementation has begun.
+- Keep each issue limited to implementation coordination only.
+- If you use an issue, apply the security rules below before creating or updating it.
+
+## Security and data hygiene for external updates
+
+Before creating or updating an issue or PR description, remove any sensitive or identifying data.
+
+- Do **not** include: credentials, keys/tokens/secrets, tenant/client/seller/store info,
+  request/session/process IDs, user/admin/approver identities,
+  endpoints, hostnames, IP/MAC addresses, personal device names, local file paths,
+  commit hashes, workflow run IDs, package hashes, logs, diagnostics, crash dumps,
+  manifests, screenshots, or security-control settings.
+- Use short, non-sensitive pass/fail summaries and generic placeholders.
+- Keep evidence in an approved private location and reference it without copying identifiers.
+
+If prohibited information is found in an existing or draft issue, stop touching that issue,
+report only the issue number + risk category in this thread, and sanitize the issue before
+continuing.
+
+Use `gh` for issue operations when available.
