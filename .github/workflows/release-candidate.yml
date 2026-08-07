@@ -40,17 +40,17 @@ jobs:
             echo "Release workflow must be dispatched from develop; received $GITHUB_REF." >&2
             exit 1
           fi
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: develop
           fetch-depth: 0
           persist-credentials: true
 
       - name: Cache Linux desktop package archives
-        uses: actions/cache@v4
+        uses: actions/cache@v6.1.0
         with:
           path: /var/cache/apt/archives
-          key: ${{ runner.os }}-apt-release-linux-desktop-v1
+          key: ${{ runner.os }}-apt-linux-desktop-v1
       - name: Install Linux desktop build dependencies
         run: |
           sudo apt-get update
@@ -58,11 +58,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.88.0
         with:
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-      - uses: pnpm/action-setup@v6
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          shared-key: workspace
+      - uses: pnpm/action-setup@v6.0.10
         with:
           version: 11
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: 22
           cache: pnpm
@@ -130,15 +132,17 @@ jobs:
     needs: prepare-version
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ needs.prepare-version.outputs.commit }}
       - uses: dtolnay/rust-toolchain@1.88.0
-      - uses: Swatinem/rust-cache@v2
-      - uses: pnpm/action-setup@v6
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          shared-key: workspace
+      - uses: pnpm/action-setup@v6.0.10
         with:
           version: 11
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: 22
           cache: pnpm
@@ -151,17 +155,21 @@ jobs:
         run: |
           application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "sonos-volume-bridge"))')"
           test "$RELEASE_VERSION" = "$application_version"
-      - run: cargo tauri build --bundles app
-      - run: test -d 'target/release/bundle/macos/Sonos Volume Bridge.app'
-      - name: Ad-hoc sign the complete app bundle
+      - run: cargo tauri build --no-bundle
+      - run: test -x target/release/sonos-volume-bridge
+      - name: Archive the unsigned macOS executable
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
         run: |
-          codesign --force --deep --sign - --timestamp=none \
-            'target/release/bundle/macos/Sonos Volume Bridge.app'
-      - name: Verify the app bundle signature
-        run: |
-          codesign --verify --deep --strict --verbose=4 \
-            'target/release/bundle/macos/Sonos Volume Bridge.app'
-
+          tar -czf \
+            "sonos-volume-bridge-${RELEASE_TAG}-macos-unsigned.tar.gz" \
+            target/release/sonos-volume-bridge ui/dist
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: macos-unsigned-${{ needs.prepare-version.outputs.tag }}
+          path: sonos-volume-bridge-*-macos-unsigned.tar.gz
+          if-no-files-found: error
+          retention-days: 1
   macos-signed:
     name: Sign and notarize macOS app
     needs: [prepare-version, macos-app]
@@ -173,21 +181,23 @@ jobs:
       APPLE_API_ISSUER: ${{ vars.APPLE_API_ISSUER }}
       APPLE_API_KEY: ${{ vars.APPLE_API_KEY }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ needs.prepare-version.outputs.commit }}
       - uses: dtolnay/rust-toolchain@1.88.0
-      - uses: Swatinem/rust-cache@v2
-      - uses: pnpm/action-setup@v6
+      - uses: Swatinem/rust-cache@v2.9.2
         with:
-          version: 11
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: ui/pnpm-lock.yaml
-      - run: pnpm --dir ui install --frozen-lockfile
+          shared-key: workspace
       - run: cargo install tauri-cli --version '^2' --locked
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: macos-unsigned-${{ needs.prepare-version.outputs.tag }}
+          path: macos-unsigned
+      - name: Restore the unsigned macOS executable
+        run: |
+          tar -xzf macos-unsigned/sonos-volume-bridge-*-macos-unsigned.tar.gz
+          test -x target/release/sonos-volume-bridge
+          test -d ui/dist
       - name: Import the Developer ID certificate
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -228,8 +238,8 @@ jobs:
         run: |
           application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "sonos-volume-bridge"))')"
           test "$RELEASE_VERSION" = "$application_version"
-      - name: Build, sign, notarize, and staple the app
-        run: cargo tauri build --bundles app
+      - name: Bundle, sign, notarize, and staple the existing executable
+        run: cargo tauri bundle --bundles app
       - name: Verify the signed and notarized app
         run: |
           app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
@@ -245,7 +255,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             'target/release/bundle/macos/Sonos Volume Bridge.app' \
             "sonos-volume-bridge-${RELEASE_TAG}-macos.zip"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7.0.1
         with:
           name: macos-release
           path: sonos-volume-bridge-*-macos.zip
@@ -257,27 +267,34 @@ jobs:
           rm -f "$RUNNER_TEMP/developer-id.p12"
           rm -f "$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
 
-  windows-installer:
-    name: Build Windows installer
+  windows-packages:
+    name: Build Windows NSIS and MSIX packages
     needs: prepare-version
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ needs.prepare-version.outputs.commit }}
       - uses: dtolnay/rust-toolchain@1.88.0
-      - uses: Swatinem/rust-cache@v2
-      - uses: pnpm/action-setup@v6
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          shared-key: workspace
+      - uses: pnpm/action-setup@v6.0.10
         with:
           version: 11
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: 22
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
       - run: cargo install tauri-cli --version '^2' --locked
-      - run: cargo tauri build --bundles nsis
+      - run: cargo tauri build --no-bundle
+      - name: Build and validate the MSIX from the compiled executable
+        shell: pwsh
+        run: ./scripts/build-msix.ps1
+      - name: Bundle NSIS from the compiled executable
+        run: cargo tauri bundle --bundles nsis
       - name: Collect the unsigned installer
         shell: pwsh
         env:
@@ -286,55 +303,29 @@ jobs:
           $installer = Get-ChildItem target/release/bundle -Recurse -Filter '*.exe' | Select-Object -First 1
           if ($null -eq $installer) { throw 'No NSIS installer was generated.' }
           Copy-Item $installer.FullName "sonos-volume-bridge-$env:RELEASE_TAG-windows-unsigned.exe"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7.0.1
         with:
           name: windows-release
           path: sonos-volume-bridge-*-windows-unsigned.exe
           if-no-files-found: error
-
-  windows-store-package:
-    name: Build Microsoft Store MSIX
-    needs: prepare-version
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
-      - uses: dtolnay/rust-toolchain@1.88.0
-      - uses: Swatinem/rust-cache@v2
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: ui/pnpm-lock.yaml
-      - run: pnpm --dir ui install --frozen-lockfile
-      - run: cargo install tauri-cli --version '^2' --locked
-      - run: cargo tauri build --no-bundle
-      - name: Build and validate the MSIX package
-        shell: pwsh
-        run: ./scripts/build-msix.ps1
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7.0.1
         with:
           name: microsoft-store-msix-${{ needs.prepare-version.outputs.tag }}
           path: target/release/bundle/msix/*.msix
           if-no-files-found: error
-
   publish-release:
     name: Publish GitHub Release
-    needs: [prepare-version, macos-signed, windows-installer, windows-store-package]
+    needs: [prepare-version, macos-signed, windows-packages]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: develop
           fetch-depth: 0
           persist-credentials: true
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v8.0.1
         with:
           pattern: "*-release"
           path: release-assets
@@ -408,18 +399,18 @@ jobs:
   publish-microsoft-store:
     name: Submit GA release to Microsoft Store
     if: ${{ inputs.channel == 'GA' }}
-    needs: [prepare-version, windows-store-package, publish-release]
+    needs: [prepare-version, windows-packages, publish-release]
     runs-on: windows-latest
     environment: microsoft-store
     env:
       MICROSOFT_STORE_PRODUCT_ID: 9N7JKGXCMST0
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v8.0.1
         with:
           name: microsoft-store-msix-${{ needs.prepare-version.outputs.tag }}
           path: microsoft-store-msix
       - name: Configure Microsoft Store Developer CLI
-        uses: microsoft/microsoft-store-apppublisher@v1.1
+        uses: microsoft/microsoft-store-apppublisher@v1.4
       - name: Authenticate with Partner Center
         shell: pwsh
         env:

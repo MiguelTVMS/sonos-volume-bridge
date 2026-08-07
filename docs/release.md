@@ -19,13 +19,23 @@ both platform packages from that exact commit, creates and pushes its annotated
 GitHub Release with downloadable assets, a channel-aware installation and signing summary, and GitHub-generated change notes. Pull requests with `feature`, `enhancement`, `bug`, `fix`, `maintenance`, `refactor`, or `documentation` labels are grouped in those notes. It never merges branches. Merge
 `develop` into `main` only after the release workflow succeeds.
 
-The current published release is [v0.1.1](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/tag/v0.1.1).
+The current published release is [v0.3.0](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/tag/v0.3.0).
 
-The protected macOS release job imports the Developer ID identity into an
-ephemeral keychain, signs the application with Hardened Runtime, submits it to
-Apple for notarization, staples the ticket, and verifies the result before the
-archive is published. The Windows installer remains unsigned, so SmartScreen
-may still warn before installation.
+The release workflow compiles one macOS executable and one Windows executable
+per version. The protected macOS release job downloads the exact executable
+produced by the unprivileged build job, imports the Developer ID identity into
+an ephemeral keychain, bundles and signs the application with Hardened Runtime,
+submits it to Apple for notarization, staples the ticket, and verifies the
+result before the archive is published. The Windows job packages its one
+compiled output first as a clean Microsoft Store MSIX payload, then applies
+Tauri's NSIS-specific metadata while producing the direct-download installer.
+The Windows installer remains unsigned, so SmartScreen may still warn before
+installation.
+
+Rust caches use one shared logical key across CI and release job names. The
+cache action still isolates entries by operating system, Rust toolchain, Cargo
+manifests, lockfile, and relevant compiler environment, while allowing jobs
+with compatible inputs to reuse downloaded tools and compilation outputs.
 
 Run the manual `Verify macOS Signing` workflow from `develop` after rotating an
 Apple certificate or notarization key. It exercises the same protected signing,

@@ -15,13 +15,15 @@ jobs:
     name: Build Microsoft Store MSIX
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - uses: dtolnay/rust-toolchain@1.88.0
-      - uses: Swatinem/rust-cache@v2
-      - uses: pnpm/action-setup@v6
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          shared-key: workspace
+      - uses: pnpm/action-setup@v6.0.10
         with:
           version: 11
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: 22
           cache: pnpm
@@ -32,7 +34,7 @@ jobs:
       - name: Build and validate the MSIX package
         shell: pwsh
         run: ./scripts/build-msix.ps1
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7.0.1
         with:
           name: microsoft-store-msix
           path: target/release/bundle/msix/*.msix

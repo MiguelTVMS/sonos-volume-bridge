@@ -21,13 +21,15 @@ jobs:
       APPLE_API_ISSUER: ${{ vars.APPLE_API_ISSUER }}
       APPLE_API_KEY: ${{ vars.APPLE_API_KEY }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - uses: dtolnay/rust-toolchain@1.88.0
-      - uses: Swatinem/rust-cache@v2
-      - uses: pnpm/action-setup@v6
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          shared-key: workspace
+      - uses: pnpm/action-setup@v6.0.10
         with:
           version: 11
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: 22
           cache: pnpm
@@ -83,7 +85,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             'target/release/bundle/macos/Sonos Volume Bridge.app' \
             "sonos-volume-bridge-${GITHUB_SHA}-macos-verification.zip"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7.0.1
         with:
           name: macos-signing-verification
           path: sonos-volume-bridge-*-macos-verification.zip
