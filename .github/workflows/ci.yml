@@ -1,14 +1,6 @@
 name: CI
 
 on:
-  push:
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
-      - ".vscode/**"
-      - "AGENTS.md"
-      - "LICENSE"
-      - ".github/dependabot.yml"
   pull_request:
     paths-ignore:
       - "**/*.md"
