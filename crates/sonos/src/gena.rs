@@ -122,7 +122,7 @@ fn timeout_header(timeout: Duration) -> String {
     format!("Second-{}", timeout.as_secs())
 }
 fn parse_timeout(value: &str) -> Option<Duration> {
-    let value = value.trim().trim_matches("\"");
+    let value = value.trim().trim_matches('"');
     let value = value.to_ascii_lowercase();
     let value = value.strip_prefix("second-")?;
     if value == "infinite" {
@@ -240,18 +240,24 @@ mod tests {
 
     #[test]
     fn parses_timeout_with_expected_prefix_case_and_whitespace() {
-        assert_eq!(parse_timeout(" second-300 "), Some(Duration::from_secs(300)));
+        assert_eq!(
+            parse_timeout(" second-300 "),
+            Some(Duration::from_secs(300))
+        );
         assert_eq!(parse_timeout("Second-300"), Some(Duration::from_secs(300)));
         assert_eq!(parse_timeout("SECOND-45"), Some(Duration::from_secs(45)));
-        assert_eq!(parse_timeout("\"Second-120\""), Some(Duration::from_secs(120)));
+        assert_eq!(
+            parse_timeout("\"Second-120\""),
+            Some(Duration::from_secs(120))
+        );
     }
 
     #[test]
     fn parses_infinite_or_invalid_timeout_as_fallback() {
-        assert_eq!(parse_timeout("Second-infinite"), Some(Duration::from_secs(300)));
+        assert_eq!(
+            parse_timeout("Second-infinite"),
+            Some(Duration::from_secs(300))
+        );
         assert_eq!(parse_timeout(""), None);
     }
 }
-
-
-

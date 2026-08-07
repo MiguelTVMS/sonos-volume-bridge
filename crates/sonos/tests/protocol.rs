@@ -2,7 +2,9 @@ use sonos_volume_bridge_domain::{MuteState, SonosVolume};
 use sonos_volume_bridge_sonos::{
     EventDeduplicator, SonosError, parse_device_description, parse_last_change, parse_ssdp_response,
 };
-use sonos_volume_bridge_sonos::{RenderingControlService, SonosClient, SonosDevice, SonosId, GenaEvent};
+use sonos_volume_bridge_sonos::{
+    GenaEvent, RenderingControlService, SonosClient, SonosDevice, SonosId,
+};
 use sonos_volume_bridge_test_support::{MockSonosServer, MockSonosState};
 use url::Url;
 

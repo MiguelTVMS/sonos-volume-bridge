@@ -188,9 +188,18 @@ mod tests {
 
     #[test]
     fn validate_local_urls_allow_private_ipv4_and_ipv6_hosts() {
-        assert!(validate_local_url(&Url::parse("http://192.168.1.42:1400/description.xml").unwrap()).is_ok());
-        assert!(validate_local_url(&Url::parse("http://[fe80::1]:1400/description.xml").unwrap()).is_ok());
-        assert!(validate_local_url(&Url::parse("http://[fd00::1]:1400/description.xml").unwrap()).is_ok());
+        assert!(
+            validate_local_url(&Url::parse("http://192.168.1.42:1400/description.xml").unwrap())
+                .is_ok()
+        );
+        assert!(
+            validate_local_url(&Url::parse("http://[fe80::1]:1400/description.xml").unwrap())
+                .is_ok()
+        );
+        assert!(
+            validate_local_url(&Url::parse("http://[fd00::1]:1400/description.xml").unwrap())
+                .is_ok()
+        );
     }
 
     #[test]
@@ -204,9 +213,10 @@ mod tests {
             Err(SonosError::NonLocalHost(_))
         ));
         assert!(matches!(
-            validate_local_url(&Url::parse("http://[2001:4860:4860::8888]:1400/description.xml").unwrap()),
+            validate_local_url(
+                &Url::parse("http://[2001:4860:4860::8888]:1400/description.xml").unwrap()
+            ),
             Err(SonosError::NonLocalHost(_))
         ));
     }
 }
-

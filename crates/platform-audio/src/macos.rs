@@ -197,7 +197,8 @@ impl MacosAudioController {
         command: impl FnOnce(oneshot::Sender<Result<T, PlatformAudioError>>) -> Command,
     ) -> Result<T, PlatformAudioError> {
         let (response, receiver) = oneshot::channel();
-        self.worker.commands
+        self.worker
+            .commands
             .try_send(command(response))
             .map_err(|_| PlatformAudioError::DeviceUnavailable)?;
         receiver
@@ -822,4 +823,3 @@ mod tests {
         );
     }
 }
-
