@@ -19,8 +19,12 @@ use crate::{
 use async_trait::async_trait;
 use sonos_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, NormalizedVolume};
 use std::{
-    sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender},
-    thread,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+        mpsc::{self, Receiver, RecvTimeoutError, SyncSender},
+    },
+    thread::{self, JoinHandle},
     time::Duration,
 };
 use tokio::sync::{broadcast, oneshot};
@@ -134,8 +138,28 @@ fn string_from_utf16z(value: &[u16]) -> String {
 }
 #[derive(Clone)]
 pub struct WindowsAudioController {
-    commands: SyncSender<Command>,
+    worker: Arc<WorkerHandle>,
     events: broadcast::Sender<SystemAudioEvent>,
+}
+
+struct WorkerHandle {
+    commands: SyncSender<Command>,
+    shutdown: Arc<AtomicBool>,
+    thread: Mutex<Option<JoinHandle<()>>>,
+}
+
+impl Drop for WorkerHandle {
+    fn drop(&mut self) {
+        self.shutdown.store(true, Ordering::Release);
+        let thread = self
+            .thread
+            .get_mut()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
+        if let Some(thread) = thread {
+            let _ = thread.join();
+        }
+    }
 }
 
 impl WindowsAudioController {
@@ -144,11 +168,28 @@ impl WindowsAudioController {
         let (events, _) = broadcast::channel(64);
         let worker_events = events.clone();
         let worker_commands = commands.clone();
-        thread::Builder::new()
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let worker_shutdown = Arc::clone(&shutdown);
+        let thread = thread::Builder::new()
             .name("sonos-volume-bridge-core-audio".to_owned())
-            .spawn(move || run_worker(selection, receiver, worker_events, worker_commands))
+            .spawn(move || {
+                run_worker(
+                    selection,
+                    receiver,
+                    worker_events,
+                    worker_commands,
+                    &worker_shutdown,
+                );
+            })
             .map_err(|error| PlatformAudioError::Platform(error.to_string()))?;
-        Ok(Self { commands, events })
+        Ok(Self {
+            worker: Arc::new(WorkerHandle {
+                commands,
+                shutdown,
+                thread: Mutex::new(Some(thread)),
+            }),
+            events,
+        })
     }
 
     async fn request<T>(
@@ -156,7 +197,8 @@ impl WindowsAudioController {
         command: impl FnOnce(oneshot::Sender<Result<T, PlatformAudioError>>) -> Command,
     ) -> Result<T, PlatformAudioError> {
         let (response, receiver) = oneshot::channel();
-        self.commands
+        self.worker
+            .commands
             .send(command(response))
             .map_err(|_| PlatformAudioError::DeviceUnavailable)?;
         receiver
@@ -205,6 +247,7 @@ fn run_worker(
     receiver: Receiver<Command>,
     events: broadcast::Sender<SystemAudioEvent>,
     commands: SyncSender<Command>,
+    shutdown: &AtomicBool,
 ) {
     // SAFETY: this thread calls `CoUninitialize` exactly once after successful initialization,
     // and Core Audio interfaces never leave this thread.
@@ -213,7 +256,7 @@ fn run_worker(
         let _ = events.send(SystemAudioEvent::DeviceUnavailable { device_id: None });
         return;
     }
-    let result = worker_loop(selection, receiver, events.clone(), commands);
+    let result = worker_loop(selection, receiver, events.clone(), commands, shutdown);
     if result.is_err() {
         let _ = events.send(SystemAudioEvent::DeviceUnavailable { device_id: None });
     }
@@ -227,15 +270,17 @@ fn worker_loop(
     receiver: Receiver<Command>,
     events: broadcast::Sender<SystemAudioEvent>,
     commands: SyncSender<Command>,
+    shutdown: &AtomicBool,
 ) -> Result<(), windows::core::Error> {
     let enumerator: IMMDeviceEnumerator =
         unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
-    let default_callback: IMMNotificationClient = DefaultDeviceCallback { commands }.into();
-    unsafe {
-        enumerator.RegisterEndpointNotificationCallback(&default_callback)?;
-    }
+    let _default_registration =
+        DefaultDeviceRegistration::register(&enumerator, &selection, commands)?;
     let mut endpoint = attach_endpoint(&enumerator, &selection, &events)?;
     loop {
+        if shutdown.load(Ordering::Acquire) {
+            break;
+        }
         let command = match receiver.recv_timeout(Duration::from_millis(250)) {
             Ok(command) => command,
             Err(error) => {
@@ -268,17 +313,21 @@ fn worker_loop(
                 );
             }
             Command::Reattach if selection == AudioDeviceSelection::FollowDefault => {
-                endpoint.detach();
-                endpoint = attach_endpoint(&enumerator, &selection, &events)?;
-                let _ = events.send(SystemAudioEvent::DefaultOutputChanged);
+                match attach_endpoint(&enumerator, &selection, &events) {
+                    Ok(next) => {
+                        endpoint = next;
+                        let _ = events.send(SystemAudioEvent::DefaultOutputChanged);
+                    }
+                    Err(_) => {
+                        let _ =
+                            events.send(SystemAudioEvent::DeviceUnavailable { device_id: None });
+                    }
+                }
             }
             Command::Reattach => {}
         }
     }
-    endpoint.detach();
-    unsafe {
-        enumerator.UnregisterEndpointNotificationCallback(&default_callback)?;
-    }
+    drop(endpoint);
     Ok(())
 }
 
@@ -288,6 +337,12 @@ fn worker_continues_after(error: RecvTimeoutError) -> bool {
 struct EndpointRegistration {
     volume: IAudioEndpointVolume,
     callback: IAudioEndpointVolumeCallback,
+}
+
+impl Drop for EndpointRegistration {
+    fn drop(&mut self) {
+        let _ = unsafe { self.volume.UnregisterControlChangeNotify(&self.callback) };
+    }
 }
 
 impl EndpointRegistration {
@@ -315,8 +370,43 @@ impl EndpointRegistration {
         unsafe { self.volume.SetMute(muted, &APPLICATION_EVENT_CONTEXT) }
             .map_err(|error| error.to_string())
     }
-    fn detach(&self) {
-        let _ = unsafe { self.volume.UnregisterControlChangeNotify(&self.callback) };
+}
+
+fn needs_default_device_notifications(selection: &AudioDeviceSelection) -> bool {
+    *selection == AudioDeviceSelection::FollowDefault
+}
+
+struct DefaultDeviceRegistration {
+    enumerator: IMMDeviceEnumerator,
+    callback: IMMNotificationClient,
+}
+
+impl DefaultDeviceRegistration {
+    fn register(
+        enumerator: &IMMDeviceEnumerator,
+        selection: &AudioDeviceSelection,
+        commands: SyncSender<Command>,
+    ) -> windows::core::Result<Option<Self>> {
+        if !needs_default_device_notifications(selection) {
+            return Ok(None);
+        }
+        let callback: IMMNotificationClient = DefaultDeviceCallback { commands }.into();
+        unsafe {
+            enumerator.RegisterEndpointNotificationCallback(&callback)?;
+        }
+        Ok(Some(Self {
+            enumerator: enumerator.clone(),
+            callback,
+        }))
+    }
+}
+
+impl Drop for DefaultDeviceRegistration {
+    fn drop(&mut self) {
+        let _ = unsafe {
+            self.enumerator
+                .UnregisterEndpointNotificationCallback(&self.callback)
+        };
     }
 }
 
@@ -429,6 +519,45 @@ mod tests {
     fn normalizes_core_audio_scalar_endpoints() {
         assert_eq!(normalized(0.0), NormalizedVolume::MIN);
         assert_eq!(normalized(1.0), NormalizedVolume::MAX);
+    }
+
+    #[test]
+    fn fixed_endpoints_do_not_register_for_default_device_changes() {
+        assert!(needs_default_device_notifications(
+            &AudioDeviceSelection::FollowDefault
+        ));
+        assert!(!needs_default_device_notifications(
+            &AudioDeviceSelection::Fixed {
+                device_id: "g8".to_owned(),
+            }
+        ));
+    }
+
+    #[test]
+    fn final_worker_owner_signals_shutdown_and_joins() {
+        let (commands, _receiver) = mpsc::sync_channel(1);
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let worker_shutdown = Arc::clone(&shutdown);
+        let stopped = Arc::new(AtomicBool::new(false));
+        let worker_stopped = Arc::clone(&stopped);
+        let thread = thread::spawn(move || {
+            while !worker_shutdown.load(Ordering::Acquire) {
+                thread::yield_now();
+            }
+            worker_stopped.store(true, Ordering::Release);
+        });
+        let first = Arc::new(WorkerHandle {
+            commands,
+            shutdown,
+            thread: Mutex::new(Some(thread)),
+        });
+        let final_owner = Arc::clone(&first);
+
+        drop(first);
+        assert!(!stopped.load(Ordering::Acquire));
+
+        drop(final_owner);
+        assert!(stopped.load(Ordering::Acquire));
     }
 }
 #[test]
