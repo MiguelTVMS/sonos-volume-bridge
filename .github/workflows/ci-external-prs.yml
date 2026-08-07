@@ -2,7 +2,13 @@ name: External PR Validation
 
 on:
   pull_request:
-
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - ".vscode/**"
+      - "AGENTS.md"
+      - "LICENSE"
+      - ".github/dependabot.yml"
 permissions:
   contents: read
   pull-requests: write
@@ -241,3 +247,4 @@ EOF
         with:
           name: external-pr-frontend-build-logs-${{ github.run_id }}
           path: .ci-artifacts
+

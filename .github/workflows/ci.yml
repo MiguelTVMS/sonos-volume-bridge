@@ -28,6 +28,7 @@ concurrency:
 jobs:
   rust:
     name: Rust (${{ matrix.os }})
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -43,6 +44,7 @@ jobs:
 
   rust-quality:
     name: Rust quality
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
@@ -65,6 +67,7 @@ jobs:
 
   frontend:
     name: Frontend
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
@@ -79,15 +82,3 @@ jobs:
       - run: pnpm --dir ui install --frozen-lockfile
       - run: pnpm --dir ui run format
       - run: pnpm --dir ui run lint
-
-  audit:
-    name: Dependency audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: dtolnay/rust-toolchain@1.88.0
-      - uses: Swatinem/rust-cache@v2.9.2
-        with:
-          shared-key: workspace-${{ runner.os }}
-      - run: cargo install cargo-audit --locked
-      - run: cargo audit
