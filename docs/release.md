@@ -26,9 +26,12 @@ per version. The protected macOS release job downloads the exact executable
 produced by the unprivileged build job, imports the Developer ID identity into
 an ephemeral keychain, bundles and signs the application with Hardened Runtime,
 submits it to Apple for notarization, staples the ticket, and verifies the
-result before the archive is published. The Windows job packages its one
-compiled output first as a clean Microsoft Store MSIX payload, then applies
-Tauri's NSIS-specific metadata while producing the direct-download installer.
+result before the archive is published. The Windows build job uploads its one
+compiled output for two independent
+packaging jobs. One produces the clean Microsoft Store MSIX payload while the
+other applies Tauri's NSIS-specific metadata to produce the direct-download
+installer. A packaging failure can therefore be isolated to its installer type
+without compiling the application again.
 The Windows installer remains unsigned, so SmartScreen may still warn before
 installation.
 

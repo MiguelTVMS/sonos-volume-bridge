@@ -267,8 +267,8 @@ jobs:
           rm -f "$RUNNER_TEMP/developer-id.p12"
           rm -f "$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
 
-  windows-packages:
-    name: Build Windows NSIS and MSIX packages
+  windows-app:
+    name: Build Windows executable
     needs: prepare-version
     runs-on: windows-latest
     steps:
@@ -290,9 +290,41 @@ jobs:
       - run: pnpm --dir ui install --frozen-lockfile
       - run: cargo install tauri-cli --version '^2' --locked
       - run: cargo tauri build --no-bundle
-      - name: Build and validate the MSIX from the compiled executable
+      - name: Verify the compiled executable
         shell: pwsh
-        run: ./scripts/build-msix.ps1
+        run: |
+          if (-not (Test-Path -LiteralPath 'target/release/sonos-volume-bridge.exe' -PathType Leaf)) {
+            throw 'The Windows release executable was not generated.'
+          }
+          if (-not (Test-Path -LiteralPath 'ui/dist' -PathType Container)) {
+            throw 'The frontend distribution was not generated.'
+          }
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: windows-build-${{ needs.prepare-version.outputs.tag }}
+          path: |
+            target/release/sonos-volume-bridge.exe
+            ui/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  windows-nsis:
+    name: Package Windows NSIS installer
+    needs: [prepare-version, windows-app]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ needs.prepare-version.outputs.commit }}
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          shared-key: workspace
+      - run: cargo install tauri-cli --version '^2' --locked
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: windows-build-${{ needs.prepare-version.outputs.tag }}
+          path: .
       - name: Bundle NSIS from the compiled executable
         run: cargo tauri bundle --bundles nsis
       - name: Collect the unsigned installer
@@ -308,6 +340,23 @@ jobs:
           name: windows-release
           path: sonos-volume-bridge-*-windows-unsigned.exe
           if-no-files-found: error
+
+  windows-msix:
+    name: Package Microsoft Store MSIX
+    needs: [prepare-version, windows-app]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ needs.prepare-version.outputs.commit }}
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: windows-build-${{ needs.prepare-version.outputs.tag }}
+          path: .
+      - name: Build and validate the MSIX from the compiled executable
+        shell: pwsh
+        run: ./scripts/build-msix.ps1
       - uses: actions/upload-artifact@v7.0.1
         with:
           name: microsoft-store-msix-${{ needs.prepare-version.outputs.tag }}
@@ -315,7 +364,7 @@ jobs:
           if-no-files-found: error
   publish-release:
     name: Publish GitHub Release
-    needs: [prepare-version, macos-signed, windows-packages]
+    needs: [prepare-version, macos-signed, windows-nsis, windows-msix]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -399,7 +448,7 @@ jobs:
   publish-microsoft-store:
     name: Submit GA release to Microsoft Store
     if: ${{ inputs.channel == 'GA' }}
-    needs: [prepare-version, windows-packages, publish-release]
+    needs: [prepare-version, windows-msix, publish-release]
     runs-on: windows-latest
     environment: microsoft-store
     env:
