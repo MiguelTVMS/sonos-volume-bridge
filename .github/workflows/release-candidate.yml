@@ -70,12 +70,12 @@ jobs:
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
-      - run: cargo fmt --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
-      - run: pnpm --dir ui run format
-      - run: pnpm --dir ui run lint
-      - run: pnpm --dir ui run build
+      - run: pnpm run ci:rustfmt
+      - run: pnpm run ci:clippy
+      - run: pnpm run ci:test
+      - run: pnpm run ci:ui-format
+      - run: pnpm run ci:ui-lint
+      - run: pnpm run ci:ui-build
       - name: Bump the workspace version
         id: version
         env:
@@ -487,3 +487,4 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw 'Microsoft Store submission failed.'
           }
+

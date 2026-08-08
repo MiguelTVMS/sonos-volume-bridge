@@ -4,13 +4,33 @@ Install Rust 1.88.0 (including `clippy` and `rustfmt`), Node.js 22, and pnpm
 11. Run the complete local verification suite with:
 
 ```sh
-cargo fmt --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-pnpm --dir ui install --frozen-lockfile
-pnpm --dir ui run format
-pnpm --dir ui run lint
-pnpm --dir ui run build
+pnpm run ci:all
+```
+
+## Pre-commit validation
+
+Enable local hooks once per clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+The pre-commit hook runs the same baseline checks automatically for staged Rust and UI
+changes:
+
+- Rust: `pnpm run ci:rustfmt`, `pnpm run ci:clippy`, `pnpm run ci:test`
+- UI: `pnpm run ci:ui-format`, `pnpm run ci:ui-lint`
+
+Run the validation manually at any time:
+
+```sh
+pnpm precommit
+```
+
+or run all CI-aligned checks:
+
+```sh
+pnpm run ci:all
 ```
 
 Run the Tauri application during development with:

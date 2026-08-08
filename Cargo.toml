@@ -43,3 +43,5 @@ doc_markdown = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 return_self_not_must_use = "allow"
+[patch.crates-io]
+glib = { path = "patches/glib-0.18.5" }

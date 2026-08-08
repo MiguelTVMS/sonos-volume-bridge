@@ -62,6 +62,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.88.0
         with:
           components: rustfmt, clippy
+      - uses: pnpm/action-setup@v6.0.10
+        with:
+          version: 11
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
       - uses: Swatinem/rust-cache@v2.9.2
         with:
           shared-key: external-pr-rust-lint-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
@@ -69,12 +77,12 @@ jobs:
         run: |
           mkdir -p .ci-artifacts
           set -o pipefail
-          cargo fmt --all -- --check 2>&1 | tee .ci-artifacts/rustfmt.log
+          pnpm run ci:rustfmt 2>&1 | tee .ci-artifacts/rustfmt.log
       - name: Run clippy
         run: |
           mkdir -p .ci-artifacts
           set -o pipefail
-          cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tee .ci-artifacts/clippy.log
+          pnpm run ci:clippy 2>&1 | tee .ci-artifacts/clippy.log
       - name: Upload rust lint logs
         if: failure()
         uses: actions/upload-artifact@v4.6.2
@@ -97,6 +105,14 @@ jobs:
       - name: Install Linux desktop build dependencies
         run: sudo apt-get update && sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
       - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: pnpm/action-setup@v6.0.10
+        with:
+          version: 11
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
       - uses: Swatinem/rust-cache@v2.9.2
         with:
           shared-key: external-pr-rust-tests-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
@@ -105,7 +121,7 @@ jobs:
         run: |
           mkdir -p .ci-artifacts
           set +e
-          cargo test --workspace 2>&1 | tee .ci-artifacts/cargo-test.log
+          pnpm run ci:test 2>&1 | tee .ci-artifacts/cargo-test.log
           test_exit=${PIPESTATUS[0]}
           echo "result=$test_exit" >> "$GITHUB_OUTPUT"
           exit $test_exit
@@ -238,12 +254,12 @@ EOF
         run: |
           mkdir -p .ci-artifacts
           set -o pipefail
-          pnpm --dir ui run format 2>&1 | tee .ci-artifacts/frontend-format.log
+          pnpm run ci:ui-format 2>&1 | tee .ci-artifacts/frontend-format.log
       - name: Run frontend lint
         run: |
           mkdir -p .ci-artifacts
           set -o pipefail
-          pnpm --dir ui run lint 2>&1 | tee .ci-artifacts/frontend-lint.log
+          pnpm run ci:ui-lint 2>&1 | tee .ci-artifacts/frontend-lint.log
       - name: Upload frontend lint logs
         if: failure()
         uses: actions/upload-artifact@v4.6.2
@@ -271,10 +287,11 @@ EOF
         run: |
           mkdir -p .ci-artifacts
           set -o pipefail
-          pnpm --dir ui run build 2>&1 | tee .ci-artifacts/frontend-build.log
+          pnpm run ci:ui-build 2>&1 | tee .ci-artifacts/frontend-build.log
       - name: Upload frontend build logs
         if: failure()
         uses: actions/upload-artifact@v4.6.2
         with:
           name: external-pr-frontend-build-logs-${{ github.run_id }}
           path: .ci-artifacts
+

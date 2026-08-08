@@ -78,12 +78,20 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.88.0
         with:
           components: rustfmt, clippy
+      - uses: pnpm/action-setup@v6.0.10
+        with:
+          version: 11
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
       - uses: Swatinem/rust-cache@v2.9.2
         with:
           shared-key: workspace-${{ runner.os }}
-      - run: cargo fmt --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
+      - run: pnpm run ci:rustfmt
+      - run: pnpm run ci:clippy
+      - run: pnpm run ci:test
 
   frontend:
     name: Frontend
@@ -101,5 +109,5 @@ jobs:
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
-      - run: pnpm --dir ui run format
-      - run: pnpm --dir ui run lint
+      - run: pnpm run ci:frontend
+
