@@ -24,6 +24,7 @@ concurrency:
 
 jobs:
   changes:
+    if: github.event_name == 'pull_request' && github.event.pull_request != null
     name: Detect changed paths
     runs-on: ubuntu-latest
     outputs:
@@ -47,7 +48,7 @@ jobs:
 
   rust-lint:
     name: External PR • Rust lint
-    if: github.event.pull_request.head.repo.full_name != github.repository && needs.changes.outputs.rust == 'true'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     needs: changes
     steps:
@@ -92,7 +93,7 @@ jobs:
 
   rust-tests:
     name: External PR • Rust tests
-    if: github.event.pull_request.head.repo.full_name != github.repository && needs.changes.outputs.rust == 'true'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     needs: changes
     steps:
@@ -236,7 +237,7 @@ EOF
 
   frontend-lint:
     name: External PR • Frontend lint
-    if: github.event.pull_request.head.repo.full_name != github.repository && needs.changes.outputs.ui == 'true'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-latest
     needs: changes
     steps:
@@ -269,7 +270,7 @@ EOF
 
   frontend-build:
     name: External PR • Frontend build
-    if: github.event.pull_request.head.repo.full_name != github.repository && needs.changes.outputs.ui == 'true'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-latest
     needs: changes
     steps:
