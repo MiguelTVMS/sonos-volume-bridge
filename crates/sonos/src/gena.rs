@@ -20,6 +20,7 @@ use tokio::{
 use url::Url;
 
 const MAX_NOTIFY_BYTES: usize = 64 * 1024;
+const DEFAULT_SUBSCRIPTION_TIMEOUT: Duration = Duration::from_secs(300);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Subscription {
@@ -114,18 +115,20 @@ async fn subscription_from_response(
         .get("timeout")
         .and_then(|value| value.to_str().ok())
         .and_then(parse_timeout)
-        .ok_or(SonosError::MissingSoapValue("TIMEOUT"))?;
+        .unwrap_or(DEFAULT_SUBSCRIPTION_TIMEOUT);
     Ok(Subscription { id, timeout })
 }
 fn timeout_header(timeout: Duration) -> String {
     format!("Second-{}", timeout.as_secs())
 }
 fn parse_timeout(value: &str) -> Option<Duration> {
-    value
-        .strip_prefix("Second-")?
-        .parse::<u64>()
-        .ok()
-        .map(Duration::from_secs)
+    let value = value.trim().trim_matches('"');
+    let value = value.to_ascii_lowercase();
+    let value = value.strip_prefix("second-")?;
+    if value == "infinite" {
+        return Some(DEFAULT_SUBSCRIPTION_TIMEOUT);
+    }
+    value.parse::<u64>().ok().map(Duration::from_secs)
 }
 
 /// Listener restricted to the supplied local bind address and Sonos peer address.
@@ -233,5 +236,28 @@ mod tests {
             parse_notify(request, "/sonos-volume-bridge/a", Some("uuid:sub")).unwrap();
         assert_eq!(body, b"body");
         assert_eq!(sequence, Some(2));
+    }
+
+    #[test]
+    fn parses_timeout_with_expected_prefix_case_and_whitespace() {
+        assert_eq!(
+            parse_timeout(" second-300 "),
+            Some(Duration::from_secs(300))
+        );
+        assert_eq!(parse_timeout("Second-300"), Some(Duration::from_secs(300)));
+        assert_eq!(parse_timeout("SECOND-45"), Some(Duration::from_secs(45)));
+        assert_eq!(
+            parse_timeout("\"Second-120\""),
+            Some(Duration::from_secs(120))
+        );
+    }
+
+    #[test]
+    fn parses_infinite_or_invalid_timeout_as_fallback() {
+        assert_eq!(
+            parse_timeout("Second-infinite"),
+            Some(Duration::from_secs(300))
+        );
+        assert_eq!(parse_timeout(""), None);
     }
 }

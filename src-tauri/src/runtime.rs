@@ -18,7 +18,7 @@ use sonos_volume_bridge_platform_audio::{
     AudioDeviceSelection, PlatformAudioError, SystemAudioController, SystemAudioEvent,
 };
 use sonos_volume_bridge_sonos::{
-    CallbackListener, GenaClient, SonosClient, SonosDevice, SonosId, discover,
+    CallbackListener, EventDeduplicator, GenaClient, SonosClient, SonosDevice, SonosId, discover,
 };
 use sonos_volume_bridge_synchronization::Synchronizer;
 use std::{
@@ -375,6 +375,7 @@ async fn run_session(
         .as_ref()
         .map_or_else(|| Instant::now() + Duration::from_secs(5), renewal_at);
     let mut last_local = Some(local_state);
+    let mut deduplicator = EventDeduplicator::default();
 
     loop {
         let poll_delay = coordinator.next_poll_interval();
@@ -386,7 +387,7 @@ async fn run_session(
                 }
             }
             event = listener.recv() => {
-                if let Some(event) = event {
+                if let Some(event) = event.filter(|event| deduplicator.accept(event.clone())) {
                     coordinator.on_sonos_event(event.state.volume, event.state.muted).await.map_err(RuntimeError::from)?;
                     let local_state = audio.current_state().await.map_err(RuntimeError::Local)?;
                     update_snapshot(snapshot, app, generation, UiStatus::Synchronized, Some(SnapshotValues { name: &speaker_name, sonos_volume: Some(event.state.volume.get()), local_volume: Some(local_state.volume.get()), muted: Some(event.state.muted.0) }));

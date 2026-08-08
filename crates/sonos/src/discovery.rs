@@ -35,6 +35,9 @@ fn bind_addresses(ips: impl IntoIterator<Item = IpAddr>) -> Vec<SocketAddr> {
             IpAddr::V4(ip) if !ip.is_loopback() && !ip.is_unspecified() => {
                 Some(SocketAddr::from((ip, 0)))
             }
+            IpAddr::V6(ip) if !ip.is_loopback() && !ip.is_unspecified() => {
+                Some(SocketAddr::from((ip, 0)))
+            }
             _ => None,
         })
         .collect();
@@ -143,6 +146,7 @@ pub(crate) fn validate_local_url(url: &Url) -> Result<(), SonosError> {
     }
     let host = url.host_str().ok_or(SonosError::MissingHost)?;
     let address = host
+        .trim_matches(|c| c == '[' || c == ']')
         .parse::<std::net::IpAddr>()
         .map_err(|_| SonosError::NonLocalHost(host.to_owned()))?;
     let allowed = match address {
@@ -171,11 +175,49 @@ mod tests {
                 IpAddr::from([10, 3, 10, 42]),
                 IpAddr::from([169, 254, 1, 10]),
                 IpAddr::V6("fe80::1".parse().unwrap()),
+                IpAddr::V6("fe80::2".parse().unwrap()),
+                IpAddr::V6("fe80::1".parse().unwrap()),
             ]),
             vec![
                 "10.3.10.42:0".parse().unwrap(),
                 "169.254.1.10:0".parse().unwrap(),
+                "[fe80::1]:0".parse().unwrap(),
+                "[fe80::2]:0".parse().unwrap(),
             ]
         );
+    }
+
+    #[test]
+    fn validate_local_urls_allow_private_ipv4_and_ipv6_hosts() {
+        assert!(
+            validate_local_url(&Url::parse("http://192.168.1.42:1400/description.xml").unwrap())
+                .is_ok()
+        );
+        assert!(
+            validate_local_url(&Url::parse("http://[fe80::1]:1400/description.xml").unwrap())
+                .is_ok()
+        );
+        assert!(
+            validate_local_url(&Url::parse("http://[fd00::1]:1400/description.xml").unwrap())
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn validate_local_urls_reject_non_http_or_public_addresses() {
+        assert!(matches!(
+            validate_local_url(&Url::parse("https://192.168.1.42:1400/description.xml").unwrap()),
+            Err(SonosError::NonHttpUrl)
+        ));
+        assert!(matches!(
+            validate_local_url(&Url::parse("http://93.184.216.34:1400/description.xml").unwrap()),
+            Err(SonosError::NonLocalHost(_))
+        ));
+        assert!(matches!(
+            validate_local_url(
+                &Url::parse("http://[2001:4860:4860::8888]:1400/description.xml").unwrap()
+            ),
+            Err(SonosError::NonLocalHost(_))
+        ));
     }
 }
