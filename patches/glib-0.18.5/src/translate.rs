@@ -2234,15 +2234,15 @@ where
         let orig_ptr = ptr;
         let mut res = Vec::with_capacity(num);
         for _ in 0..num {
-            if ptr.is_null() {
+            let Some(node) = ptr.as_ref() else {
                 break;
-            }
+            };
 
-            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from((*ptr).data);
+            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from(node.data);
             if !item_ptr.is_null() {
                 res.push(from_glib_full(item_ptr));
             }
-            ptr = (*ptr).next;
+            ptr = node.next;
         }
         ffi::g_slist_free(orig_ptr);
         res
@@ -2257,12 +2257,12 @@ where
 {
     unsafe fn from_glib_none_as_vec(mut ptr: *mut ffi::GSList) -> Vec<T> {
         let mut res = Vec::new();
-        while !ptr.is_null() {
-            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from((*ptr).data);
+        while let Some(node) = ptr.as_ref() {
+            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from(node.data);
             if !item_ptr.is_null() {
                 res.push(from_glib_none(item_ptr));
             }
-            ptr = (*ptr).next;
+            ptr = node.next;
         }
         res
     }
@@ -2272,16 +2272,15 @@ where
         ffi::g_slist_free(ptr);
         res
     }
-
     unsafe fn from_glib_full_as_vec(mut ptr: *mut ffi::GSList) -> Vec<T> {
         let orig_ptr = ptr;
         let mut res = Vec::new();
-        while !ptr.is_null() {
-            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from((*ptr).data);
+        while let Some(node) = ptr.as_ref() {
+            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from(node.data);
             if !item_ptr.is_null() {
                 res.push(from_glib_full(item_ptr));
             }
-            ptr = (*ptr).next;
+            ptr = node.next;
         }
         ffi::g_slist_free(orig_ptr);
         res
@@ -2300,15 +2299,15 @@ where
         }
         let mut res = Vec::with_capacity(num);
         for _ in 0..num {
-            if ptr.is_null() {
+            let Some(node) = ptr.as_ref() else {
                 break;
-            }
+            };
 
-            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from((*ptr).data);
+            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from(node.data);
             if !item_ptr.is_null() {
                 res.push(from_glib_none(item_ptr));
             }
-            ptr = (*ptr).next;
+            ptr = node.next;
         }
         res
     }
@@ -2326,15 +2325,15 @@ where
         let orig_ptr = ptr;
         let mut res = Vec::with_capacity(num);
         for _ in 0..num {
-            if ptr.is_null() {
+            let Some(node) = ptr.as_ref() else {
                 break;
-            }
+            };
 
-            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from((*ptr).data);
+            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from(node.data);
             if !item_ptr.is_null() {
                 res.push(from_glib_full(item_ptr));
             }
-            ptr = (*ptr).next;
+            ptr = node.next;
         }
         ffi::g_list_free(orig_ptr);
         res
@@ -2349,12 +2348,12 @@ where
 {
     unsafe fn from_glib_none_as_vec(mut ptr: *mut ffi::GList) -> Vec<T> {
         let mut res = Vec::new();
-        while !ptr.is_null() {
-            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from((*ptr).data);
+        while let Some(node) = ptr.as_ref() {
+            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from(node.data);
             if !item_ptr.is_null() {
                 res.push(from_glib_none(item_ptr));
             }
-            ptr = (*ptr).next;
+            ptr = node.next;
         }
         res
     }
@@ -2368,12 +2367,12 @@ where
     unsafe fn from_glib_full_as_vec(mut ptr: *mut ffi::GList) -> Vec<T> {
         let orig_ptr = ptr;
         let mut res = Vec::new();
-        while !ptr.is_null() {
-            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from((*ptr).data);
+        while let Some(node) = ptr.as_ref() {
+            let item_ptr: <T as GlibPtrDefault>::GlibType = Ptr::from(node.data);
             if !item_ptr.is_null() {
                 res.push(from_glib_full(item_ptr));
             }
-            ptr = (*ptr).next;
+            ptr = node.next;
         }
         ffi::g_list_free(orig_ptr);
         res
@@ -2572,16 +2571,25 @@ where
         + FromGlibPtrFull<<T as GlibPtrDefault>::GlibType>,
 {
     unsafe fn from_glib_none_as_vec(ptr: *mut ffi::GPtrArray) -> Vec<T> {
+        if ptr.is_null() {
+            return Vec::new();
+        }
         let num = (*ptr).len as usize;
         FromGlibContainer::from_glib_none_num(ptr, num)
     }
 
     unsafe fn from_glib_container_as_vec(ptr: *mut ffi::GPtrArray) -> Vec<T> {
+        if ptr.is_null() {
+            return Vec::new();
+        }
         let num = (*ptr).len as usize;
         FromGlibContainer::from_glib_container_num(ptr, num)
     }
 
     unsafe fn from_glib_full_as_vec(ptr: *mut ffi::GPtrArray) -> Vec<T> {
+        if ptr.is_null() {
+            return Vec::new();
+        }
         let num = (*ptr).len as usize;
         FromGlibContainer::from_glib_full_num(ptr, num)
     }
