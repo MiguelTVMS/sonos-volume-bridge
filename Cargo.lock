@@ -3393,7 +3393,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "serde",
@@ -3418,7 +3418,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-domain"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "serde",
  "thiserror 2.0.19",
@@ -3426,7 +3426,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-integration"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "sonos-volume-bridge-domain",
@@ -3437,7 +3437,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-platform-audio"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "sonos-volume-bridge-domain",
@@ -3449,7 +3449,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-sonos"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "if-addrs",
  "quick-xml",
@@ -3465,14 +3465,14 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-synchronization"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "sonos-volume-bridge-domain",
 ]
 
 [[package]]
 name = "sonos-volume-bridge-test-support"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "sonos-volume-bridge-domain",
  "tokio",
@@ -5563,4 +5563,3 @@ dependencies = [
  "syn 2.0.119",
  "winnow 1.0.4",
 ]
-
