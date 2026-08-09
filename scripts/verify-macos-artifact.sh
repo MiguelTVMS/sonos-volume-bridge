@@ -34,7 +34,7 @@ case "$channel" in
     fi
     ;;
   app-store)
-    codesign --display --verbose=4 "$app_path" 2>&1 | grep -F 'Apple Distribution'
+    codesign --display --verbose=4 "$app_path" 2>&1 | grep -E 'Mac App Distribution|3rd Party Mac Developer Application'
     profile="$app_path/Contents/embedded.provisionprofile"
     test -f "$profile"
     security cms -D -i "$profile" >"$profile_plist"

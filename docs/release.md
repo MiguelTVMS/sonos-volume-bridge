@@ -27,7 +27,7 @@ executable produced by the unprivileged build job, imports the Developer ID
 identity into an ephemeral keychain, bundles a sandboxed application, signs it
 with Hardened Runtime, submits it to Apple for notarization, staples the ticket,
 and verifies the result before the archive is published. The protected Mac App
-Store job independently imports its Apple Distribution and Mac Installer
+Store job independently imports its Mac App Distribution and Mac Installer
 Distribution identities, embeds the Mac App Store provisioning profile, verifies
 the sandbox entitlements and profile, then produces a signed upload `.pkg`.
 The Windows build job uploads its one
@@ -111,7 +111,7 @@ release:
   keychain password, notarization private key, and optionally a base64 Developer
   ID provisioning profile as secrets.
 - `apple-app-store`: `APPLE_APP_STORE_SIGNING_IDENTITY` and
-  `APPLE_MAC_INSTALLER_IDENTITY` variables; Apple Distribution certificate,
+  `APPLE_MAC_INSTALLER_IDENTITY` variables; Mac App Distribution certificate,
   Mac Installer Distribution certificate, their passwords, keychain password,
   and the base64 Mac App Store provisioning profile as secrets.
 

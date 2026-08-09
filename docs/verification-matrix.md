@@ -4,7 +4,7 @@ Run this matrix for every release candidate on a private local network with one
 supported Sonos speaker and one physical output device per operating system.
 Complete this matrix before treating a release as ready for general use. The
 macOS direct-download package is Developer ID signed and notarized. The Mac App
-Store package is Apple Distribution signed with an embedded provisioning
+Store package is Mac App Distribution signed with an embedded provisioning
 profile. The Windows installer is currently unsigned.
 Record the operating-system version, Sonos firmware version, speaker model, and
 result in the release issue. Do not record device serial numbers, LAN addresses,
