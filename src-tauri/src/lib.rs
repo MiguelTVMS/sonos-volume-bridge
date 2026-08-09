@@ -28,11 +28,34 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let config_path = app.path().app_config_dir()?.join("config.json");
             let store = ConfigStore::new(config_path);
-            let configuration = store
+            let mut configuration = store
                 .load_or_default()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
+            #[cfg(target_os = "macos")]
+            let migrated_fixed_output = if configuration.follow_default_audio_device {
+                false
+            } else {
+                configuration
+                    .fixed_audio_device_id
+                    .as_deref()
+                    .and_then(sonos_volume_bridge_platform_audio::macos::migrate_legacy_device_id)
+                    .map(|uid| {
+                        configuration.fixed_audio_device_id = Some(uid);
+                        store
+                            .save(&configuration)
+                            .map_err(|error| std::io::Error::other(error.to_string()))
+                    })
+                    .transpose()?
+                    .is_some()
+            };
             let guard = logging::initialize(&app.path().app_log_dir()?, configuration.log_level)?;
             tracing::info!("SonosVolumeBridge application shell starting");
+            #[cfg(target_os = "macos")]
+            if migrated_fixed_output {
+                tracing::info!(
+                    "migrated selected local audio output to a persistent Core Audio UID"
+                );
+            }
             let state = AppState::new(store, configuration, guard);
             app.manage(state);
             tray::install(app.handle())?;

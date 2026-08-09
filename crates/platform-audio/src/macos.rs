@@ -46,10 +46,12 @@ const ELEMENT_MASTER: UInt32 = 0;
 const DEFAULT_OUTPUT_DEVICE: UInt32 = 0x644f_7574; // 'dOut'
 const DEVICES: UInt32 = 0x6465_7623; // 'dev#'
 const OBJECT_NAME: UInt32 = 0x6c6e_616d; // 'lnam'
+const DEVICE_UID: UInt32 = 0x7569_6420; // 'uid '
 const VOLUME_SCALAR: UInt32 = 0x766f_6c6d; // 'volm'
 const MUTE: UInt32 = 0x6d75_7465; // 'mute'
 const STREAM_CONFIGURATION: UInt32 = 0x736c_6179; // 'slay'
 const EXPECTED_WRITE_LIFETIME_MS: u64 = 500;
+const DEVICE_UNAVAILABLE: OSStatus = -2;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -130,6 +132,16 @@ const UTF8: u32 = 0x0800_0100;
 pub fn list_output_devices() -> Result<Vec<AudioOutputDevice>, PlatformAudioError> {
     // SAFETY: all FFI calls use correctly sized buffers and only copy Core Audio-owned values.
     unsafe { output_devices().map_err(map_error) }
+}
+
+/// Converts a legacy numeric Core Audio object ID to its persistent device UID.
+///
+/// Core Audio object IDs may change when a USB output reconnects. This is only
+/// used to migrate existing settings while that output is still available.
+pub fn migrate_legacy_device_id(id: &str) -> Option<String> {
+    let id = legacy_audio_object_id(id)?;
+    // SAFETY: this only reads the UID property from the currently registered device.
+    unsafe { device_uid(id) }
 }
 
 #[derive(Clone)]
@@ -268,7 +280,7 @@ fn run_worker(
     let mut endpoint = match unsafe { Endpoint::attach(&selection, Arc::clone(&context)) } {
         Ok(endpoint) => endpoint,
         Err(error) => {
-            eprintln!("Core Audio default output attachment failed with OSStatus {error}");
+            eprintln!("Core Audio selected output attachment failed with OSStatus {error}");
             let _ = events.send(SystemAudioEvent::DeviceUnavailable { device_id: None });
             return;
         }
@@ -292,19 +304,19 @@ fn run_worker(
             Command::SetMuted { muted, response } => {
                 let _ = response.send(unsafe { endpoint.set_muted(muted) });
             }
-            Command::Reattach if selection == AudioDeviceSelection::FollowDefault => match unsafe {
-                Endpoint::attach(&selection, Arc::clone(&context))
-            } {
-                Ok(next) => {
-                    endpoint.detach();
-                    endpoint = next;
-                    let _ = events.send(SystemAudioEvent::DefaultOutputChanged);
+            Command::Reattach => {
+                match unsafe { Endpoint::attach(&selection, Arc::clone(&context)) } {
+                    Ok(next) => {
+                        endpoint.detach();
+                        endpoint = next;
+                        let _ = events.send(SystemAudioEvent::DefaultOutputChanged);
+                    }
+                    Err(_) => {
+                        let _ =
+                            events.send(SystemAudioEvent::DeviceUnavailable { device_id: None });
+                    }
                 }
-                Err(_) => {
-                    let _ = events.send(SystemAudioEvent::DeviceUnavailable { device_id: None });
-                }
-            },
-            Command::Reattach => {}
+            }
         }
     }
     endpoint.detach();
@@ -324,9 +336,9 @@ impl Endpoint {
     ) -> Result<Self, OSStatus> {
         let id = match selection {
             AudioDeviceSelection::FollowDefault => unsafe { default_output_device()? },
-            AudioDeviceSelection::Fixed { device_id } => {
-                device_id.parse::<AudioObjectID>().map_err(|_| -1)?
-            }
+            AudioDeviceSelection::Fixed { device_id } => unsafe {
+                resolve_fixed_output(device_id)?
+            },
         };
         let master = address(VOLUME_SCALAR, SCOPE_OUTPUT, ELEMENT_MASTER);
         let has_master = unsafe { AudioObjectHasProperty(id, &master) != 0 }
@@ -451,6 +463,17 @@ impl Endpoint {
                 "Core Audio default-output listener registration failed with OSStatus {status}"
             );
         }
+        let status = unsafe {
+            AudioObjectAddPropertyListener(
+                SYSTEM_OBJECT,
+                &address(DEVICES, SCOPE_GLOBAL, ELEMENT_MASTER),
+                device_list_changed,
+                data,
+            )
+        };
+        if status != NO_ERR {
+            eprintln!("Core Audio device-list listener registration failed with OSStatus {status}");
+        }
     }
     fn detach(&self) {
         // SAFETY: registrations use this endpoint's stable context pointer; Core Audio no longer invokes it after removal returns.
@@ -476,6 +499,12 @@ impl Endpoint {
                 SYSTEM_OBJECT,
                 &address(DEFAULT_OUTPUT_DEVICE, SCOPE_GLOBAL, ELEMENT_MASTER),
                 default_output_changed,
+                data,
+            );
+            let _ = AudioObjectRemovePropertyListener(
+                SYSTEM_OBJECT,
+                &address(DEVICES, SCOPE_GLOBAL, ELEMENT_MASTER),
+                device_list_changed,
                 data,
             );
         }
@@ -514,6 +543,18 @@ unsafe extern "C" fn property_changed(
 }
 
 unsafe extern "C" fn default_output_changed(
+    _: AudioObjectID,
+    _: UInt32,
+    _: *const AudioObjectPropertyAddress,
+    data: *mut c_void,
+) -> OSStatus {
+    if let Some(context) = unsafe { data.cast::<CallbackContext>().as_ref() } {
+        let _ = context.commands.try_send(Command::Reattach);
+    }
+    NO_ERR
+}
+
+unsafe extern "C" fn device_list_changed(
     _: AudioObjectID,
     _: UInt32,
     _: *const AudioObjectPropertyAddress,
@@ -564,6 +605,16 @@ unsafe fn default_output_device() -> Result<AudioObjectID, OSStatus> {
             address(DEFAULT_OUTPUT_DEVICE, SCOPE_GLOBAL, ELEMENT_MASTER),
         )
     }
+}
+unsafe fn resolve_fixed_output(device_id: &str) -> Result<AudioObjectID, OSStatus> {
+    if let Some(id) = legacy_audio_object_id(device_id) {
+        return Ok(id);
+    }
+    let devices = unsafe { audio_object_ids()? };
+    devices
+        .into_iter()
+        .find(|id| unsafe { device_uid(*id).as_deref() == Some(device_id) })
+        .ok_or(DEVICE_UNAVAILABLE)
 }
 unsafe fn scalar(id: AudioObjectID, address: AudioObjectPropertyAddress) -> Result<f32, OSStatus> {
     unsafe { get(id, address) }
@@ -700,6 +751,14 @@ unsafe fn output_channels(id: AudioObjectID) -> Result<Vec<UInt32>, OSStatus> {
 }
 
 unsafe fn output_devices() -> Result<Vec<AudioOutputDevice>, OSStatus> {
+    let ids = unsafe { audio_object_ids()? };
+    Ok(ids
+        .into_iter()
+        .filter_map(|id| unsafe { output_device(id) })
+        .collect())
+}
+
+unsafe fn audio_object_ids() -> Result<Vec<AudioObjectID>, OSStatus> {
     let devices_address = address(DEVICES, SCOPE_GLOBAL, ELEMENT_MASTER);
     let mut size = 0_u32;
     let status = unsafe {
@@ -728,10 +787,7 @@ unsafe fn output_devices() -> Result<Vec<AudioOutputDevice>, OSStatus> {
     if status != NO_ERR {
         return Err(status);
     }
-    Ok(ids
-        .into_iter()
-        .filter_map(|id| unsafe { output_device(id) })
-        .collect())
+    Ok(ids)
 }
 
 unsafe fn output_device(id: AudioObjectID) -> Option<AudioOutputDevice> {
@@ -744,19 +800,25 @@ unsafe fn output_device(id: AudioObjectID) -> Option<AudioOutputDevice> {
         && matches!(unsafe { settable(id, &master) }, Ok(true)))
         || unsafe { output_channels(id).is_ok_and(|channels| !channels.is_empty()) };
     Some(AudioOutputDevice {
-        id: id.to_string(),
+        id: unsafe { device_uid(id) }?,
         name: unsafe { device_name(id) }.unwrap_or_else(|| format!("Output device {id}")),
         writable_volume,
     })
 }
 
 unsafe fn device_name(id: AudioObjectID) -> Option<String> {
+    unsafe { string_property(id, OBJECT_NAME) }
+}
+unsafe fn device_uid(id: AudioObjectID) -> Option<String> {
+    unsafe { string_property(id, DEVICE_UID) }
+}
+unsafe fn string_property(id: AudioObjectID, selector: UInt32) -> Option<String> {
     let mut value: *const c_void = std::ptr::null();
     let mut size = std::mem::size_of_val(&value) as u32;
     let status = unsafe {
         AudioObjectGetPropertyData(
             id,
-            &address(OBJECT_NAME, SCOPE_GLOBAL, ELEMENT_MASTER),
+            &address(selector, SCOPE_GLOBAL, ELEMENT_MASTER),
             0,
             std::ptr::null(),
             &mut size,
@@ -779,11 +841,16 @@ unsafe fn device_name(id: AudioObjectID) -> Option<String> {
     .map(str::to_owned)
 }
 fn map_error(status: OSStatus) -> PlatformAudioError {
-    if status == -1 {
+    if status == DEVICE_UNAVAILABLE {
+        PlatformAudioError::DeviceUnavailable
+    } else if status == -1 {
         PlatformAudioError::UnsupportedDevice
     } else {
         PlatformAudioError::Platform(format!("Core Audio OSStatus {status}"))
     }
+}
+fn legacy_audio_object_id(id: &str) -> Option<AudioObjectID> {
+    id.parse().ok()
 }
 fn now_ms() -> u64 {
     SystemTime::now()
@@ -821,5 +888,11 @@ mod tests {
             expected.classify(observed, 9),
             sonos_volume_bridge_domain::SuppressionDecision::Suppress
         );
+    }
+
+    #[test]
+    fn recognizes_legacy_numeric_device_ids_only() {
+        assert_eq!(legacy_audio_object_id("331"), Some(331));
+        assert_eq!(legacy_audio_object_id("com.example.output"), None);
     }
 }
