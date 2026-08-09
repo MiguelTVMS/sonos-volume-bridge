@@ -161,21 +161,21 @@ jobs:
           fi
 
           cat > "$summary_file" <<EOF
-### Rust test summary
+          ### Rust test summary
 
-- Exit code: ${{ steps.run_tests.outputs.result }}
-- Overall: $overall
-- Test suites: ${total_packages}
-- Passed suites: ${ok_packages}
-- Failed suites: ${failed_packages}
-- Total passed: ${passed_tests}
-- Total failed: ${failed_tests}
-- Total ignored: ${ignored_tests}
-- Total measured: ${measured_tests}
-- Total filtered: ${filtered_tests}
+          - Exit code: ${{ steps.run_tests.outputs.result }}
+          - Overall: $overall
+          - Test suites: ${total_packages}
+          - Passed suites: ${ok_packages}
+          - Failed suites: ${failed_packages}
+          - Total passed: ${passed_tests}
+          - Total failed: ${failed_tests}
+          - Total ignored: ${ignored_tests}
+          - Total measured: ${measured_tests}
+          - Total filtered: ${filtered_tests}
 
-#### Raw summary lines
-EOF
+          #### Raw summary lines
+          EOF
           if [[ -n "$summary_lines" ]]; then
             while IFS= read -r line; do
               printf '- `%s`\n' "$line" >> "$summary_file"
@@ -295,4 +295,3 @@ EOF
         with:
           name: external-pr-frontend-build-logs-${{ github.run_id }}
           path: .ci-artifacts
-
