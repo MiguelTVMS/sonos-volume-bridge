@@ -1,0 +1,87 @@
+name: Verify Mac App Store Signing
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-macos-app-store-signing
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Sign and verify Mac App Store package
+    runs-on: macos-latest
+    environment: apple-app-store
+    env:
+      APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_APP_STORE_SIGNING_IDENTITY }}
+      APPLE_MAC_INSTALLER_IDENTITY: ${{ vars.APPLE_MAC_INSTALLER_IDENTITY }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          shared-key: workspace
+      - uses: pnpm/action-setup@v6.0.10
+        with:
+          version: 11
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: cargo install tauri-cli --version '^2' --locked
+      - name: Import App Store signing certificates
+        env:
+          APPLE_APP_STORE_CERTIFICATE: ${{ secrets.APPLE_APP_STORE_CERTIFICATE }}
+          APPLE_APP_STORE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_APP_STORE_CERTIFICATE_PASSWORD }}
+          APPLE_MAC_INSTALLER_CERTIFICATE: ${{ secrets.APPLE_MAC_INSTALLER_CERTIFICATE }}
+          APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          keychain_path="$RUNNER_TEMP/apple-app-store.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          curl --fail --silent --show-error --location \
+            https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer \
+            --output "$RUNNER_TEMP/AppleWWDRCAG3.cer"
+          security import "$RUNNER_TEMP/AppleWWDRCAG3.cer" -k "$keychain_path"
+          printf '%s' "$APPLE_APP_STORE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/app-store.p12"
+          printf '%s' "$APPLE_MAC_INSTALLER_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/mac-installer.p12"
+          security import "$RUNNER_TEMP/app-store.p12" -k "$keychain_path" -P "$APPLE_APP_STORE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security import "$RUNNER_TEMP/mac-installer.p12" -k "$keychain_path" -P "$APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          security default-keychain -s "$keychain_path"
+          security find-identity -v -p codesigning "$keychain_path" | grep -F "\"$APPLE_SIGNING_IDENTITY\""
+          security find-identity -v -p basic "$keychain_path" | grep -F "\"$APPLE_MAC_INSTALLER_IDENTITY\""
+      - name: Materialize the Mac App Store provisioning profile
+        env:
+          APPLE_APP_STORE_PROVISIONING_PROFILE: ${{ secrets.APPLE_APP_STORE_PROVISIONING_PROFILE }}
+        run: |
+          printf '%s' "$APPLE_APP_STORE_PROVISIONING_PROFILE" | base64 --decode > src-tauri/macos-app-store.provisionprofile
+          chmod 600 src-tauri/macos-app-store.provisionprofile
+          security cms -D -i src-tauri/macos-app-store.provisionprofile >/dev/null
+          ./scripts/prepare-profile-entitlements.sh src-tauri/macos-app-store.provisionprofile src-tauri/Entitlements.appstore.plist
+      - name: Bundle and verify the App Store application
+        run: |
+          cargo tauri bundle --bundles app --config src-tauri/tauri.appstore.conf.json
+          app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
+          pnpm run verify:macos-artifact -- app-store "$app_path"
+          xcrun productbuild --sign "$APPLE_MAC_INSTALLER_IDENTITY" --component "$app_path" /Applications sonos-volume-bridge-macos-app-store.pkg
+          pkgutil --check-signature sonos-volume-bridge-macos-app-store.pkg | grep -F 'Status: signed by a certificate trusted by Mac OS X'
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: macos-app-store-signing-verification
+          path: sonos-volume-bridge-macos-app-store.pkg
+          if-no-files-found: error
+      - name: Remove temporary Apple credentials
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/apple-app-store.keychain-db" || true
+          rm -f "$RUNNER_TEMP/AppleWWDRCAG3.cer" "$RUNNER_TEMP/app-store.p12" "$RUNNER_TEMP/mac-installer.p12"
+          rm -f src-tauri/macos-app-store.provisionprofile src-tauri/Entitlements.appstore.plist

@@ -12,6 +12,7 @@
     "ci:ui-build": "pnpm --dir ui run build",
     "ci:frontend": "pnpm run ci:ui-format && pnpm run ci:ui-lint",
     "ci:frontend-build": "pnpm run ci:ui-build",
-    "ci:all": "pnpm run ci:rust && pnpm run ci:frontend && pnpm run ci:frontend-build"
+    "ci:all": "pnpm run ci:rust && pnpm run ci:frontend && pnpm run ci:frontend-build",
+    "verify:macos-artifact": "./scripts/verify-macos-artifact.sh"
   }
 }
