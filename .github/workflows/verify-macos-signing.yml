@@ -75,9 +75,7 @@ jobs:
       - name: Verify the signed and notarized app
         run: |
           app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
-          test -d "$app_path"
-          codesign --verify --deep --strict --verbose=4 "$app_path"
-          codesign --display --verbose=4 "$app_path" 2>&1 | grep -F 'runtime'
+          ./scripts/verify-macos-artifact.sh direct "$app_path"
           xcrun stapler validate "$app_path"
           spctl --assess --type execute --verbose=4 "$app_path"
       - name: Archive the verified app bundle

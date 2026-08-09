@@ -3,8 +3,9 @@
 Run this matrix for every release candidate on a private local network with one
 supported Sonos speaker and one physical output device per operating system.
 Complete this matrix before treating a release as ready for general use. The
-macOS package is Developer ID signed and notarized; the Windows installer is
-currently unsigned.
+macOS direct-download package is Developer ID signed and notarized. The Mac App
+Store package is Apple Distribution signed with an embedded provisioning
+profile. The Windows installer is currently unsigned.
 Record the operating-system version, Sonos firmware version, speaker model, and
 result in the release issue. Do not record device serial numbers, LAN addresses,
 or diagnostic payloads.
@@ -38,6 +39,9 @@ or diagnostic payloads.
 | Bundle signature | `codesign --verify --deep --strict --verbose=4` succeeds for the downloaded app bundle and reports the expected Developer ID identity. |
 | Notarization ticket | `xcrun stapler validate` succeeds for the downloaded app bundle. |
 | Gatekeeper assessment | `spctl --assess --type execute --verbose=4` accepts the downloaded app bundle. |
+| Sandbox entitlements | The signed app reports App Sandbox plus incoming and outgoing network entitlements, with no unrelated sandbox entitlement. |
+| App Store profile | The App Store build contains `Contents/embedded.provisionprofile`; its App ID matches the bundle identifier and its entitlements authorize App Sandbox. |
+| Clean-account launch | On a clean macOS account, install and launch each distribution separately. Confirm there are no sandbox denials affecting discovery, control, callbacks, reconnection, polling, Core Audio, tray operation, login launch, settings, diagnostics, or uninstall. |
 | Default output replacement | Change the default output device and confirm safe listener replacement and recovery. |
 | Master/channel volume | Test a device with master volume and, where available, a channel-only device. Both apply the expected local value. |
 | Expected-write suppression | Sonos-confirmed local writes within configured tolerance do not produce a second Sonos command. |
