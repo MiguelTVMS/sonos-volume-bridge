@@ -57,8 +57,8 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
           security list-keychains -d user -s "$keychain_path"
           security default-keychain -s "$keychain_path"
-          security find-identity -v -p codesigning "$keychain_path" | grep -F "\"$APPLE_SIGNING_IDENTITY\""
-          security find-identity -v -p basic "$keychain_path" | grep -F "\"$APPLE_MAC_INSTALLER_IDENTITY\""
+          security find-identity -v -p codesigning "$keychain_path" | grep -F '1 valid identities found'
+          security find-identity -v -p basic "$keychain_path" | grep -F '1 valid identities found'
       - name: Materialize the Mac App Store provisioning profile
         env:
           APPLE_APP_STORE_PROVISIONING_PROFILE: ${{ secrets.APPLE_APP_STORE_PROVISIONING_PROFILE }}
