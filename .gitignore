@@ -3,3 +3,6 @@
 /ui/node_modules/
 /ui/dist/
 /src-tauri/gen/
+/src-tauri/*.provisionprofile
+/src-tauri/Entitlements.appstore.plist
+/src-tauri/Entitlements.direct.plist

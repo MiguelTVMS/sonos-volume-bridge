@@ -22,11 +22,15 @@ GitHub Release with downloadable assets, a channel-aware installation and signin
 The current published release is [v0.3.0](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/tag/v0.3.0).
 
 The release workflow compiles one macOS executable and one Windows executable
-per version. The protected macOS release job downloads the exact executable
-produced by the unprivileged build job, imports the Developer ID identity into
-an ephemeral keychain, bundles and signs the application with Hardened Runtime,
-submits it to Apple for notarization, staples the ticket, and verifies the
-result before the archive is published. The Windows build job uploads its one
+per version. The protected macOS direct-download job downloads the exact
+executable produced by the unprivileged build job, imports the Developer ID
+identity into an ephemeral keychain, bundles a sandboxed application, signs it
+with Hardened Runtime, submits it to Apple for notarization, staples the ticket,
+and verifies the result before the archive is published. The protected Mac App
+Store job independently imports its Apple Distribution and Mac Installer
+Distribution identities, embeds the Mac App Store provisioning profile, verifies
+the sandbox entitlements and profile, then produces a signed upload `.pkg`.
+The Windows build job uploads its one
 compiled output for two independent
 packaging jobs. One produces the clean Microsoft Store MSIX payload while the
 other applies Tauri's NSIS-specific metadata to produce the direct-download
@@ -40,10 +44,10 @@ cache action still isolates entries by operating system, Rust toolchain, Cargo
 manifests, lockfile, and relevant compiler environment, while allowing jobs
 with compatible inputs to reuse downloaded tools and compilation outputs.
 
-Run the manual `Verify macOS Signing` workflow from `develop` after rotating an
-Apple certificate or notarization key. It exercises the same protected signing,
-notarization, stapling, and verification path without changing the version,
-creating a tag, or publishing a release.
+Run the manual `Verify macOS Signing` workflow from `develop` after rotating a
+Developer ID certificate or notarization key. It exercises the direct-download
+signing, notarization, stapling, and verification path without changing the
+version, creating a tag, or publishing a release.
 
 ## Windows packaging
 
@@ -87,12 +91,37 @@ package version is derived from the workspace semantic version as
 
 ## macOS packaging
 
-Build on Apple Silicon at minimum. The release workflow packages the notarized
-app as a ZIP preserving the `.app` bundle. Apple credentials are scoped to the
-protected `apple-signing` GitHub environment and are materialized only in the
-macOS signing job's temporary files and keychain. Verify menu-bar behavior, no
-Dock icon in normal background operation, autostart, wake/reconnect, and
-uninstall.
+Build on Apple Silicon at minimum. macOS 13 or later is required because the
+sandboxed app uses Apple's `SMAppService` login-item API instead of a
+filesystem LaunchAgent. The release workflow packages the notarized
+direct-download app as a ZIP preserving the `.app` bundle and creates a signed
+`.pkg` for Mac App Store upload. The sandbox entitlement set grants only App
+Sandbox plus incoming and outgoing network access. This is required for Sonos
+discovery, control, and event callbacks. Core Audio, local configuration,
+diagnostics, logging, menu-bar operation, and launch-at-login must be validated
+in the sandboxed app on a clean macOS account.
+
+Apple credentials are scoped to the protected `apple-signing` and
+`apple-app-store` GitHub environments and are materialized only in each signing
+job's temporary files and keychain. Configure these values before dispatching a
+release:
+
+- `apple-signing`: `APPLE_SIGNING_IDENTITY`, `APPLE_TEAM_ID`, `APPLE_API_ISSUER`,
+  and `APPLE_API_KEY` variables; Developer ID certificate, certificate password,
+  keychain password, notarization private key, and optionally a base64 Developer
+  ID provisioning profile as secrets.
+- `apple-app-store`: `APPLE_APP_STORE_SIGNING_IDENTITY` and
+  `APPLE_MAC_INSTALLER_IDENTITY` variables; Apple Distribution certificate,
+  Mac Installer Distribution certificate, their passwords, keychain password,
+  and the base64 Mac App Store provisioning profile as secrets.
+
+Never commit certificates, private keys, or provisioning profiles. The App Store
+profile must match the bundle identifier in `src-tauri/tauri.conf.json`.
+
+The direct-download and Mac App Store editions are separate installations.
+Users must uninstall the direct-download edition before installing the App Store
+edition. The sandbox uses a different settings container, so existing settings
+are not migrated and must be configured again.
 
 ## Release checklist
 
@@ -105,6 +134,8 @@ uninstall.
   attach the redacted results to the release issue.
 - Approve the protected `apple-signing` environment when the signing job is
   ready to start.
+- Approve the protected `apple-app-store` environment when the Mac App Store
+  signing job is ready to start, then upload its signed `.pkg` after validation.
 - Run the `Release` workflow from `develop`, then merge `develop` into `main`
   after its GitHub Release and downloads have been verified. Do not add Apple
   credentials to this repository.

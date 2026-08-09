@@ -41,7 +41,7 @@ Open it when you want to change a setting; otherwise, it stays out of the way.
 
 ## What you need
 
-- A Windows or macOS computer
+- A Windows computer or a Mac running macOS 13 or later
 - A Sonos speaker on the same local network as the computer
 - A computer audio output whose volume can be changed by software
 
@@ -68,6 +68,12 @@ window and leave the app running from the menu bar or system tray.
 > Windows installer is not yet digitally signed, so Windows SmartScreen may
 > show a warning even when it was downloaded from this project's official
 > GitHub release page.
+
+> [!WARNING]
+> The direct-download and Mac App Store editions of Sonos Volume Bridge are
+> separate installations. Before installing the App Store edition, uninstall
+> the direct-download edition. Your existing settings are not migrated, so you
+> will need to select your speaker and audio preferences again.
 
 ## Privacy
 

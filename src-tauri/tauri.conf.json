@@ -7,8 +7,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "category": "Utility",
     "icon": ["icons/icon.icns", "icons/icon.ico", "icons/icon.png"],
+    "macOS": { "entitlements": "./Entitlements.plist", "minimumSystemVersion": "13.0" },
     "windows": { "nsis": { "template": "./windows/installer.nsi" } }
   }
 }
-

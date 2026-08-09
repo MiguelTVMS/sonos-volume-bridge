@@ -170,8 +170,8 @@ jobs:
           path: sonos-volume-bridge-*-macos-unsigned.tar.gz
           if-no-files-found: error
           retention-days: 1
-  macos-signed:
-    name: Sign and notarize macOS app
+  macos-direct:
+    name: Sign and notarize macOS direct-download app
     needs: [prepare-version, macos-app]
     runs-on: macos-latest
     environment: apple-signing
@@ -232,6 +232,18 @@ jobs:
           printf '%s' "$APPLE_API_PRIVATE_KEY" > "$api_key_path"
           chmod 600 "$api_key_path"
           echo "APPLE_API_KEY_PATH=$api_key_path" >> "$GITHUB_ENV"
+      - name: Materialize an optional Developer ID provisioning profile
+        env:
+          APPLE_DEVELOPER_ID_PROVISIONING_PROFILE: ${{ secrets.APPLE_DEVELOPER_ID_PROVISIONING_PROFILE }}
+        run: |
+          if [ -n "$APPLE_DEVELOPER_ID_PROVISIONING_PROFILE" ]; then
+            printf '%s' "$APPLE_DEVELOPER_ID_PROVISIONING_PROFILE" | base64 --decode > src-tauri/macos-developer-id.provisionprofile
+            chmod 600 src-tauri/macos-developer-id.provisionprofile
+            ./scripts/prepare-profile-entitlements.sh \
+              src-tauri/macos-developer-id.provisionprofile \
+              src-tauri/Entitlements.direct.plist
+            echo "HAS_DEVELOPER_ID_PROFILE=true" >> "$GITHUB_ENV"
+          fi
       - name: Verify the tag matches the application version
         env:
           RELEASE_VERSION: ${{ needs.prepare-version.outputs.version }}
@@ -239,13 +251,16 @@ jobs:
           application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "sonos-volume-bridge"))')"
           test "$RELEASE_VERSION" = "$application_version"
       - name: Bundle, sign, notarize, and staple the existing executable
-        run: cargo tauri bundle --bundles app
+        run: |
+          if [ "${HAS_DEVELOPER_ID_PROFILE:-false}" = true ]; then
+            cargo tauri bundle --bundles app --config src-tauri/tauri.direct.conf.json
+          else
+            cargo tauri bundle --bundles app
+          fi
       - name: Verify the signed and notarized app
         run: |
           app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
-          test -d "$app_path"
-          codesign --verify --deep --strict --verbose=4 "$app_path"
-          codesign --display --verbose=4 "$app_path" 2>&1 | grep -F 'runtime'
+          ./scripts/verify-macos-artifact.sh direct "$app_path"
           xcrun stapler validate "$app_path"
           spctl --assess --type execute --verbose=4 "$app_path"
       - name: Archive the notarized app bundle
@@ -266,6 +281,89 @@ jobs:
           security delete-keychain "$RUNNER_TEMP/apple-signing.keychain-db" || true
           rm -f "$RUNNER_TEMP/developer-id.p12"
           rm -f "$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+          rm -f src-tauri/macos-developer-id.provisionprofile
+          rm -f src-tauri/Entitlements.direct.plist
+
+  macos-app-store:
+    name: Sign macOS App Store package
+    needs: [prepare-version, macos-app]
+    runs-on: macos-latest
+    environment: apple-app-store
+    env:
+      APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_APP_STORE_SIGNING_IDENTITY }}
+      APPLE_MAC_INSTALLER_IDENTITY: ${{ vars.APPLE_MAC_INSTALLER_IDENTITY }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ needs.prepare-version.outputs.commit }}
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          shared-key: workspace
+      - run: cargo install tauri-cli --version '^2' --locked
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: macos-unsigned-${{ needs.prepare-version.outputs.tag }}
+          path: macos-unsigned
+      - name: Restore the unsigned macOS executable
+        run: |
+          tar -xzf macos-unsigned/sonos-volume-bridge-*-macos-unsigned.tar.gz
+          test -x target/release/sonos-volume-bridge
+          test -d ui/dist
+      - name: Import App Store signing certificates
+        env:
+          APPLE_APP_STORE_CERTIFICATE: ${{ secrets.APPLE_APP_STORE_CERTIFICATE }}
+          APPLE_APP_STORE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_APP_STORE_CERTIFICATE_PASSWORD }}
+          APPLE_MAC_INSTALLER_CERTIFICATE: ${{ secrets.APPLE_MAC_INSTALLER_CERTIFICATE }}
+          APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          keychain_path="$RUNNER_TEMP/apple-app-store.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          printf '%s' "$APPLE_APP_STORE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/app-store.p12"
+          printf '%s' "$APPLE_MAC_INSTALLER_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/mac-installer.p12"
+          security import "$RUNNER_TEMP/app-store.p12" -k "$keychain_path" -P "$APPLE_APP_STORE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security import "$RUNNER_TEMP/mac-installer.p12" -k "$keychain_path" -P "$APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          security default-keychain -s "$keychain_path"
+          security find-identity -v -p codesigning "$keychain_path" | grep -F "\"$APPLE_SIGNING_IDENTITY\""
+          security find-identity -v -p basic "$keychain_path" | grep -F "\"$APPLE_MAC_INSTALLER_IDENTITY\""
+      - name: Materialize the Mac App Store provisioning profile
+        env:
+          APPLE_APP_STORE_PROVISIONING_PROFILE: ${{ secrets.APPLE_APP_STORE_PROVISIONING_PROFILE }}
+        run: |
+          printf '%s' "$APPLE_APP_STORE_PROVISIONING_PROFILE" | base64 --decode > src-tauri/macos-app-store.provisionprofile
+          chmod 600 src-tauri/macos-app-store.provisionprofile
+          security cms -D -i src-tauri/macos-app-store.provisionprofile >/dev/null
+          ./scripts/prepare-profile-entitlements.sh \
+            src-tauri/macos-app-store.provisionprofile \
+            src-tauri/Entitlements.appstore.plist
+      - name: Bundle and sign the App Store application
+        run: cargo tauri bundle --bundles app --config src-tauri/tauri.appstore.conf.json
+      - name: Verify the signed App Store application and package it
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+        run: |
+          app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
+          ./scripts/verify-macos-artifact.sh app-store "$app_path"
+          package_path="sonos-volume-bridge-${RELEASE_TAG}-macos-app-store.pkg"
+          xcrun productbuild --sign "$APPLE_MAC_INSTALLER_IDENTITY" --component "$app_path" /Applications "$package_path"
+          pkgutil --check-signature "$package_path" | grep -F 'Status: signed by a certificate trusted by Mac OS X'
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: macos-app-store-${{ needs.prepare-version.outputs.tag }}
+          path: sonos-volume-bridge-*-macos-app-store.pkg
+          if-no-files-found: error
+      - name: Remove temporary Apple credentials
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/apple-app-store.keychain-db" || true
+          rm -f "$RUNNER_TEMP/app-store.p12" "$RUNNER_TEMP/mac-installer.p12"
+          rm -f src-tauri/macos-app-store.provisionprofile
+          rm -f src-tauri/Entitlements.appstore.plist
 
   windows-app:
     name: Build Windows executable
@@ -364,7 +462,7 @@ jobs:
           if-no-files-found: error
   publish-release:
     name: Publish GitHub Release
-    needs: [prepare-version, macos-signed, windows-nsis, windows-msix]
+    needs: [prepare-version, macos-direct, windows-nsis, windows-msix]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -487,4 +585,3 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw 'Microsoft Store submission failed.'
           }
-

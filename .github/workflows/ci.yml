@@ -111,3 +111,10 @@ jobs:
       - run: pnpm --dir ui install --frozen-lockfile
       - run: pnpm run ci:frontend
 
+  macos-packaging:
+    name: macOS packaging configuration
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - run: ./scripts/verify-macos-packaging-config.sh

@@ -1,6 +1,31 @@
 use tauri::AppHandle;
+#[cfg(not(target_os = "macos"))]
 use tauri_plugin_autostart::ManagerExt;
 
+#[cfg(target_os = "macos")]
+#[allow(unsafe_code)] // `objc2` marks Objective-C message dispatch as unsafe.
+fn update_macos(start_at_login: bool) -> Result<(), String> {
+    use objc2_service_management::{SMAppService, SMAppServiceStatus};
+
+    let service = unsafe { SMAppService::mainAppService() };
+    let status = unsafe { service.status() };
+
+    if start_at_login {
+        if status == SMAppServiceStatus::Enabled {
+            return Ok(());
+        }
+        return unsafe { service.registerAndReturnError() }
+            .map_err(|error| format!("macOS could not enable start at login: {error:?}"));
+    }
+
+    if status == SMAppServiceStatus::NotRegistered {
+        return Ok(());
+    }
+    unsafe { service.unregisterAndReturnError() }
+        .map_err(|error| format!("macOS could not disable start at login: {error:?}"))
+}
+
+#[cfg(not(target_os = "macos"))]
 fn update_unpacked(app: &AppHandle, start_at_login: bool) -> Result<(), String> {
     if start_at_login {
         app.autolaunch().enable().map_err(|error| error.to_string())
@@ -13,6 +38,7 @@ fn update_unpacked(app: &AppHandle, start_at_login: bool) -> Result<(), String> 
     }
 }
 
+#[cfg(not(target_os = "macos"))]
 fn is_missing_entry(error: &str) -> bool {
     error.contains("(os error 2)")
 }
@@ -55,6 +81,12 @@ fn update_packaged(start_at_login: bool) -> Result<(), String> {
     }
 }
 
+#[cfg(target_os = "macos")]
+pub fn update(_app: &AppHandle, start_at_login: bool) -> Result<(), String> {
+    update_macos(start_at_login)
+}
+
+#[cfg(not(target_os = "macos"))]
 pub fn update(app: &AppHandle, start_at_login: bool) -> Result<(), String> {
     #[cfg(windows)]
     if windows::ApplicationModel::Package::Current().is_ok() {
@@ -64,7 +96,7 @@ pub fn update(app: &AppHandle, start_at_login: bool) -> Result<(), String> {
     update_unpacked(app, start_at_login)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "macos")))]
 mod tests {
     use super::is_missing_entry;
 
