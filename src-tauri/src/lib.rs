@@ -28,9 +28,11 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let config_path = app.path().app_config_dir()?.join("config.json");
             let store = ConfigStore::new(config_path);
-            let mut configuration = store
+            let configuration = store
                 .load_or_default()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
+            #[cfg(target_os = "macos")]
+            let mut configuration = configuration;
             #[cfg(target_os = "macos")]
             let migrated_fixed_output = if configuration.follow_default_audio_device {
                 false
