@@ -260,7 +260,7 @@ jobs:
       - name: Verify the signed and notarized app
         run: |
           app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
-          pnpm run verify:macos-artifact -- direct "$app_path"
+          ./scripts/verify-macos-artifact.sh direct "$app_path"
           xcrun stapler validate "$app_path"
           spctl --assess --type execute --verbose=4 "$app_path"
       - name: Archive the notarized app bundle
@@ -335,6 +335,12 @@ jobs:
           security default-keychain -s "$keychain_path"
           security find-identity -v -p codesigning "$keychain_path" | grep -F '1 valid identities found'
           security find-identity -v -p basic "$keychain_path" | grep -F '1 valid identities found'
+          app_signing_identity="$(security find-identity -v -p codesigning "$keychain_path" | awk '/^[[:space:]]*[0-9]+\)/ { print $2; exit }')"
+          installer_signing_identity="$(security find-identity -v -p basic "$keychain_path" | awk '/^[[:space:]]*[0-9]+\)/ { print $2; exit }')"
+          test -n "$app_signing_identity"
+          test -n "$installer_signing_identity"
+          echo "APPLE_SIGNING_IDENTITY=$app_signing_identity" >> "$GITHUB_ENV"
+          echo "APPLE_MAC_INSTALLER_IDENTITY=$installer_signing_identity" >> "$GITHUB_ENV"
       - name: Materialize the Mac App Store provisioning profile
         env:
           APPLE_APP_STORE_PROVISIONING_PROFILE: ${{ secrets.APPLE_APP_STORE_PROVISIONING_PROFILE }}
@@ -352,7 +358,7 @@ jobs:
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
         run: |
           app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
-          pnpm run verify:macos-artifact -- app-store "$app_path"
+          ./scripts/verify-macos-artifact.sh app-store "$app_path"
           package_path="sonos-volume-bridge-${RELEASE_TAG}-macos-app-store.pkg"
           xcrun productbuild --sign "$APPLE_MAC_INSTALLER_IDENTITY" --component "$app_path" /Applications "$package_path"
           pkgutil --check-signature "$package_path" | grep -F 'Status: signed by a certificate trusted by Mac OS X'
