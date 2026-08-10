@@ -12,7 +12,7 @@ profile_plist="$(mktemp)"
 trap 'rm -f "$profile_plist"' EXIT
 
 security cms -D -i "$profile" >"$profile_plist"
-application_identifier="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$profile_plist")"
+application_identifier="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.application-identifier' "$profile_plist")"
 team_identifier="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.team-identifier' "$profile_plist")"
 
 python3 - "$application_identifier" "$team_identifier" "$output" <<'PY'
