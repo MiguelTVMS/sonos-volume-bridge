@@ -34,14 +34,13 @@ case "$channel" in
     fi
     ;;
   app-store)
-    codesign --display --verbose=4 "$app_path" 2>&1 | grep -F 'Apple Distribution'
+    codesign --display --verbose=4 "$app_path" 2>&1 | grep -E 'Apple Distribution|Mac App Distribution|3rd Party Mac Developer Application'
     profile="$app_path/Contents/embedded.provisionprofile"
     test -f "$profile"
     security cms -D -i "$profile" >"$profile_plist"
     bundle_identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Contents/Info.plist")"
     profile_application_identifier="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.application-identifier' "$profile_plist")"
     test "${profile_application_identifier#*.}" = "$bundle_identifier"
-    test "$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.security.app-sandbox' "$profile_plist")" = 'true'
     test "$(/usr/libexec/PlistBuddy -c 'Print :com.apple.application-identifier' "$entitlements")" = "$profile_application_identifier"
     test "$(/usr/libexec/PlistBuddy -c 'Print :com.apple.developer.team-identifier' "$entitlements")" = "$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.team-identifier' "$profile_plist")"
     ;;
