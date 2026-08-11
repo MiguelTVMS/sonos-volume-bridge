@@ -3417,7 +3417,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "async-trait",
  "objc2-service-management",
@@ -3443,7 +3443,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-domain"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "serde",
  "thiserror 2.0.19",
@@ -3451,7 +3451,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-integration"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "async-trait",
  "sonos-volume-bridge-domain",
@@ -3462,7 +3462,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-platform-audio"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "async-trait",
  "sonos-volume-bridge-domain",
@@ -3474,7 +3474,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-sonos"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "if-addrs",
  "quick-xml",
@@ -3490,14 +3490,14 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-synchronization"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "sonos-volume-bridge-domain",
 ]
 
 [[package]]
 name = "sonos-volume-bridge-test-support"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "sonos-volume-bridge-domain",
  "tokio",
