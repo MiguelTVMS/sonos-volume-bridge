@@ -480,20 +480,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Require release tag credential
-        env:
-          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          if [ -z "$RELEASE_TOKEN" ]; then
-            echo "::error title=Missing release credential::Configure the RELEASE_TOKEN repository secret with a credential allowed to create tags that reference workflow files."
-            exit 1
-          fi
       - uses: actions/checkout@v7
         with:
           ref: develop
           fetch-depth: 0
           persist-credentials: true
-          token: ${{ secrets.RELEASE_TOKEN }}
       - uses: actions/download-artifact@v8
         with:
           pattern: "*-release"
