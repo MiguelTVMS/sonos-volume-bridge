@@ -86,7 +86,7 @@ jobs:
           pnpm run ci:clippy 2>&1 | tee .ci-artifacts/clippy.log
       - name: Upload rust lint logs
         if: failure()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: external-pr-rust-lint-logs-${{ github.run_id }}
           path: .ci-artifacts
@@ -188,7 +188,7 @@ jobs:
           echo "summary_file=$summary_file" >> "$GITHUB_OUTPUT"
       - name: Upload rust test artifacts
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: external-pr-rust-test-artifacts-${{ github.run_id }}
           path: .ci-artifacts
@@ -263,7 +263,7 @@ jobs:
           pnpm run ci:ui-lint 2>&1 | tee .ci-artifacts/frontend-lint.log
       - name: Upload frontend lint logs
         if: failure()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: external-pr-frontend-lint-logs-${{ github.run_id }}
           path: .ci-artifacts
@@ -291,7 +291,7 @@ jobs:
           pnpm run ci:ui-build 2>&1 | tee .ci-artifacts/frontend-build.log
       - name: Upload frontend build logs
         if: failure()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: external-pr-frontend-build-logs-${{ github.run_id }}
           path: .ci-artifacts
