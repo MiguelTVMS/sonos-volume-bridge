@@ -84,10 +84,12 @@ synchronization. See the [Privacy Policy](PRIVACY.md) for complete details.
 
 ## Project status
 
-Sonos Volume Bridge is an early community project. Windows and macOS packages
-are available, but hardware combinations vary, so feedback about your computer,
-audio output, and Sonos setup is welcome. Please report problems through
-[GitHub Issues](https://github.com/MiguelTVMS/sonos-volume-bridge/issues).
+Sonos Volume Bridge is an early community project. Development is currently
+limited to hands-on testing with a Sonos Ray, so support for other Sonos models
+may need validation. Windows and macOS packages are available, but hardware
+combinations vary. Please create a
+[GitHub issue](https://github.com/MiguelTVMS/sonos-volume-bridge/issues) to
+report compatibility problems or help develop support for other Sonos speakers.
 
 ## For contributors
 

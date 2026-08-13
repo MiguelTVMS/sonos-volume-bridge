@@ -18,6 +18,8 @@ pub struct AppConfiguration {
     pub follow_default_audio_device: bool,
     pub fixed_audio_device_id: Option<String>,
     pub synchronize_mute: bool,
+    #[serde(default)]
+    pub mute_speaker_at_zero_volume: bool,
     #[serde(default = "default_two_way_synchronization")]
     pub two_way_synchronization: bool,
     pub start_at_login: bool,
@@ -48,6 +50,7 @@ impl Default for AppConfiguration {
             follow_default_audio_device: true,
             fixed_audio_device_id: None,
             synchronize_mute: true,
+            mute_speaker_at_zero_volume: false,
             two_way_synchronization: true,
             start_at_login: false,
             fallback_polling: true,

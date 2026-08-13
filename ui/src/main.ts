@@ -5,7 +5,9 @@ import { diagnosticsDisclosureState } from './diagnostics';
 import './style.css';
 
 type MappingPoint = { local: number; sonos: number };
-type SettingsPage = 'devices' | 'volume' | 'general' | 'diagnostics' | 'about';
+type SettingsPage = 'devices' | 'speaker' | 'volume' | 'general' | 'diagnostics' | 'about';
+type SpeakerSetting = 'loudness' | 'nightSound' | 'speechEnhancement' | 'statusLight' | 'treble' | 'bass';
+type SpeakerSettings = { loudness: boolean | null; nightSound: boolean | null; speechEnhancement: boolean | null; statusLight: boolean | null; treble: number | null; bass: number | null };
 type Configuration = {
   schemaVersion: number;
   selectedSonosId: string | null;
@@ -13,6 +15,7 @@ type Configuration = {
   followDefaultAudioDevice: boolean;
   fixedAudioDeviceId: string | null;
   synchronizeMute: boolean;
+  muteSpeakerAtZeroVolume: boolean;
   twoWaySynchronization: boolean;
   startAtLogin: boolean;
   fallbackPolling: boolean;
@@ -47,8 +50,10 @@ type Diagnostics = {
   followsSystemOutput: boolean;
   fixedAudioDeviceId: string | null;
   synchronizeMute: boolean;
+  muteSpeakerAtZeroVolume: boolean;
   twoWaySynchronization: boolean;
   fallbackPolling: boolean;
+  audioInputFormat: string | null;
 };
 
 const root = document.querySelector<HTMLDivElement>('#app');
@@ -57,6 +62,7 @@ const app: HTMLDivElement = root;
 let snapshot: Snapshot | null = null;
 let discoveredSonos: DiscoveredSonos[] = [];
 let audioOutputs: AudioOutput[] = [];
+let speakerSettings: SpeakerSettings = { loudness: null, nightSound: null, speechEnhancement: null, statusLight: null, treble: null, bass: null };
 let activePage: SettingsPage = 'devices';
 let discoveryStatus = 'Not checked yet';
 let saveTimeout: number | undefined;
@@ -200,6 +206,7 @@ function render(nextSnapshot: Snapshot): void {
         <div class="app-heading"><h1><span class="sonos-name">SONOS</span><span>Volume Bridge</span></h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
         <nav aria-label="Settings sections">
           ${pageButton('devices', 'Devices')}
+          ${pageButton('speaker', 'Speaker')}
           ${pageButton('volume', 'Volume')}
           ${pageButton('general', 'General')}
           ${pageButton('diagnostics', 'Diagnostics')}
@@ -219,10 +226,14 @@ function render(nextSnapshot: Snapshot): void {
           </div>`,
         )}
         ${panel(
+          'speaker',
+          `<div class="panel-heading"><h2>Speaker</h2><p>Adjust sound settings available on the selected Sonos speaker.</p></div><div class="settings-group"><label class="toggle"><span>Night sound</span><input type="checkbox" role="switch" data-speaker-setting="nightSound"${speakerSettings.nightSound ? ' checked' : ''}${speakerSettings.nightSound === null ? ' disabled' : ''}/></label><label class="toggle"><span>Loudness</span><input type="checkbox" role="switch" data-speaker-setting="loudness"${speakerSettings.loudness ? ' checked' : ''}${speakerSettings.loudness === null ? ' disabled' : ''}/></label><label class="toggle"><span>Status light</span><input type="checkbox" role="switch" data-speaker-setting="statusLight"${speakerSettings.statusLight ? ' checked' : ''}${speakerSettings.statusLight === null ? ' disabled' : ''}/></label><label class="toggle"><span>Speech enhancement</span><input type="checkbox" role="switch" data-speaker-setting="speechEnhancement"${speakerSettings.speechEnhancement ? ' checked' : ''}${speakerSettings.speechEnhancement === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>Treble <output>${speakerSettings.treble ?? 'Unavailable'}</output></span><input type="range" min="-10" max="10" value="${speakerSettings.treble ?? 0}" data-speaker-level="treble"${speakerSettings.treble === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>Bass <output>${speakerSettings.bass ?? 'Unavailable'}</output></span><input type="range" min="-10" max="10" value="${speakerSettings.bass ?? 0}" data-speaker-level="bass"${speakerSettings.bass === null ? ' disabled' : ''}/></label><div class="speaker-settings-footer"><p class="setting-note">Unavailable settings are shown in gray.</p><div class="speaker-settings-actions"><button class="secondary" type="button" id="use-tv-audio">Use TV audio</button><button class="secondary icon-button" type="button" id="refresh-speaker-settings" title="Refresh speaker settings" aria-label="Refresh speaker settings">↻</button></div></div></div>`,
+        )}
+        ${panel(
           'volume',
           `<div class="panel-heading"><h2>Volume</h2><p>Control how your computer volume changes the speaker.</p></div>
           <div class="settings-group">
-            <label class="toggle"><span>Two-way synchronization</span><input type="checkbox" role="switch" name="twoWaySynchronization" ${c.twoWaySynchronization ? 'checked' : ''}/></label>
+            <label class="toggle"><span>Two-way synchronization</span><input type="checkbox" role="switch" name="twoWaySynchronization" ${c.twoWaySynchronization ? 'checked' : ''}/></label><label class="toggle"><span>Mute speaker at zero volume</span><input type="checkbox" role="switch" name="muteSpeakerAtZeroVolume" ${c.muteSpeakerAtZeroVolume ? 'checked' : ''}/></label>
             <label>Highest speaker volume <output class="range-value" id="maximum-value">${c.maximumSonosVolume}%</output><input name="maximumSonosVolume" id="maximum-volume" type="range" min="0" max="100" step="1" value="${c.maximumSonosVolume}" /></label>
             <label>Volume feel<select name="mapping">${mappingOptions(c)}</select></label>
             <details class="help"><summary>What do these options mean?</summary><dl><div><dt>Balanced</dt><dd>Gives you more control at lower volumes and rises more gently.</dd></div><div><dt>Direct</dt><dd>Keeps the speaker volume closely matched to your computer volume.</dd></div><div><dt>Scaled</dt><dd>Scales the full system volume range to the highest speaker volume you chose.</dd></div></dl></details>
@@ -240,7 +251,7 @@ function render(nextSnapshot: Snapshot): void {
         ${panel(
           'diagnostics',
           `<div class="panel-heading"><h2>Diagnostics</h2><p>Live information about the speaker and audio output.</p></div>
-          <dl class="status-list"><div><dt>Connection</dt><dd id="diagnostic-connection">${escapeHtml(status)}</dd></div><div><dt>Speaker</dt><dd id="diagnostic-speaker">${escapeHtml(speakerName)}</dd></div><div><dt>Speaker volume</dt><dd id="diagnostic-sonos-volume">${volumeText(nextSnapshot.sonosVolume)}</dd></div><div><dt>Selected output</dt><dd id="diagnostic-output">${escapeHtml(selectedOutputName(c))}</dd></div><div><dt>Output volume</dt><dd id="diagnostic-local-volume">${volumeText(nextSnapshot.localVolume)}</dd></div><div><dt>Mute</dt><dd id="diagnostic-mute">${muteText(nextSnapshot.muted)}</dd></div><div><dt>Speaker search</dt><dd>${escapeHtml(discoveryStatus)}</dd></div></dl>
+          <dl class="status-list"><div><dt>Connection</dt><dd id="diagnostic-connection">${escapeHtml(status)}</dd></div><div><dt>Speaker</dt><dd id="diagnostic-speaker">${escapeHtml(speakerName)}</dd></div><div><dt>Speaker volume</dt><dd id="diagnostic-sonos-volume">${volumeText(nextSnapshot.sonosVolume)}</dd></div><div><dt>Speaker input format</dt><dd id="diagnostic-audio-input">Unavailable</dd></div><div><dt>Selected output</dt><dd id="diagnostic-output">${escapeHtml(selectedOutputName(c))}</dd></div><div><dt>Output volume</dt><dd id="diagnostic-local-volume">${volumeText(nextSnapshot.localVolume)}</dd></div><div><dt>Mute</dt><dd id="diagnostic-mute">${muteText(nextSnapshot.muted)}</dd></div><div><dt>Speaker search</dt><dd>${escapeHtml(discoveryStatus)}</dd></div></dl>
           <details class="technical-details" id="technical-details"${diagnosticDetailsVisible ? ' open' : ''}><summary>Speaker technical details</summary><p>Shows the saved speaker identity and local endpoint for troubleshooting.</p><pre id="diagnostic-payload">${diagnosticDetailsVisible ? 'Loading…' : ''}</pre></details>
           <div class="diagnostics-actions"><button class="secondary" type="button" id="export">Export diagnostics</button><button class="danger" type="button" id="reset">Reset settings</button></div>`,
         )}
@@ -254,12 +265,27 @@ function render(nextSnapshot: Snapshot): void {
       </form>
     </div>`;
   const form = document.querySelector<HTMLFormElement>('#settings');
-  form?.addEventListener('input', scheduleSave);
-  form?.addEventListener('change', scheduleSave);
+  const scheduleConfigurationSave = (event: Event): void => {
+    if (!(event.target instanceof HTMLElement) || (!event.target.dataset.speakerSetting && !event.target.dataset.speakerLevel)) scheduleSave();
+  };
+  form?.addEventListener('input', scheduleConfigurationSave);
+  form?.addEventListener('change', scheduleConfigurationSave);
+  document.querySelectorAll<HTMLInputElement>('[data-speaker-setting]').forEach((input) => {
+    input.addEventListener('change', () => void updateSpeakerSetting(input));
+  });  document.querySelectorAll<HTMLInputElement>('[data-speaker-level]').forEach((input) => {
+    input.addEventListener('input', () => {
+      const label = input.closest('label')?.querySelector<HTMLOutputElement>('output');
+      if (label) label.value = input.value;
+    });
+    input.addEventListener('change', () => void updateSpeakerLevel(input));
+  });
+
   document.querySelectorAll<HTMLButtonElement>('[data-page]').forEach((button) => {
     button.addEventListener('click', () => activatePage(button.dataset.page as SettingsPage));
   });
   document.querySelector('#test')?.addEventListener('click', testVolume);
+  document.querySelector('#use-tv-audio')?.addEventListener('click', () => void useTvAudio());
+  document.querySelector('#refresh-speaker-settings')?.addEventListener('click', () => void refreshSpeakerSettings());
   document.querySelector('#technical-details')?.addEventListener('toggle', refreshDiagnostics);
   document.querySelector('#export')?.addEventListener('click', exportDiagnostics);
   document.querySelector('#reset')?.addEventListener('click', reset);
@@ -275,6 +301,7 @@ function render(nextSnapshot: Snapshot): void {
 
 function activatePage(page: SettingsPage): void {
   activePage = page;
+  if (page === 'diagnostics') void refreshAudioInputFormat();
   document.querySelectorAll<HTMLElement>('[data-panel]').forEach((element) => {
     element.hidden = element.dataset.panel !== page;
   });
@@ -357,6 +384,40 @@ async function discoverSonos(): Promise<void> {
   }
 }
 
+async function refreshSpeakerSettings(): Promise<void> {
+  speakerSettings = await invoke<SpeakerSettings>('get_speaker_settings').catch(() => ({ loudness: null, nightSound: null, speechEnhancement: null, statusLight: null, treble: null, bass: null }));
+  if (snapshot) render(snapshot);
+}
+
+async function useTvAudio(): Promise<void> {
+  try {
+    await invoke('use_tv_audio');
+    notice('TV audio selected.');
+    void refreshAudioInputFormat();
+  } catch (error) {
+    notice(String(error));
+  }
+}
+async function updateSpeakerSetting(input: HTMLInputElement): Promise<void> {
+  try {
+    await invoke('set_speaker_setting', { setting: input.dataset.speakerSetting, enabled: input.checked });
+    speakerSettings[input.dataset.speakerSetting as 'loudness' | 'nightSound' | 'speechEnhancement' | 'statusLight'] = input.checked;
+    notice('Saved.');
+  } catch (error) {
+    input.checked = !input.checked;
+    notice(String(error));
+  }
+}
+
+async function updateSpeakerLevel(input: HTMLInputElement): Promise<void> {
+  try {
+    const setting = input.dataset.speakerLevel as 'treble' | 'bass';
+    const value = Number(input.value);
+    await invoke('set_speaker_level', { setting, value });
+    speakerSettings[setting] = value;
+    notice('Saved.');
+  } catch (error) { notice(String(error)); }
+}
 function notice(value: string): void {
   const output = document.querySelector<HTMLOutputElement>('#notice');
   if (output) output.value = value;
@@ -373,6 +434,7 @@ function formConfiguration(form: HTMLFormElement): Configuration {
     followDefaultAudioDevice: output === 'default',
     fixedAudioDeviceId: output === 'default' ? null : output,
     synchronizeMute: values.has('synchronizeMute'),
+    muteSpeakerAtZeroVolume: values.has('muteSpeakerAtZeroVolume'),
     twoWaySynchronization: values.has('twoWaySynchronization'),
     startAtLogin: values.has('startAtLogin'),
     fallbackPolling: values.has('fallbackPolling'),
@@ -424,6 +486,13 @@ async function testVolume(): Promise<void> {
     notice(String(error));
   }
 }
+async function refreshAudioInputFormat(): Promise<void> {
+  try {
+    const diagnostics = await invoke<Diagnostics>('diagnostics');
+    const audioInput = document.querySelector<HTMLElement>('#diagnostic-audio-input');
+    if (audioInput) audioInput.textContent = diagnostics.audioInputFormat ?? 'Unavailable';
+  } catch { /* Diagnostics remain usable when the speaker is unavailable. */ }
+}
 async function refreshDiagnostics(event: Event): Promise<void> {
   const details = event.currentTarget as HTMLDetailsElement;
   const disclosureState = diagnosticsDisclosureState(details.open);
@@ -432,6 +501,8 @@ async function refreshDiagnostics(event: Event): Promise<void> {
 
   try {
     const diagnostics = await invoke<Diagnostics>('diagnostics');
+    const audioInput = document.querySelector<HTMLElement>('#diagnostic-audio-input');
+    if (audioInput) audioInput.textContent = diagnostics.audioInputFormat ?? 'Unavailable';
     const payload = document.querySelector<HTMLPreElement>('#diagnostic-payload');
     if (payload) payload.textContent = JSON.stringify(diagnostics, null, 2);
   } catch (error) {
@@ -451,6 +522,7 @@ invoke<Snapshot>('get_snapshot')
     render(nextSnapshot);
     startStatusPolling();
     void refreshAudioOutputs();
+    void refreshSpeakerSettings();
     discoveryStatus = 'Searching…';
     void discoverSonos();
   })

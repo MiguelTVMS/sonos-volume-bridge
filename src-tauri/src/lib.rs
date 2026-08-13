@@ -88,7 +88,11 @@ pub fn run() {
             commands::export_diagnostics,
             commands::discover_sonos,
             commands::list_audio_outputs,
-            commands::test_volume
+            commands::test_volume,
+            commands::get_speaker_settings,
+            commands::set_speaker_setting,
+            commands::set_speaker_level,
+            commands::use_tv_audio
         ])
         .run(tauri::generate_context!())
         .expect("Tauri runtime failed");

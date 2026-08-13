@@ -1,9 +1,9 @@
 use sonos_volume_bridge_domain::{MuteState, SonosVolume};
 use sonos_volume_bridge_sonos::{
-    EventDeduplicator, SonosError, parse_device_description, parse_last_change, parse_ssdp_response,
+    AvTransportService, GenaEvent, RenderingControlService, SonosClient, SonosDevice, SonosId,
 };
 use sonos_volume_bridge_sonos::{
-    GenaEvent, RenderingControlService, SonosClient, SonosDevice, SonosId,
+    EventDeduplicator, SonosError, parse_device_description, parse_last_change, parse_ssdp_response,
 };
 use sonos_volume_bridge_test_support::{MockSonosServer, MockSonosState};
 use url::Url;
@@ -92,6 +92,18 @@ fn grouped_metadata_keeps_selected_player_identity() {
 }
 
 #[test]
+fn discovers_av_transport_control_url() {
+    let device = parse_device_description(
+        include_bytes!("fixtures/grouped-device-description.xml"),
+        &Url::parse(LOCATION).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        device.av_transport.unwrap().control_url.as_str(),
+        "http://192.168.1.40:1400/MediaRenderer/AVTransport/Control"
+    );
+}
+#[test]
 fn standard_rendering_control_wins_over_group_rendering_control() {
     let xml = br"<root><device><friendlyName>Office</friendlyName><UDN>uuid:RINCON_test</UDN><serviceList><service><serviceType>urn:schemas-upnp-org:service:RenderingControl:1</serviceType><controlURL>/standard</controlURL><eventSubURL>/standard-event</eventSubURL></service><service><serviceType>urn:schemas-upnp-org:service:GroupRenderingControl:1</serviceType><controlURL>/group</controlURL><eventSubURL>/group-event</eventSubURL></service></serviceList></device></root>";
     let device = parse_device_description(xml, &Url::parse(LOCATION).unwrap()).unwrap();
@@ -129,6 +141,9 @@ async fn mock_server_supports_rendering_control_round_trip() {
             control_url: base.join("control").unwrap(),
             event_url: base.join("event").unwrap(),
         },
+        av_transport: Some(AvTransportService {
+            control_url: base.join("avtransport").unwrap(),
+        }),
     };
     let client = SonosClient::builder().build().unwrap();
     assert_eq!(client.get_volume(&device).await.unwrap().get(), 20);
@@ -137,6 +152,7 @@ async fn mock_server_supports_rendering_control_round_trip() {
         .await
         .unwrap();
     client.set_mute(&device, MuteState(true)).await.unwrap();
+    client.select_home_theater_input(&device).await.unwrap();
     assert_eq!(
         server.state().await,
         MockSonosState {

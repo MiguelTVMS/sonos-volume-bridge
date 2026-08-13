@@ -1,10 +1,13 @@
-use crate::state::{AppState, UiStatus};
+use crate::{
+    runtime::{self, SpeakerSetting, SpeakerSettings},
+    state::{AppState, UiStatus},
+};
 use std::sync::Mutex;
 use tauri::{
     AppHandle, Manager, Runtime, Theme,
     image::Image,
-    menu::{Menu, MenuItem, PredefinedMenuItem},
-    tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -14,8 +17,11 @@ enum ConnectionState {
 }
 
 struct TrayMenuItems<R: Runtime> {
+    menu: Menu<R>,
     speaker: MenuItem<R>,
     status: MenuItem<R>,
+    speaker_separator: PredefinedMenuItem<R>,
+    speaker_controls: Mutex<Vec<CheckMenuItem<R>>>,
     connection: Mutex<ConnectionState>,
 }
 
@@ -40,6 +46,7 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let settings = MenuItem::with_id(app, "settings", "Open settings", true, None::<&str>)?;
     let diagnostics = MenuItem::with_id(app, "diagnostics", "Diagnostics", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let speaker_separator = PredefinedMenuItem::separator(app)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
         app,
@@ -60,6 +67,18 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .tooltip("Sonos Volume Bridge")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "settings" | "diagnostics" => show_settings(app),
+            "speaker-night-sound" => {
+                toggle_speaker_setting(app, SpeakerSetting::NightSound, event.id().as_ref());
+            }
+            "speaker-loudness" => {
+                toggle_speaker_setting(app, SpeakerSetting::Loudness, event.id().as_ref());
+            }
+            "speaker-status-light" => {
+                toggle_speaker_setting(app, SpeakerSetting::StatusLight, event.id().as_ref());
+            }
+            "speaker-speech-enhancement" => {
+                toggle_speaker_setting(app, SpeakerSetting::SpeechEnhancement, event.id().as_ref());
+            }
             "quit" => {
                 if let Some(state) = app.try_state::<AppState>() {
                     state.stop_runtime();
@@ -68,23 +87,108 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             }
             _ => {}
         })
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::DoubleClick { button, .. } = event
-                && opens_settings_on_double_click(button)
-            {
+        .on_tray_icon_event(|tray, event| match event {
+            TrayIconEvent::Click {
+                button: MouseButton::Left | MouseButton::Right,
+                button_state: MouseButtonState::Down,
+                ..
+            } => refresh_speaker_controls(tray.app_handle()),
+            TrayIconEvent::DoubleClick { button, .. } if opens_settings_on_double_click(button) => {
                 show_settings(tray.app_handle());
             }
+            _ => {}
         })
         .build(app)?;
     let _ = app.manage(TrayMenuItems {
+        menu,
         speaker,
         status,
+        speaker_separator,
+        speaker_controls: Mutex::new(Vec::new()),
         connection: Mutex::new(connection),
     });
     refresh(app);
     Ok(())
 }
 
+fn refresh_speaker_controls<R: Runtime>(app: &AppHandle<R>) {
+    let configuration = app
+        .try_state::<AppState>()
+        .and_then(|state| state.configuration.lock().ok().map(|value| value.clone()));
+    let settings = configuration.map_or_else(SpeakerSettings::default, |configuration| {
+        tauri::async_runtime::block_on(runtime::speaker_settings(configuration))
+    });
+    update_speaker_controls(app, &settings);
+}
+
+fn update_speaker_controls<R: Runtime>(app: &AppHandle<R>, settings: &SpeakerSettings) {
+    let Some(items) = app.try_state::<TrayMenuItems<R>>() else {
+        return;
+    };
+    let Ok(mut controls) = items.speaker_controls.lock() else {
+        return;
+    };
+    for control in controls.drain(..) {
+        let _ = items.menu.remove(&control);
+    }
+    let _ = items.menu.remove(&items.speaker_separator);
+
+    let available = available_speaker_controls(settings);
+    if available.is_empty() {
+        return;
+    }
+
+    let _ = items.menu.insert(&items.speaker_separator, 3);
+    for (index, (id, label, enabled)) in available.into_iter().enumerate() {
+        let Ok(control) = CheckMenuItem::with_id(app, id, label, true, enabled, None::<&str>)
+        else {
+            continue;
+        };
+        let _ = items.menu.insert(&control, 4 + index);
+        controls.push(control);
+    }
+}
+
+fn available_speaker_controls(
+    settings: &SpeakerSettings,
+) -> Vec<(&'static str, &'static str, bool)> {
+    [
+        ("speaker-night-sound", "Night sound", settings.night_sound),
+        ("speaker-loudness", "Loudness", settings.loudness),
+        (
+            "speaker-status-light",
+            "Status light",
+            settings.status_light,
+        ),
+        (
+            "speaker-speech-enhancement",
+            "Speech enhancement",
+            settings.speech_enhancement,
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(id, label, enabled)| enabled.map(|enabled| (id, label, enabled)))
+    .collect()
+}
+fn toggle_speaker_setting<R: Runtime>(app: &AppHandle<R>, setting: SpeakerSetting, id: &str) {
+    let Some(items) = app.try_state::<TrayMenuItems<R>>() else {
+        return;
+    };
+    let enabled = items.speaker_controls.lock().ok().and_then(|controls| {
+        controls
+            .iter()
+            .find(|control| control.id().as_ref() == id)
+            .and_then(|control| control.is_checked().ok())
+    });
+    let configuration = app
+        .try_state::<AppState>()
+        .and_then(|state| state.configuration.lock().ok().map(|value| value.clone()));
+    if let (Some(enabled), Some(configuration)) = (enabled, configuration) {
+        tauri::async_runtime::spawn(async move {
+            let _ = runtime::set_speaker_setting(configuration, setting, enabled).await;
+        });
+    }
+}
 pub fn update_icon_for_theme<R: Runtime>(app: &AppHandle<R>, theme: Theme) {
     let connection = app_connection(app);
     if let Some(tray) = app.tray_by_id("main-tray") {

@@ -1,7 +1,7 @@
 use crate::{
     autostart,
     config::AppConfiguration,
-    runtime::{self, AvailableAudioOutput, DiscoveredSonos},
+    runtime::{self, AvailableAudioOutput, DiscoveredSonos, SpeakerSetting, SpeakerSettings},
     state::{AppState, UiSnapshot},
 };
 use serde::Serialize;
@@ -65,11 +65,12 @@ pub struct Diagnostics {
     pub synchronize_mute: bool,
     pub two_way_synchronization: bool,
     pub fallback_polling: bool,
+    pub audio_input_format: Option<String>,
 }
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri injects managed state by value.
-pub fn diagnostics(state: State<'_, AppState>) -> Diagnostics {
+pub async fn diagnostics(state: State<'_, AppState>) -> Result<Diagnostics, String> {
     let snapshot = state.snapshot.lock().map_or_else(
         |_| UiSnapshot {
             runtime_generation: 0,
@@ -82,7 +83,14 @@ pub fn diagnostics(state: State<'_, AppState>) -> Diagnostics {
         },
         |snapshot| snapshot.clone(),
     );
-    build_diagnostics(state.store.path().exists(), &snapshot)
+    let mut diagnostics = build_diagnostics(state.store.path().exists(), &snapshot);
+    let configuration = state
+        .configuration
+        .lock()
+        .map_err(|_| "application state is unavailable".to_owned())?
+        .clone();
+    diagnostics.audio_input_format = runtime::audio_input_format(configuration).await;
+    Ok(diagnostics)
 }
 
 fn build_diagnostics(configuration_present: bool, snapshot: &UiSnapshot) -> Diagnostics {
@@ -105,6 +113,7 @@ fn build_diagnostics(configuration_present: bool, snapshot: &UiSnapshot) -> Diag
         synchronize_mute: configuration.synchronize_mute,
         two_way_synchronization: configuration.two_way_synchronization,
         fallback_polling: configuration.fallback_polling,
+        audio_input_format: None,
     }
 }
 
@@ -148,8 +157,8 @@ mod tests {
 }
 
 #[tauri::command]
-pub fn export_diagnostics(state: State<'_, AppState>) -> Result<String, String> {
-    serde_json::to_string_pretty(&diagnostics(state)).map_err(|error| error.to_string())
+pub async fn export_diagnostics(state: State<'_, AppState>) -> Result<String, String> {
+    serde_json::to_string_pretty(&diagnostics(state).await?).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -174,4 +183,54 @@ pub async fn test_volume(state: State<'_, AppState>) -> Result<(), String> {
         return Err("Select a Sonos device before testing volume.".to_owned());
     }
     runtime::test_selected_device(configuration).await
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub async fn get_speaker_settings(state: State<'_, AppState>) -> Result<SpeakerSettings, String> {
+    let configuration = state
+        .configuration
+        .lock()
+        .map_or_else(|_| AppConfiguration::default(), |value| value.clone());
+    Ok(runtime::speaker_settings(configuration).await)
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub async fn use_tv_audio(state: State<'_, AppState>) -> Result<(), String> {
+    let configuration = state
+        .configuration
+        .lock()
+        .map_err(|_| "application state is unavailable".to_owned())?
+        .clone();
+    runtime::use_tv_audio(configuration).await
+}
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub async fn set_speaker_level(
+    setting: SpeakerSetting,
+    value: i8,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let configuration = state
+        .configuration
+        .lock()
+        .map_err(|_| "application state is unavailable".to_owned())?
+        .clone();
+    runtime::set_speaker_level(configuration, setting, value).await
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub async fn set_speaker_setting(
+    setting: SpeakerSetting,
+    enabled: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let configuration = state
+        .configuration
+        .lock()
+        .map_err(|_| "application state is unavailable".to_owned())?
+        .clone();
+    runtime::set_speaker_setting(configuration, setting, enabled).await
 }
