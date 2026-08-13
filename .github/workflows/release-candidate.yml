@@ -119,6 +119,7 @@ jobs:
         id: commit
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -126,6 +127,8 @@ jobs:
           git commit -m "chore: release v$RELEASE_VERSION"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           git push origin HEAD:develop
+          git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
+          git push origin "$RELEASE_TAG"
 
   macos-app:
     name: Build unsigned macOS app
@@ -487,21 +490,6 @@ jobs:
           pattern: "*-release"
           path: release-assets
           merge-multiple: true
-      - name: Create the release tag on develop
-        env:
-          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
-          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch --tags origin
-          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null; then
-            existing_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
-            test "$existing_commit" = "$RELEASE_COMMIT"
-          else
-            git tag -a "$RELEASE_TAG" "$RELEASE_COMMIT" -m "Release $RELEASE_TAG"
-            git push origin "$RELEASE_TAG"
-          fi
       - name: Create or update the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
