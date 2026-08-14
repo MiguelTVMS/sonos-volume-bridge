@@ -59,20 +59,26 @@ jobs:
           security default-keychain -s "$keychain_path"
           codesigning_identities="$(security find-identity -v -p codesigning "$keychain_path")"
           basic_identities="$(security find-identity -v -p basic "$keychain_path")"
-          echo "$codesigning_identities" | grep -F '1 valid identities found'
-          echo "$basic_identities" | grep -F '1 valid identities found'
+          echo "Codesigning identities:"
+          echo "$codesigning_identities"
+          echo "Installer identities:"
+          echo "$basic_identities"
           app_signing_identity_hint="$(printf '%b' "$APPLE_SIGNING_IDENTITY")"
           installer_signing_identity_hint="$(printf '%b' "$APPLE_MAC_INSTALLER_IDENTITY")"
-          app_signing_identity="$(printf '%s\n' "$codesigning_identities" | awk -v identity_hint="$app_signing_identity_hint" 'index($0, identity_hint) > 0 { print $2; exit }')"
+          app_signing_identity="$(printf '%s\n' "$codesigning_identities" | awk -v identity_hint="$app_signing_identity_hint" 'index(tolower($0), tolower(identity_hint)) > 0 { print $2; exit }')"
           if [ -z "$app_signing_identity" ]; then
             app_signing_identity="$(printf '%s\n' "$codesigning_identities" | awk '/^[[:space:]]*[0-9]+\)/ { print $2; exit }')"
           fi
-          installer_signing_identity="$(printf '%s\n' "$basic_identities" | awk -v identity_hint="$installer_signing_identity_hint" 'index($0, identity_hint) > 0 { print $2; exit }')"
+          installer_signing_identity="$(printf '%s\n' "$basic_identities" | awk -v identity_hint="$installer_signing_identity_hint" 'index(tolower($0), tolower(identity_hint)) > 0 { print $2; exit }')"
           if [ -z "$installer_signing_identity" ]; then
             installer_signing_identity="$(printf '%s\n' "$basic_identities" | awk 'tolower($0) ~ /installer/ { print $2; exit }')"
           fi
           if [ -z "$installer_signing_identity" ]; then
             installer_signing_identity="$(printf '%s\n' "$basic_identities" | awk '/^[[:space:]]*[0-9]+\)/ { print $2; exit }')"
+          fi
+          if [ -z "$app_signing_identity" ] || [ -z "$installer_signing_identity" ]; then
+            echo "::error::Failed to resolve signing identities from imported certificates."
+            exit 1
           fi
           test -n "$app_signing_identity"
           test -n "$installer_signing_identity"
