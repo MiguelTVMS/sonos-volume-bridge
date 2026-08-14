@@ -405,18 +405,57 @@ jobs:
           security default-keychain -s "$keychain_path"
           security find-identity -v -p codesigning "$keychain_path" | grep -F '1 valid identities found'
           security find-identity -v -p basic "$keychain_path" | grep -F '1 valid identities found'
+          codesigning_identities="$(security find-identity -v -p codesigning "$keychain_path")"
+          basic_identities="$(security find-identity -v -p basic "$keychain_path")"
+          echo "Codesigning identities:"
+          echo "$codesigning_identities"
+          echo "Installer identities:"
+          echo "$basic_identities"
+          find_identity_line() {
+            identities="$1"
+            identity_hint="$2"
+            fallback_pattern="$3"
+            identity_line="$(printf '%s\n' "$identities" | awk -v identity_hint="$identity_hint" 'index(tolower($0), tolower(identity_hint)) > 0 { print; exit }')"
+            if [ -z "$identity_line" ] && [ -n "$fallback_pattern" ]; then
+              identity_line="$(printf '%s\n' "$identities" | awk -v pattern="$fallback_pattern" 'tolower($0) ~ pattern { print; exit }')"
+            fi
+            if [ -z "$identity_line" ]; then
+              identity_line="$(printf '%s\n' "$identities" | awk '/^[[:space:]]*[0-9]+\)/ { print; exit }')"
+            fi
+            printf '%s' "$identity_line"
+          }
           app_signing_identity_hint="$(printf '%b' "$APPLE_SIGNING_IDENTITY")"
           installer_signing_identity_hint="$(printf '%b' "$APPLE_MAC_INSTALLER_IDENTITY")"
-          app_signing_identity="$(security find-identity -v -p codesigning "$keychain_path" | awk -v identity_hint="$app_signing_identity_hint" 'index($0, identity_hint) > 0 { print $2; exit }')"
+          app_signing_identity_line="$(find_identity_line "$codesigning_identities" "$app_signing_identity_hint" '3rd party mac developer application|developer id application|apple distribution')"
+          installer_signing_identity_line="$(find_identity_line "$basic_identities" "$installer_signing_identity_hint" '3rd party mac developer installer|developer id installer|mac installer distribution')"
+          if [ -z "$app_signing_identity_line" ] || [ -z "$installer_signing_identity_line" ]; then
+            echo "::error::Failed to resolve signing identities from imported certificates."
+            exit 1
+          fi
+          app_signing_identity="$(echo "$app_signing_identity_line" | awk '{print $2}')"
+          installer_signing_identity="$(echo "$installer_signing_identity_line" | awk '{print $2}')"
+          if ! echo "$app_signing_identity_line" | grep -qiE '3rd party mac developer application|developer id application|apple distribution'; then
+            echo "::error::App signing identity is missing expected certificate type. Got: $app_signing_identity_line"
+            exit 1
+          fi
+          if ! echo "$installer_signing_identity_line" | grep -qiE '3rd party mac developer installer|developer id installer|mac installer distribution'; then
+            echo "::error::Installer signing identity is missing expected installer certificate type. Got: $installer_signing_identity_line"
+            exit 1
+          fi
           if [ -z "$app_signing_identity" ]; then
-            app_signing_identity="$(security find-identity -v -p codesigning "$keychain_path" | awk '/^[[:space:]]*[0-9]+\)/ { print $2; exit }')"
+            echo "::error::App signing identity is empty. Check APPLE_APP_STORE_SIGNING_IDENTITY and certificate import."
+            exit 1
           fi
-          installer_signing_identity="$(security find-identity -v -p basic "$keychain_path" | awk -v identity_hint="$installer_signing_identity_hint" 'index($0, identity_hint) > 0 { print $2; exit }')"
           if [ -z "$installer_signing_identity" ]; then
-            installer_signing_identity="$(security find-identity -v -p basic "$keychain_path" | awk 'tolower($0) ~ /installer/ { print $2; exit }')"
+            echo "::error::Installer signing identity is empty. Check APPLE_MAC_INSTALLER_IDENTITY and certificate import."
+            exit 1
           fi
-          test -n "$app_signing_identity"
+          if [ "$app_signing_identity" = "$installer_signing_identity" ]; then
+            echo "::error::App Store app and installer identities are identical. APPLE_MAC_INSTALLER_CERTIFICATE likely contains the app certificate by mistake."
+            exit 1
+          fi
           test -n "$installer_signing_identity"
+          test -n "$app_signing_identity"
           echo "APPLE_SIGNING_IDENTITY=$app_signing_identity" >> "$GITHUB_ENV"
           echo "APPLE_MAC_INSTALLER_IDENTITY=$installer_signing_identity" >> "$GITHUB_ENV"
       - name: Materialize the Mac App Store provisioning profile
