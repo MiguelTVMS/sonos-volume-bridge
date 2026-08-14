@@ -14,17 +14,16 @@ cp .env.example .env.development
 # edit .env.development with local values
 ```
 
-If you use `dotenvx` for local command parity, you can load variables as:
+Local `pnpm`/Rust CI scripts already load `.env.development` first and then keep
+any already-exported environment variables from your shell. So `pnpm run ci:all`
+works directly.
+
+If you use `npx dotenvx run --`, use that as well, but keep the local scripts in
+`scripts/local/with-env.sh` as the default path:
 
 ```sh
-npx dotenvx run -- pnpm run ci:all
-```
-
-If you set `APPLE_SHARED_CERT_PASSWORD` in `.env.development`, load and expand
-the per-cert passwords with:
-
-```sh
-npx dotenvx run -- sh -c './scripts/local/resolve-apple-secrets.sh && pnpm run ci:all'
+./scripts/local/resolve-apple-secrets.sh
+pnpm run ci:all
 ```
 
 ## Pre-commit validation
