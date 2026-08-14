@@ -20,6 +20,13 @@ If you use `dotenvx` for local command parity, you can load variables as:
 npx dotenvx run -- pnpm run ci:all
 ```
 
+If you set `APPLE_SHARED_CERT_PASSWORD` in `.env.development`, load and expand
+the per-cert passwords with:
+
+```sh
+npx dotenvx run -- sh -c './scripts/local/resolve-apple-secrets.sh && pnpm run ci:all'
+```
+
 ## Pre-commit validation
 
 Enable local hooks once per clone:
