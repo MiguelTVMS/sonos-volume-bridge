@@ -57,17 +57,22 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
           security list-keychains -d user -s "$keychain_path"
           security default-keychain -s "$keychain_path"
-          security find-identity -v -p codesigning "$keychain_path" | grep -F '1 valid identities found'
-          security find-identity -v -p basic "$keychain_path" | grep -F '1 valid identities found'
+          codesigning_identities="$(security find-identity -v -p codesigning "$keychain_path")"
+          basic_identities="$(security find-identity -v -p basic "$keychain_path")"
+          echo "$codesigning_identities" | grep -F '1 valid identities found'
+          echo "$basic_identities" | grep -F '1 valid identities found'
           app_signing_identity_hint="$(printf '%b' "$APPLE_SIGNING_IDENTITY")"
           installer_signing_identity_hint="$(printf '%b' "$APPLE_MAC_INSTALLER_IDENTITY")"
-          app_signing_identity="$(security find-identity -v -p codesigning "$keychain_path" | awk -v identity_hint="$app_signing_identity_hint" 'index($0, identity_hint) > 0 { print $2; exit }')"
+          app_signing_identity="$(printf '%s\n' "$codesigning_identities" | awk -v identity_hint="$app_signing_identity_hint" 'index($0, identity_hint) > 0 { print $2; exit }')"
           if [ -z "$app_signing_identity" ]; then
-            app_signing_identity="$(security find-identity -v -p codesigning "$keychain_path" | awk '/^[[:space:]]*[0-9]+\)/ { print $2; exit }')"
+            app_signing_identity="$(printf '%s\n' "$codesigning_identities" | awk '/^[[:space:]]*[0-9]+\)/ { print $2; exit }')"
           fi
-          installer_signing_identity="$(security find-identity -v -p basic "$keychain_path" | awk -v identity_hint="$installer_signing_identity_hint" 'index($0, identity_hint) > 0 { print $2; exit }')"
+          installer_signing_identity="$(printf '%s\n' "$basic_identities" | awk -v identity_hint="$installer_signing_identity_hint" 'index($0, identity_hint) > 0 { print $2; exit }')"
           if [ -z "$installer_signing_identity" ]; then
-            installer_signing_identity="$(security find-identity -v -p basic "$keychain_path" | awk 'tolower($0) ~ /installer/ { print $2; exit }')"
+            installer_signing_identity="$(printf '%s\n' "$basic_identities" | awk 'tolower($0) ~ /installer/ { print $2; exit }')"
+          fi
+          if [ -z "$installer_signing_identity" ]; then
+            installer_signing_identity="$(printf '%s\n' "$basic_identities" | awk '/^[[:space:]]*[0-9]+\)/ { print $2; exit }')"
           fi
           test -n "$app_signing_identity"
           test -n "$installer_signing_identity"
