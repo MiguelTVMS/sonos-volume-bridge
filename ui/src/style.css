@@ -433,10 +433,27 @@ button.icon-button {
   line-height: 1.45;
 }
 
-.toggle input[type='checkbox']:disabled { cursor: default; opacity: 0.45; }
-.setting-note { color: var(--secondary-text); font-size: 12px; }
+.toggle input[type='checkbox']:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.setting-note {
+  color: var(--secondary-text);
+  font-size: 12px;
+}
 
-.speaker-settings-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.speaker-settings-footer .setting-note { margin: 0; }
+.speaker-settings-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.speaker-settings-footer .setting-note {
+  margin: 0;
+}
 
-.speaker-settings-actions { display: flex; align-items: center; gap: 8px; }
+.speaker-settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

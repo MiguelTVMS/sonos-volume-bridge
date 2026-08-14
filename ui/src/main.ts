@@ -6,8 +6,14 @@ import './style.css';
 
 type MappingPoint = { local: number; sonos: number };
 type SettingsPage = 'devices' | 'speaker' | 'volume' | 'general' | 'diagnostics' | 'about';
-type SpeakerSetting = 'loudness' | 'nightSound' | 'speechEnhancement' | 'statusLight' | 'treble' | 'bass';
-type SpeakerSettings = { loudness: boolean | null; nightSound: boolean | null; speechEnhancement: boolean | null; statusLight: boolean | null; treble: number | null; bass: number | null };
+type SpeakerSettings = {
+  loudness: boolean | null;
+  nightSound: boolean | null;
+  speechEnhancement: boolean | null;
+  statusLight: boolean | null;
+  treble: number | null;
+  bass: number | null;
+};
 type Configuration = {
   schemaVersion: number;
   selectedSonosId: string | null;
@@ -62,7 +68,14 @@ const app: HTMLDivElement = root;
 let snapshot: Snapshot | null = null;
 let discoveredSonos: DiscoveredSonos[] = [];
 let audioOutputs: AudioOutput[] = [];
-let speakerSettings: SpeakerSettings = { loudness: null, nightSound: null, speechEnhancement: null, statusLight: null, treble: null, bass: null };
+let speakerSettings: SpeakerSettings = {
+  loudness: null,
+  nightSound: null,
+  speechEnhancement: null,
+  statusLight: null,
+  treble: null,
+  bass: null,
+};
 let activePage: SettingsPage = 'devices';
 let discoveryStatus = 'Not checked yet';
 let saveTimeout: number | undefined;
@@ -266,13 +279,18 @@ function render(nextSnapshot: Snapshot): void {
     </div>`;
   const form = document.querySelector<HTMLFormElement>('#settings');
   const scheduleConfigurationSave = (event: Event): void => {
-    if (!(event.target instanceof HTMLElement) || (!event.target.dataset.speakerSetting && !event.target.dataset.speakerLevel)) scheduleSave();
+    if (
+      !(event.target instanceof HTMLElement) ||
+      (!event.target.dataset.speakerSetting && !event.target.dataset.speakerLevel)
+    )
+      scheduleSave();
   };
   form?.addEventListener('input', scheduleConfigurationSave);
   form?.addEventListener('change', scheduleConfigurationSave);
   document.querySelectorAll<HTMLInputElement>('[data-speaker-setting]').forEach((input) => {
     input.addEventListener('change', () => void updateSpeakerSetting(input));
-  });  document.querySelectorAll<HTMLInputElement>('[data-speaker-level]').forEach((input) => {
+  });
+  document.querySelectorAll<HTMLInputElement>('[data-speaker-level]').forEach((input) => {
     input.addEventListener('input', () => {
       const label = input.closest('label')?.querySelector<HTMLOutputElement>('output');
       if (label) label.value = input.value;
@@ -285,7 +303,9 @@ function render(nextSnapshot: Snapshot): void {
   });
   document.querySelector('#test')?.addEventListener('click', testVolume);
   document.querySelector('#use-tv-audio')?.addEventListener('click', () => void useTvAudio());
-  document.querySelector('#refresh-speaker-settings')?.addEventListener('click', () => void refreshSpeakerSettings());
+  document
+    .querySelector('#refresh-speaker-settings')
+    ?.addEventListener('click', () => void refreshSpeakerSettings());
   document.querySelector('#technical-details')?.addEventListener('toggle', refreshDiagnostics);
   document.querySelector('#export')?.addEventListener('click', exportDiagnostics);
   document.querySelector('#reset')?.addEventListener('click', reset);
@@ -385,7 +405,14 @@ async function discoverSonos(): Promise<void> {
 }
 
 async function refreshSpeakerSettings(): Promise<void> {
-  speakerSettings = await invoke<SpeakerSettings>('get_speaker_settings').catch(() => ({ loudness: null, nightSound: null, speechEnhancement: null, statusLight: null, treble: null, bass: null }));
+  speakerSettings = await invoke<SpeakerSettings>('get_speaker_settings').catch(() => ({
+    loudness: null,
+    nightSound: null,
+    speechEnhancement: null,
+    statusLight: null,
+    treble: null,
+    bass: null,
+  }));
   if (snapshot) render(snapshot);
 }
 
@@ -400,8 +427,14 @@ async function useTvAudio(): Promise<void> {
 }
 async function updateSpeakerSetting(input: HTMLInputElement): Promise<void> {
   try {
-    await invoke('set_speaker_setting', { setting: input.dataset.speakerSetting, enabled: input.checked });
-    speakerSettings[input.dataset.speakerSetting as 'loudness' | 'nightSound' | 'speechEnhancement' | 'statusLight'] = input.checked;
+    await invoke('set_speaker_setting', {
+      setting: input.dataset.speakerSetting,
+      enabled: input.checked,
+    });
+    speakerSettings[
+      input.dataset.speakerSetting as
+        'loudness' | 'nightSound' | 'speechEnhancement' | 'statusLight'
+    ] = input.checked;
     notice('Saved.');
   } catch (error) {
     input.checked = !input.checked;
@@ -416,7 +449,9 @@ async function updateSpeakerLevel(input: HTMLInputElement): Promise<void> {
     await invoke('set_speaker_level', { setting, value });
     speakerSettings[setting] = value;
     notice('Saved.');
-  } catch (error) { notice(String(error)); }
+  } catch (error) {
+    notice(String(error));
+  }
 }
 function notice(value: string): void {
   const output = document.querySelector<HTMLOutputElement>('#notice');
@@ -491,7 +526,9 @@ async function refreshAudioInputFormat(): Promise<void> {
     const diagnostics = await invoke<Diagnostics>('diagnostics');
     const audioInput = document.querySelector<HTMLElement>('#diagnostic-audio-input');
     if (audioInput) audioInput.textContent = diagnostics.audioInputFormat ?? 'Unavailable';
-  } catch { /* Diagnostics remain usable when the speaker is unavailable. */ }
+  } catch {
+    /* Diagnostics remain usable when the speaker is unavailable. */
+  }
 }
 async function refreshDiagnostics(event: Event): Promise<void> {
   const details = event.currentTarget as HTMLDetailsElement;
