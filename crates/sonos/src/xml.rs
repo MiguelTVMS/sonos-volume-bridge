@@ -1,5 +1,6 @@
 use crate::{
-    RenderingControlService, SonosDevice, SonosError, SonosId, discovery::validate_local_url,
+    AvTransportService, RenderingControlService, SonosDevice, SonosError, SonosId,
+    discovery::validate_local_url,
 };
 use quick_xml::{Reader, escape::unescape, events::Event};
 use url::Url;
@@ -24,6 +25,7 @@ pub fn parse_device_description(xml: &[u8], location: &Url) -> Result<SonosDevic
     let mut service = None::<ServiceCandidate>;
     let mut rendering_control = None;
     let mut group_rendering_control = None;
+    let mut av_transport = None;
     loop {
         match reader.read_event_into(&mut buffer) {
             Ok(Event::Start(event)) => {
@@ -46,6 +48,11 @@ pub fn parse_device_description(xml: &[u8], location: &Url) -> Result<SonosDevic
                             if group_rendering_control.is_none() =>
                         {
                             group_rendering_control = Some(candidate);
+                        }
+                        Some("urn:schemas-upnp-org:service:AVTransport:1")
+                            if av_transport.is_none() =>
+                        {
+                            av_transport = Some(candidate);
                         }
                         _ => {}
                     }
@@ -108,6 +115,16 @@ pub fn parse_device_description(xml: &[u8], location: &Url) -> Result<SonosDevic
         .map_err(|error| SonosError::Xml(error.to_string()))?;
     validate_local_url(&control_url)?;
     validate_local_url(&event_url)?;
+    let av_transport = av_transport
+        .and_then(|service| service.control_url)
+        .map(|control_url| {
+            let control_url = location
+                .join(&control_url)
+                .map_err(|error| SonosError::Xml(error.to_string()))?;
+            validate_local_url(&control_url)?;
+            Ok::<AvTransportService, SonosError>(AvTransportService { control_url })
+        })
+        .transpose()?;
     Ok(SonosDevice {
         id,
         friendly_name: name,
@@ -117,6 +134,7 @@ pub fn parse_device_description(xml: &[u8], location: &Url) -> Result<SonosDevic
             control_url,
             event_url,
         },
+        av_transport,
     })
 }
 

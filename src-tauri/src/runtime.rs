@@ -9,7 +9,7 @@ use crate::{
     tray,
 };
 use async_trait::async_trait;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sonos_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, SonosVolume};
 use sonos_volume_bridge_integration::{
     Coordinator, IntegrationError, LocalAudioPort, SonosPort, SynchronizationPolicy,
@@ -148,6 +148,128 @@ pub async fn test_selected_device(configuration: AppConfiguration) -> Result<(),
         .map_err(|_| "The selected Sonos device rejected the volume test.".to_owned())
 }
 
+#[derive(Clone, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpeakerSettings {
+    pub loudness: Option<bool>,
+    pub status_light: Option<bool>,
+    pub night_sound: Option<bool>,
+    pub speech_enhancement: Option<bool>,
+    pub balance: Option<i8>,
+    pub treble: Option<i8>,
+    pub bass: Option<i8>,
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SpeakerSetting {
+    Loudness,
+    StatusLight,
+    NightSound,
+    SpeechEnhancement,
+    Balance,
+    Treble,
+    Bass,
+}
+
+pub async fn speaker_settings(configuration: AppConfiguration) -> SpeakerSettings {
+    let Ok(client) = SonosClient::builder().timeout(SONOS_TIMEOUT).build() else {
+        return SpeakerSettings::default();
+    };
+    let Ok(device) = resolve_device(&client, &configuration).await else {
+        return SpeakerSettings::default();
+    };
+    let settings = client.get_speaker_settings(&device).await;
+    SpeakerSettings {
+        loudness: settings.loudness,
+        status_light: client.get_status_light(&device).await.ok(),
+        night_sound: settings.night_sound,
+        speech_enhancement: settings.speech_enhancement,
+        balance: None,
+
+        treble: client.get_tone(&device, "Treble").await.ok(),
+        bass: client.get_tone(&device, "Bass").await.ok(),
+    }
+}
+
+pub async fn set_speaker_setting(
+    configuration: AppConfiguration,
+    setting: SpeakerSetting,
+    enabled: bool,
+) -> Result<(), String> {
+    let client = SonosClient::builder()
+        .timeout(SONOS_TIMEOUT)
+        .build()
+        .map_err(|_| "Unable to create the local Sonos client.".to_owned())?;
+    let device = resolve_device(&client, &configuration)
+        .await
+        .map_err(|_| "The selected Sonos device is unavailable.".to_owned())?;
+    match setting {
+        SpeakerSetting::Loudness => client.set_loudness(&device, enabled).await,
+        SpeakerSetting::StatusLight => client.set_status_light(&device, enabled).await,
+        SpeakerSetting::NightSound => client.set_eq(&device, "NightMode", enabled).await,
+        SpeakerSetting::Balance | SpeakerSetting::Treble | SpeakerSetting::Bass => unreachable!(),
+        SpeakerSetting::SpeechEnhancement => match client
+            .set_eq(&device, "SpeechEnhanceEnabled", enabled)
+            .await
+        {
+            Ok(()) => Ok(()),
+            Err(_) => client.set_eq(&device, "DialogLevel", enabled).await,
+        },
+    }
+    .map_err(|_| "The selected speaker does not support that setting.".to_owned())
+}
+
+pub async fn set_speaker_level(
+    configuration: AppConfiguration,
+    setting: SpeakerSetting,
+    value: i8,
+) -> Result<(), String> {
+    let client = SonosClient::builder()
+        .timeout(SONOS_TIMEOUT)
+        .build()
+        .map_err(|_| "Unable to create the local Sonos client.".to_owned())?;
+    let device = resolve_device(&client, &configuration)
+        .await
+        .map_err(|_| "The selected Sonos device is unavailable.".to_owned())?;
+    match setting {
+        SpeakerSetting::Balance => Err(
+            "Balance is temporarily unavailable while its Ray protocol mapping is corrected."
+                .to_owned(),
+        ),
+        SpeakerSetting::Treble | SpeakerSetting::Bass if (-10..=10).contains(&value) => client
+            .set_tone(
+                &device,
+                if matches!(setting, SpeakerSetting::Treble) {
+                    "Treble"
+                } else {
+                    "Bass"
+                },
+                value,
+            )
+            .await
+            .map_err(|_| "The selected speaker does not support that setting.".to_owned()),
+        _ => Err("Invalid speaker setting value.".to_owned()),
+    }
+}
+pub async fn use_tv_audio(configuration: AppConfiguration) -> Result<(), String> {
+    let client = SonosClient::builder()
+        .timeout(SONOS_TIMEOUT)
+        .build()
+        .map_err(|_| "Unable to create the local Sonos client.".to_owned())?;
+    let device = resolve_device(&client, &configuration)
+        .await
+        .map_err(|_| "The selected Sonos device is unavailable.".to_owned())?;
+    client
+        .select_home_theater_input(&device)
+        .await
+        .map_err(|_| "The selected speaker does not support TV audio.".to_owned())
+}
+pub async fn audio_input_format(configuration: AppConfiguration) -> Option<String> {
+    let client = SonosClient::builder().timeout(SONOS_TIMEOUT).build().ok()?;
+    let device = resolve_device(&client, &configuration).await.ok()?;
+    client.get_audio_input_format(&device).await.ok().flatten()
+}
 /// Owns exactly one cancellable runtime generation. A newer configuration
 /// invalidates updates from all older generations before starting its replacement.
 #[derive(Default)]
@@ -275,6 +397,7 @@ async fn run_session(
         configuration.maximum_sonos_volume,
         configuration.synchronize_mute,
         configuration.two_way_synchronization,
+        configuration.mute_speaker_at_zero_volume,
     )
     .map_err(|error| RuntimeError::Integration(error.to_string()))?;
     let sonos = DeviceSonosPort {

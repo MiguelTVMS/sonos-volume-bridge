@@ -40,6 +40,7 @@ pub struct Synchronizer {
     mapping: VolumeMapping,
     maximum: SonosVolume,
     synchronize_mute: bool,
+    mute_at_zero_volume: bool,
     two_way_synchronization: bool,
     confirmed: Option<ConfirmedSonosState>,
     pending_volume: Option<PendingIntent>,
@@ -53,12 +54,14 @@ impl Synchronizer {
         maximum: SonosVolume,
         synchronize_mute: bool,
         two_way_synchronization: bool,
+        mute_at_zero_volume: bool,
     ) -> Result<Self, MappingError> {
         mapping.validate()?;
         Ok(Self {
             mapping,
             maximum,
             synchronize_mute,
+            mute_at_zero_volume,
             two_way_synchronization,
             confirmed: None,
             pending_volume: None,
@@ -118,12 +121,16 @@ impl Synchronizer {
         });
         self.state = SyncState::WaitingForSonosConfirmation;
         let mut effects = vec![Effect::RequestSonosVolume(desired)];
-        if self.synchronize_mute {
+        if self.synchronize_mute || self.mute_at_zero_volume {
             self.pending_mute = Some(PendingIntent::SetMute {
-                desired: local.muted,
+                desired: MuteState(
+                    local.muted.0 || (self.mute_at_zero_volume && local.volume.get() == 0),
+                ),
                 created_at_ms: at_ms,
             });
-            effects.push(Effect::RequestSonosMute(local.muted));
+            effects.push(Effect::RequestSonosMute(MuteState(
+                local.muted.0 || (self.mute_at_zero_volume && local.volume.get() == 0),
+            )));
         }
         Ok(effects)
     }
@@ -181,7 +188,7 @@ mod tests {
         }
     }
     fn sync() -> Synchronizer {
-        Synchronizer::new(VolumeMapping::Linear, s(55), true, true).unwrap()
+        Synchronizer::new(VolumeMapping::Linear, s(55), true, true, false).unwrap()
     }
     #[test]
     fn startup_confirmation_only_applies_sonos_state() {
@@ -282,7 +289,8 @@ mod tests {
     }
     #[test]
     fn one_way_mode_observes_sonos_without_applying_it_locally() {
-        let mut machine = Synchronizer::new(VolumeMapping::Linear, s(55), true, false).unwrap();
+        let mut machine =
+            Synchronizer::new(VolumeMapping::Linear, s(55), true, false, false).unwrap();
         let effects = machine
             .handle(SyncEvent::SonosConfirmed {
                 volume: s(35),

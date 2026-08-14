@@ -18,12 +18,16 @@ pub enum SonosError {
     Xml(String),
     #[error("device description does not provide a RenderingControl service")]
     MissingRenderingControl,
+    #[error("device description does not provide an AVTransport service")]
+    MissingAvTransport,
     #[error("device description has no UDN")]
     MissingUdn,
     #[error("invalid Sonos volume: {0}")]
     InvalidVolume(String),
     #[error("invalid Sonos mute value: {0}")]
     InvalidMute(String),
+    #[error("invalid boolean {field} value: {value}")]
+    InvalidBoolean { field: &'static str, value: String },
     #[error("HTTP request failed: {0}")]
     Http(#[from] reqwest::Error),
     #[error("network operation failed: {0}")]

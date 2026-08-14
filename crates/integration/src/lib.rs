@@ -293,7 +293,7 @@ mod tests {
         let state = Arc::new(Mutex::new((volume(24), MuteState(false))));
         let applied = Arc::new(Mutex::new(Vec::new()));
         let machine =
-            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true).unwrap();
+            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true, false).unwrap();
         let mut coordinator = Coordinator::new(
             machine,
             Sonos(Arc::clone(&state)),
@@ -312,7 +312,7 @@ mod tests {
         let state = Arc::new(Mutex::new((volume(24), MuteState(false))));
         let applied = Arc::new(Mutex::new(Vec::new()));
         let machine =
-            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, false).unwrap();
+            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, false, false).unwrap();
         let mut coordinator = Coordinator::new(
             machine,
             Sonos(Arc::clone(&state)),
@@ -341,7 +341,7 @@ mod tests {
         let state = Arc::new(Mutex::new((volume(20), MuteState(false))));
         let applied = Arc::new(Mutex::new(Vec::new()));
         let machine =
-            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true).unwrap();
+            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true, false).unwrap();
         let mut coordinator = Coordinator::new(
             machine,
             Sonos(Arc::clone(&state)),
@@ -373,7 +373,7 @@ mod tests {
         let state = Arc::new(Mutex::new((volume(20), MuteState(false))));
         let applied = Arc::new(Mutex::new(Vec::new()));
         let machine =
-            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true).unwrap();
+            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true, false).unwrap();
         let mut coordinator = Coordinator::new(
             machine,
             Sonos(state),
@@ -395,7 +395,7 @@ mod tests {
         let state = Arc::new(Mutex::new((volume(20), MuteState(false))));
         let applied = Arc::new(Mutex::new(Vec::new()));
         let machine =
-            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true).unwrap();
+            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true, false).unwrap();
         let mut coordinator = Coordinator::new(
             machine,
             Sonos(Arc::clone(&state)),
@@ -429,7 +429,7 @@ mod tests {
         let state = Arc::new(Mutex::new((volume(20), MuteState(false))));
         let applied = Arc::new(Mutex::new(Vec::new()));
         let machine =
-            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true).unwrap();
+            Synchronizer::new(VolumeMapping::Linear, SonosVolume::MAX, true, true, false).unwrap();
         let mut coordinator = Coordinator::new(
             machine,
             Sonos(Arc::clone(&state)),

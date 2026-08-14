@@ -26,12 +26,18 @@ pub struct RenderingControlService {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AvTransportService {
+    pub control_url: Url,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SonosDevice {
     pub id: SonosId,
     pub friendly_name: String,
     pub model_name: Option<String>,
     pub model_number: Option<String>,
     pub rendering_control: RenderingControlService,
+    pub av_transport: Option<AvTransportService>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

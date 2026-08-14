@@ -35,7 +35,11 @@ impl MockSonosState {
                 "<s:Envelope><s:Body><u:GetMuteResponse><CurrentMute>{}</CurrentMute></u:GetMuteResponse></s:Body></s:Envelope>",
                 u8::from(self.muted.0)
             ),
-            "SetVolume" | "SetMute" => "<s:Envelope><s:Body/></s:Envelope>".to_owned(),
+            "GetZoneInfo" => "<s:Envelope><s:Body><u:GetZoneInfoResponse><MACAddress>001122334455</MACAddress></u:GetZoneInfoResponse></s:Body></s:Envelope>".to_owned(),
+            "GetMediaInfo" => "<s:Envelope><s:Body><u:GetMediaInfoResponse><CurrentURI>x-sonos-htastream:RINCON_00112233445501400:spdif</CurrentURI></u:GetMediaInfoResponse></s:Body></s:Envelope>".to_owned(),
+            "SetVolume" | "SetMute" | "SetAVTransportURI" => {
+                "<s:Envelope><s:Body/></s:Envelope>".to_owned()
+            }
             _ => "<s:Fault>Invalid Action</s:Fault>".to_owned(),
         }
     }
@@ -78,6 +82,12 @@ impl MockSonosServer {
                         "GetMute"
                     } else if request.contains("SetMute") {
                         "SetMute"
+                    } else if request.contains("GetZoneInfo") {
+                        "GetZoneInfo"
+                    } else if request.contains("SetAVTransportURI") {
+                        "SetAVTransportURI"
+                    } else if request.contains("GetMediaInfo") {
+                        "GetMediaInfo"
                     } else {
                         "Unknown"
                     };
