@@ -70,3 +70,14 @@ report only the issue number + risk category in this thread, and sanitize the is
 continuing.
 
 Use `gh` for issue operations when available.
+
+## Documentation maintenance
+
+- Keep `/docs` and `/docs/decisions` updated for behavior and architecture changes.
+- Before making a behavior-related change in code, read:
+  - `docs/architecture.md`
+  - `docs/how-it-works.md`
+  - `docs/state-machine.md`
+  - `docs/decisions/README.md`
+- After a behavior change, update the relevant decision records and architecture
+  references before finalizing the change.
