@@ -7,6 +7,19 @@ Install Rust 1.88.0 (including `clippy` and `rustfmt`), Node.js 22, and pnpm
 pnpm run ci:all
 ```
 
+Set up local environment variables from a template:
+
+```sh
+cp .env.example .env.development
+# edit .env.development with local values
+```
+
+If you use `dotenvx` for local command parity, you can load variables as:
+
+```sh
+npx dotenvx run -- pnpm run ci:all
+```
+
 ## Pre-commit validation
 
 Enable local hooks once per clone:
