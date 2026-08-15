@@ -399,8 +399,7 @@ jobs:
           printf '%s' "$APPLE_APP_STORE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/app-store.p12"
           printf '%s' "$APPLE_MAC_INSTALLER_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/mac-installer.p12"
           security import "$RUNNER_TEMP/app-store.p12" -k "$keychain_path" -P "$APPLE_APP_STORE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security import "$RUNNER_TEMP/mac-installer.p12" -k "$keychain_path" -P "$APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/productbuild
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$RUNNER_TEMP/mac-installer.p12" -k "$keychain_path" -P "$APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/productsign
           security list-keychains -d user -s "$keychain_path"
           security default-keychain -s "$keychain_path"
           security find-identity -v -p codesigning "$keychain_path" | grep -F '1 valid identities found'
@@ -477,8 +476,11 @@ jobs:
           app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
           ./scripts/verify-macos-artifact.sh app-store "$app_path"
           package_path="sonos-volume-bridge-${RELEASE_TAG}-macos-app-store.pkg"
-          xcrun productbuild --sign "$APPLE_MAC_INSTALLER_IDENTITY" --component "$app_path" /Applications "$package_path"
-          pkgutil --check-signature "$package_path" | grep -F 'Status: signed by a certificate trusted by Mac OS X'
+          unsigned_package_path="${package_path}.unsigned"
+          xcrun productbuild --component "$app_path" /Applications "$unsigned_package_path"
+          xcrun productsign --sign "$APPLE_MAC_INSTALLER_IDENTITY" --keychain "$keychain_path" "$unsigned_package_path" "$package_path"
+          rm -f "$unsigned_package_path"
+          pkgutil --check-signature "$package_path" 2>&1 | grep -F '3rd Party Mac Developer Installer:'
       - uses: actions/upload-artifact@v7
         with:
           name: macos-app-store-${{ needs.prepare-version.outputs.tag }}

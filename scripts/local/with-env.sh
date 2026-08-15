@@ -33,7 +33,7 @@ if [ -f "$env_file" ]; then
       continue
     fi
 
-    if [ -v "${key}" ]; then
+    if [ "${!key+x}" = x ]; then
       continue
     fi
 

@@ -13,6 +13,7 @@
     "ci:frontend": "pnpm run ci:ui-format && pnpm run ci:ui-lint",
     "ci:frontend-build": "pnpm run ci:ui-build",
     "ci:all": "pnpm run ci:rust && pnpm run ci:frontend && pnpm run ci:frontend-build",
-    "verify:macos-artifact": "./scripts/verify-macos-artifact.sh"
+    "verify:macos-artifact": "./scripts/verify-macos-artifact.sh",
+    "verify:macos-app-store-signing": "./scripts/local/with-env.sh bash ./scripts/local/verify-macos-app-store-signing.sh"
   }
 }
