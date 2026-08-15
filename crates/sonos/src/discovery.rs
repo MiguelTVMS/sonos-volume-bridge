@@ -13,7 +13,7 @@ use tokio::{
 use url::Url;
 
 const SSDP_ADDRESS: &str = "239.255.255.250:1900";
-const SEARCH: &[u8] = b"M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\nST: ssdp:all\r\n\r\n";
+const SEARCH: &[u8] = b"M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\nST: urn:schemas-upnp-org:device:ZonePlayer:1\r\n\r\n";
 
 fn discovery_bind_addresses() -> Vec<SocketAddr> {
     let addresses = get_if_addrs()

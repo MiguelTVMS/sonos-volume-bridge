@@ -40,6 +40,7 @@ const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(2);
 const REQUESTED_SUBSCRIPTION: Duration = Duration::from_secs(300);
 const INITIAL_RECONNECT_DELAY: Duration = Duration::from_secs(1);
 const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(30);
+const SONOS_UDN_PREFIX: &str = "uuid:RINCON_";
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -115,7 +116,9 @@ pub async fn discover_available() -> Result<Vec<DiscoveredSonos>, String> {
         .map_err(|_| "Sonos discovery is unavailable on this network.".to_owned())?;
     let mut devices = Vec::new();
     for location in locations {
-        if let Ok(found) = client.retrieve_device(location.clone()).await {
+        if let Ok(found) = client.retrieve_device(location.clone()).await
+            && is_sonos_speaker(&found.device)
+        {
             devices.push(DiscoveredSonos {
                 id: found.device.id.as_str().to_owned(),
                 friendly_name: display_speaker_name(&found.device.friendly_name),
@@ -614,6 +617,7 @@ async fn resolve_device(
     if let Some(address) = configuration.last_known_sonos_address.as_deref()
         && let Ok(location) = Url::parse(address)
         && let Ok(found) = client.retrieve_device(location).await
+        && is_sonos_speaker(&found.device)
         && found.device.id == selected
     {
         return Ok(found.device);
@@ -623,12 +627,17 @@ async fn resolve_device(
         .map_err(|_| RuntimeError::SonosUnavailable)?;
     for location in locations {
         if let Ok(found) = client.retrieve_device(location).await
+            && is_sonos_speaker(&found.device)
             && found.device.id == selected
         {
             return Ok(found.device);
         }
     }
     Err(RuntimeError::SonosUnavailable)
+}
+
+fn is_sonos_speaker(device: &SonosDevice) -> bool {
+    device.id.as_str().starts_with(SONOS_UDN_PREFIX)
 }
 
 fn create_audio(
@@ -783,7 +792,9 @@ fn status_name(status: &UiStatus) -> &'static str {
 mod tests {
     use super::*;
     use sonos_volume_bridge_domain::NormalizedVolume;
+    use sonos_volume_bridge_sonos::RenderingControlService;
     use tokio::sync::broadcast;
+    use url::Url;
 
     struct MuteUnavailableAudio {
         events: broadcast::Sender<SystemAudioEvent>,
@@ -869,5 +880,37 @@ mod tests {
             (MAX_RECONNECT_DELAY * 2).min(MAX_RECONNECT_DELAY),
             MAX_RECONNECT_DELAY
         );
+    }
+
+    #[test]
+    fn discoverable_sonos_filter_accepts_rincon_ids() {
+        let sonos_device = SonosDevice {
+            id: SonosId::new("uuid:RINCON_00000000000101400").unwrap(),
+            friendly_name: "Office".to_owned(),
+            model_name: None,
+            model_number: None,
+            rendering_control: RenderingControlService {
+                control_url: Url::parse("http://192.168.1.10:1400/control").unwrap(),
+                event_url: Url::parse("http://192.168.1.10:1400/event").unwrap(),
+            },
+            av_transport: None,
+        };
+        assert!(is_sonos_speaker(&sonos_device));
+    }
+
+    #[test]
+    fn discoverable_sonos_filter_rejects_non_rincon_ids() {
+        let media_renderer_device = SonosDevice {
+            id: SonosId::new("uuid:AA-BB-CC").unwrap(),
+            friendly_name: "Bedroom".to_owned(),
+            model_name: None,
+            model_number: None,
+            rendering_control: RenderingControlService {
+                control_url: Url::parse("http://192.168.1.11:1400/control").unwrap(),
+                event_url: Url::parse("http://192.168.1.11:1400/event").unwrap(),
+            },
+            av_transport: None,
+        };
+        assert!(!is_sonos_speaker(&media_renderer_device));
     }
 }
