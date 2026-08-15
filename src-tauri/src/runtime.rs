@@ -116,7 +116,9 @@ pub async fn discover_available() -> Result<Vec<DiscoveredSonos>, String> {
         .map_err(|_| "Sonos discovery is unavailable on this network.".to_owned())?;
     let mut devices = Vec::new();
     for location in locations {
-        if let Ok(found) = client.retrieve_device(location.clone()).await && is_sonos_speaker(&found.device) {
+        if let Ok(found) = client.retrieve_device(location.clone()).await
+            && is_sonos_speaker(&found.device)
+        {
             devices.push(DiscoveredSonos {
                 id: found.device.id.as_str().to_owned(),
                 friendly_name: display_speaker_name(&found.device.friendly_name),
