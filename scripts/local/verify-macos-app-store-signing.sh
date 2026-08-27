@@ -129,7 +129,7 @@ fi
 
 printf '%s' "$APPLE_APP_STORE_PROVISIONING_PROFILE" | base64 -D >"$profile_path"
 created_profile=1
-chmod 600 "$profile_path"
+  chmod 644 "$profile_path"
 security cms -D -i "$profile_path" >/dev/null
 ./scripts/prepare-profile-entitlements.sh "$profile_path" "$entitlements_path"
 created_entitlements=1

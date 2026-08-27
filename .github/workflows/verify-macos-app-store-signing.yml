@@ -119,7 +119,7 @@ jobs:
           APPLE_APP_STORE_PROVISIONING_PROFILE: ${{ secrets.APPLE_APP_STORE_PROVISIONING_PROFILE }}
         run: |
           printf '%s' "$APPLE_APP_STORE_PROVISIONING_PROFILE" | base64 --decode > src-tauri/macos-app-store.provisionprofile
-          chmod 600 src-tauri/macos-app-store.provisionprofile
+          chmod 644 src-tauri/macos-app-store.provisionprofile
           security cms -D -i src-tauri/macos-app-store.provisionprofile >/dev/null
           ./scripts/prepare-profile-entitlements.sh src-tauri/macos-app-store.provisionprofile src-tauri/Entitlements.appstore.plist
       - name: Build and verify the App Store application
