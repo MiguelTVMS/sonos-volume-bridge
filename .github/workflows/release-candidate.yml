@@ -219,7 +219,7 @@ jobs:
         run: |
           application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "sonos-volume-bridge"))')"
           test "$RELEASE_VERSION" = "$application_version"
-      - run: cargo tauri bundle --bundles deb
+      - run: cargo tauri build --bundles deb
       - name: Collect the Debian installer
         env:
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
