@@ -122,6 +122,20 @@ release:
   Mac Installer Distribution certificate, their passwords, keychain password,
   and the base64 Mac App Store provisioning profile as secrets.
 
+For App Store packaging, the installer `.p12` file must contain the dedicated
+`3rd Party Mac Developer Installer` identity. Reusing the app `.p12` here causes
+`xcrun productbuild` and the updated signing workflow to fail with a strict
+identity mismatch message.
+
+To confirm both `.p12` bundles before updating GitHub secrets:
+
+- Extract identities and subject lines:
+  - `openssl pkcs12 -legacy -in /path/to/Certificates.p12 -passin pass:'$PASS' -clcerts -nokeys | openssl x509 -noout -subject -issuer`
+  - `openssl pkcs12 -legacy -in /path/to/Installer.p12 -passin pass:'$PASS' -clcerts -nokeys | openssl x509 -noout -subject -issuer`
+- Expected result:
+  - `Certificates.p12` shows `3rd Party Mac Developer Application`.
+  - Installer `.p12` shows `3rd Party Mac Developer Installer`.
+
 Never commit certificates, private keys, or provisioning profiles. The App Store
 profile must match the bundle identifier in `src-tauri/tauri.conf.json`.
 
