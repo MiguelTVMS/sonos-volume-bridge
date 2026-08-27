@@ -86,8 +86,13 @@ curl --fail --silent --show-error --location \
 security import "$wwdr_certificate_path" -k "$keychain_path" >/dev/null
 printf '%s' "$APPLE_APP_STORE_CERTIFICATE" | base64 -D >"$app_certificate_path"
 printf '%s' "$APPLE_MAC_INSTALLER_CERTIFICATE" | base64 -D >"$installer_certificate_path"
-security import "$app_certificate_path" -k "$keychain_path" -P "$APPLE_APP_STORE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign >/dev/null
-security import "$installer_certificate_path" -k "$keychain_path" -P "$APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/productsign >/dev/null
+security import "$app_certificate_path" -k "$keychain_path" -P "$APPLE_APP_STORE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productsign >/dev/null
+security import "$installer_certificate_path" -k "$keychain_path" -P "$APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productsign >/dev/null
+security set-key-partition-list \
+  -S apple-tool:,apple:,codesign: \
+  -s \
+  -k "$KEYCHAIN_PASSWORD" \
+  "$keychain_path" >/dev/null
 
 # Match GitHub Actions: expose only the temporary keychain while signing.
 security list-keychains -d user -s "$keychain_path"
@@ -129,13 +134,17 @@ security cms -D -i "$profile_path" >/dev/null
 ./scripts/prepare-profile-entitlements.sh "$profile_path" "$entitlements_path"
 created_entitlements=1
 
-# These Developer ID variables are valid for direct distribution but conflict
-# with the App Store identity selected above.
+# Developer ID certificate variables are valid for direct distribution but
+# must not influence this App Store bundle.
 unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD
 unset APPLE_API_KEY APPLE_API_ISSUER APPLE_API_PRIVATE_KEY APPLE_API_KEY_PATH
 
-cargo tauri bundle --bundles app --config src-tauri/tauri.appstore.conf.json
+cargo tauri bundle --bundles app --config src-tauri/tauri.appstore.conf.json --no-sign
 app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
+app_executable="$app_path/Contents/MacOS/sonos-volume-bridge"
+xattr -cr "$app_path"
+codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$keychain_path" --options runtime --entitlements "$entitlements_path" "$app_executable"
+codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$keychain_path" --options runtime --entitlements "$entitlements_path" "$app_path"
 ./scripts/verify-macos-artifact.sh app-store "$app_path"
 xcrun productbuild --component "$app_path" /Applications "$unsigned_package_path"
 xcrun productsign --sign "$APPLE_MAC_INSTALLER_IDENTITY" --keychain "$keychain_path" "$unsigned_package_path" "$package_path"

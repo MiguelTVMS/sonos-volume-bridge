@@ -18,6 +18,7 @@ jobs:
     env:
       APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_APP_STORE_SIGNING_IDENTITY }}
       APPLE_MAC_INSTALLER_IDENTITY: ${{ vars.APPLE_MAC_INSTALLER_IDENTITY }}
+      APPLE_APP_STORE_KEYCHAIN_PATH: ${{ runner.temp }}/apple-app-store.keychain-db
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: dtolnay/rust-toolchain@1.88.0
@@ -42,7 +43,7 @@ jobs:
           APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          keychain_path="$RUNNER_TEMP/apple-app-store.keychain-db"
+          keychain_path="$APPLE_APP_STORE_KEYCHAIN_PATH"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
           security set-keychain-settings -lut 21600 "$keychain_path"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
@@ -52,8 +53,9 @@ jobs:
           security import "$RUNNER_TEMP/AppleWWDRCAG3.cer" -k "$keychain_path"
           printf '%s' "$APPLE_APP_STORE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/app-store.p12"
           printf '%s' "$APPLE_MAC_INSTALLER_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/mac-installer.p12"
-          security import "$RUNNER_TEMP/app-store.p12" -k "$keychain_path" -P "$APPLE_APP_STORE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security import "$RUNNER_TEMP/mac-installer.p12" -k "$keychain_path" -P "$APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/productsign
+          security import "$RUNNER_TEMP/app-store.p12" -k "$keychain_path" -P "$APPLE_APP_STORE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productsign
+          security import "$RUNNER_TEMP/mac-installer.p12" -k "$keychain_path" -P "$APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productsign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
           security list-keychains -d user -s "$keychain_path"
           security default-keychain -s "$keychain_path"
           codesigning_identities="$(security find-identity -v -p codesigning "$keychain_path")"
@@ -123,12 +125,16 @@ jobs:
           ./scripts/prepare-profile-entitlements.sh src-tauri/macos-app-store.provisionprofile src-tauri/Entitlements.appstore.plist
       - name: Bundle and verify the App Store application
         run: |
-          cargo tauri bundle --bundles app --config src-tauri/tauri.appstore.conf.json
+          cargo tauri bundle --bundles app --config src-tauri/tauri.appstore.conf.json --no-sign
           app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
+          app_executable="$app_path/Contents/MacOS/sonos-volume-bridge"
+          xattr -cr "$app_path"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_APP_STORE_KEYCHAIN_PATH" --options runtime --entitlements src-tauri/Entitlements.appstore.plist "$app_executable"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_APP_STORE_KEYCHAIN_PATH" --options runtime --entitlements src-tauri/Entitlements.appstore.plist "$app_path"
           ./scripts/verify-macos-artifact.sh app-store "$app_path"
           unsigned_package_path='sonos-volume-bridge-macos-app-store.pkg.unsigned'
           xcrun productbuild --component "$app_path" /Applications "$unsigned_package_path"
-          xcrun productsign --sign "$APPLE_MAC_INSTALLER_IDENTITY" --keychain "$keychain_path" "$unsigned_package_path" sonos-volume-bridge-macos-app-store.pkg
+          xcrun productsign --sign "$APPLE_MAC_INSTALLER_IDENTITY" --keychain "$APPLE_APP_STORE_KEYCHAIN_PATH" "$unsigned_package_path" sonos-volume-bridge-macos-app-store.pkg
           rm -f "$unsigned_package_path"
           pkgutil --check-signature sonos-volume-bridge-macos-app-store.pkg 2>&1 | grep -F '3rd Party Mac Developer Installer:'
       - uses: actions/upload-artifact@v7.0.1
@@ -139,6 +145,6 @@ jobs:
       - name: Remove temporary Apple credentials
         if: always()
         run: |
-          security delete-keychain "$RUNNER_TEMP/apple-app-store.keychain-db" || true
+          security delete-keychain "$APPLE_APP_STORE_KEYCHAIN_PATH" || true
           rm -f "$RUNNER_TEMP/AppleWWDRCAG3.cer" "$RUNNER_TEMP/app-store.p12" "$RUNNER_TEMP/mac-installer.p12"
           rm -f src-tauri/macos-app-store.provisionprofile src-tauri/Entitlements.appstore.plist
