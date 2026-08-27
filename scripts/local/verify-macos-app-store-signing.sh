@@ -139,7 +139,7 @@ created_entitlements=1
 unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD
 unset APPLE_API_KEY APPLE_API_ISSUER APPLE_API_PRIVATE_KEY APPLE_API_KEY_PATH
 
-cargo tauri bundle --bundles app --config src-tauri/tauri.appstore.conf.json --no-sign
+cargo tauri build --bundles app --config src-tauri/tauri.appstore.conf.json --no-sign
 app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
 app_executable="$app_path/Contents/MacOS/sonos-volume-bridge"
 xattr -cr "$app_path"

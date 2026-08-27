@@ -122,9 +122,9 @@ jobs:
           chmod 600 src-tauri/macos-app-store.provisionprofile
           security cms -D -i src-tauri/macos-app-store.provisionprofile >/dev/null
           ./scripts/prepare-profile-entitlements.sh src-tauri/macos-app-store.provisionprofile src-tauri/Entitlements.appstore.plist
-      - name: Bundle and verify the App Store application
+      - name: Build and verify the App Store application
         run: |
-          cargo tauri bundle --bundles app --config src-tauri/tauri.appstore.conf.json --no-sign
+          cargo tauri build --bundles app --config src-tauri/tauri.appstore.conf.json --no-sign
           app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
           app_executable="$app_path/Contents/MacOS/sonos-volume-bridge"
           xattr -cr "$app_path"
