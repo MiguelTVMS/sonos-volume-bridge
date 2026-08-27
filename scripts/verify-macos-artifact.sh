@@ -37,6 +37,11 @@ case "$channel" in
     codesign --display --verbose=4 "$app_path" 2>&1 | grep -E 'Apple Distribution|Mac App Distribution|3rd Party Mac Developer Application'
     profile="$app_path/Contents/embedded.provisionprofile"
     test -f "$profile"
+    profile_mode="$(stat -f '%Lp' "$profile")"
+    if [ "$profile_mode" != '644' ]; then
+      echo "Embedded provisioning profile must have mode 644, got $profile_mode" >&2
+      exit 1
+    fi
     security cms -D -i "$profile" >"$profile_plist"
     bundle_identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Contents/Info.plist")"
     profile_application_identifier="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.application-identifier' "$profile_plist")"
