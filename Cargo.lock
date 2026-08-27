@@ -3465,6 +3465,7 @@ name = "sonos-volume-bridge-platform-audio"
 version = "1.2.3"
 dependencies = [
  "async-trait",
+ "serde_json",
  "sonos-volume-bridge-domain",
  "thiserror 2.0.20",
  "tokio",

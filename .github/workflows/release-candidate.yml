@@ -173,6 +173,57 @@ jobs:
           path: sonos-volume-bridge-*-macos-unsigned.tar.gz
           if-no-files-found: error
           retention-days: 1
+
+  linux-deb:
+    name: Build Ubuntu Debian package
+    needs: prepare-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare-version.outputs.commit }}
+      - name: Cache Linux desktop package archives
+        uses: actions/cache@v6
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-linux-desktop-v1
+      - name: Install Linux desktop build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: cargo install tauri-cli --version '^2' --locked
+      - name: Verify the tag matches the application version
+        env:
+          RELEASE_VERSION: ${{ needs.prepare-version.outputs.version }}
+        run: |
+          application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "sonos-volume-bridge"))')"
+          test "$RELEASE_VERSION" = "$application_version"
+      - run: cargo tauri bundle --bundles deb
+      - name: Collect the Debian installer
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+        run: |
+          installer="$(find target/release/bundle/deb -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          test -n "$installer"
+          cp "$installer" "sonos-volume-bridge-${RELEASE_TAG}-linux-amd64.deb"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-release
+          path: sonos-volume-bridge-*-linux-amd64.deb
+          if-no-files-found: error
   macos-direct:
     name: Sign and notarize macOS direct-download app
     needs: [prepare-version, macos-app]
@@ -483,7 +534,7 @@ jobs:
           if-no-files-found: error
   publish-release:
     name: Publish GitHub Release
-    needs: [prepare-version, macos-direct, windows-nsis, windows-msix]
+    needs: [prepare-version, macos-direct, linux-deb, windows-nsis, windows-msix]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -532,6 +583,7 @@ jobs:
 
           - **Windows:** Download and run the Windows installer.
           - **macOS:** Download the macOS archive, then move the app to Applications.
+          - **Ubuntu:** Download and install the Debian package.
 
           ### Important
 

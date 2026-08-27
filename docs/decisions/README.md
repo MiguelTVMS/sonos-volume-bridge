@@ -12,3 +12,4 @@ This folder stores decision records. Keep one record per important design choice
 - [0008-two-way-synchronization-mode](0008-two-way-synchronization-mode.md)
 - [0009-sonos-speaker-controls](0009-sonos-speaker-controls.md)
 - [0010-discovery-filters-non-sonos-devices](0010-discovery-filters-non-sonos-devices.md)
+- [0011-ubuntu-pulse-audio-adapter](0011-ubuntu-pulse-audio-adapter.md)

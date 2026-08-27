@@ -70,6 +70,7 @@ Both Sonos and local adapters mark callback origin:
 
 - Windows: callback context IDs.
 - macOS: expected-write tracking with tolerance and expiry.
+- Ubuntu: PulseAudio/PipeWire `pactl subscribe` events with expected-write tracking.
 
 Suppressed local callbacks are ignored by the synchronizer so confirmed Sonos values
 do not create write loops.

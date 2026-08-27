@@ -76,6 +76,14 @@ pub mod macos {
     //! The macOS adapter is only compiled on macOS targets.
 }
 
+#[cfg(target_os = "linux")]
+pub mod linux;
+
+#[cfg(not(target_os = "linux"))]
+pub mod linux {
+    //! The Linux adapter is only compiled on Linux targets.
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

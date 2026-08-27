@@ -9,6 +9,7 @@ repository.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+serde_json.workspace = true
 sonos-volume-bridge-domain = { path = "../domain" }
 thiserror.workspace = true
 tokio.workspace = true

@@ -58,7 +58,7 @@ pub struct AvailableAudioOutput {
     pub writable_volume: bool,
 }
 
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 fn map_audio_outputs(
     devices: Vec<sonos_volume_bridge_platform_audio::AudioOutputDevice>,
 ) -> Vec<AvailableAudioOutput> {
@@ -73,7 +73,7 @@ fn map_audio_outputs(
 }
 
 #[cfg_attr(
-    not(any(windows, target_os = "macos")),
+    not(any(windows, target_os = "macos", target_os = "linux")),
     allow(clippy::unnecessary_wraps)
 )]
 pub fn available_audio_outputs() -> Result<Vec<AvailableAudioOutput>, String> {
@@ -89,7 +89,13 @@ pub fn available_audio_outputs() -> Result<Vec<AvailableAudioOutput>, String> {
             .map(map_audio_outputs)
             .map_err(|_| "Unable to list local output devices.".to_owned())
     }
-    #[cfg(not(any(windows, target_os = "macos")))]
+    #[cfg(target_os = "linux")]
+    {
+        sonos_volume_bridge_platform_audio::linux::list_output_devices()
+            .map(map_audio_outputs)
+            .map_err(|_| "Unable to list local output devices.".to_owned())
+    }
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     {
         Ok(Vec::new())
     }
@@ -664,7 +670,14 @@ fn create_audio(
                 .map_err(RuntimeError::Local)?,
         ))
     }
-    #[cfg(not(any(windows, target_os = "macos")))]
+    #[cfg(target_os = "linux")]
+    {
+        Ok(Arc::new(
+            sonos_volume_bridge_platform_audio::linux::LinuxAudioController::start(selection)
+                .map_err(RuntimeError::Local)?,
+        ))
+    }
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     {
         let _ = selection;
         Err(RuntimeError::Local(PlatformAudioError::DeviceUnavailable))

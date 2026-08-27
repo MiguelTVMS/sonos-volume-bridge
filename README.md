@@ -3,7 +3,7 @@
 Control the volume of a Sonos speaker with the volume controls you already use
 on your computer.
 
-Sonos Volume Bridge is a small background app for Windows and macOS. It keeps a
+Sonos Volume Bridge is a small background app for Windows, macOS, and Ubuntu. It keeps a
 Sonos speaker and your chosen computer audio output in step—without requiring a
 cloud account, Home Assistant, or a separate remote control.
 
@@ -15,7 +15,7 @@ Bridge connects that speaker to your computer's normal volume controls, so
 keyboard volume keys, system controls, and supported audio-device controls can
 adjust it for you.
 
-The app lives quietly in the menu bar on macOS or the system tray on Windows.
+The app lives quietly in the menu bar on macOS or the system tray on Windows and Ubuntu.
 Open it when you want to change a setting; otherwise, it stays out of the way.
 
 ## What it can do
@@ -41,7 +41,8 @@ Open it when you want to change a setting; otherwise, it stays out of the way.
 
 ## What you need
 
-- A Windows computer or a Mac running macOS 13 or later
+- A Windows computer, a Mac running macOS 13 or later, or Ubuntu with
+  PulseAudio or PipeWire and `pactl` (`pulseaudio-utils`)
 - A Sonos speaker on the same local network as the computer
 - A computer audio output whose volume can be changed by software
 
@@ -87,7 +88,8 @@ synchronization. See the [Privacy Policy](PRIVACY.md) for complete details.
 Sonos Volume Bridge is an early community project. Development is currently
 limited to hands-on testing with a Sonos Ray, so support for other Sonos models
 may need validation. Windows and macOS packages are available, but hardware
-combinations vary. Please create a
+combinations vary. Ubuntu support requires the PulseAudio-compatible audio
+service supplied by PulseAudio or PipeWire. Please create a
 [GitHub issue](https://github.com/MiguelTVMS/sonos-volume-bridge/issues) to
 report compatibility problems or help develop support for other Sonos speakers.
 
