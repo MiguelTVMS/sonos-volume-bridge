@@ -403,8 +403,6 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
           security list-keychains -d user -s "$keychain_path"
           security default-keychain -s "$keychain_path"
-          security find-identity -v -p codesigning "$keychain_path" | grep -F '1 valid identities found'
-          security find-identity -v -p basic "$keychain_path" | grep -F '1 valid identities found'
           codesigning_identities="$(security find-identity -v -p codesigning "$keychain_path")"
           basic_identities="$(security find-identity -v -p basic "$keychain_path")"
           echo "Codesigning identities:"
