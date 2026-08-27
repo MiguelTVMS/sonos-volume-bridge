@@ -59,6 +59,16 @@ pnpm --dir ui install
 cargo tauri dev
 ```
 
+## Ubuntu
+
+Ubuntu development and runtime require the desktop packages needed by Tauri,
+plus `pulseaudio-utils` for the PulseAudio-compatible `pactl` interface. This
+works with either PulseAudio or PipeWire's `pipewire-pulse` service:
+
+```sh
+sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev pulseaudio-utils
+```
+
 ## Visual Studio Code on Windows
 
 Open the repository root in VS Code and accept the recommended extensions. The

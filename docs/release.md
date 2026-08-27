@@ -13,16 +13,17 @@ choose one increment:
 - `Minor` increases the minor number and resets the patch number.
 - `Major` increases the major number and resets the minor and patch numbers.
 
-The workflow validates `develop`, commits the version bump to `develop`, builds
-both platform packages from that exact commit, creates and pushes its annotated
+The workflow validates `develop`, commits the version bump to `develop`, checks
+out the trusted `develop` branch for each package build and verifies the exact
+release commit before building, creates and pushes its annotated
 `vX.Y.Z` tag with the GitHub Actions bot identity, then creates or updates the
 GitHub Release with downloadable assets, a channel-aware installation and signing summary, and GitHub-generated change notes. Pull requests with `feature`, `enhancement`, `bug`, `fix`, `maintenance`, `refactor`, or `documentation` labels are grouped in those notes. It never merges branches. Merge
 `develop` into `main` only after the release workflow succeeds.
 
 The current published release is [v0.3.0](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/tag/v0.3.0).
 
-The release workflow compiles one macOS executable and one Windows executable
-per version. The protected macOS direct-download job downloads the exact
+The release workflow compiles one macOS executable, one Ubuntu Debian package,
+and one Windows executable per version. The protected macOS direct-download job downloads the exact
 executable produced by the unprivileged build job, imports the Developer ID
 identity into an ephemeral keychain, bundles a sandboxed application, signs it
 with Hardened Runtime, submits it to Apple for notarization, staples the ticket,
@@ -38,6 +39,12 @@ installer. A packaging failure can therefore be isolated to its installer type
 without compiling the application again.
 The Windows installer remains unsigned, so SmartScreen may still warn before
 installation.
+
+## Ubuntu packaging
+
+The release workflow builds an x86_64 Debian package on Ubuntu and uploads it
+to the GitHub Release. It targets Ubuntu systems using PulseAudio or PipeWire's
+PulseAudio compatibility service; users need `pulseaudio-utils` for `pactl`.
 
 Rust caches use one shared logical key across CI and release job names. The
 cache action still isolates entries by operating system, Rust toolchain, Cargo
@@ -125,8 +132,8 @@ are not migrated and must be configured again.
 
 ## Release checklist
 
-- Rust, frontend, audit, Windows, and macOS CI checks pass.
-- The Sonos and Windows/macOS manual probes pass.
+- Rust, frontend, audit, Ubuntu, Windows, and macOS CI checks pass.
+- The Sonos and Ubuntu/Windows/macOS manual probes pass.
 - Diagnostic export contains no serial numbers, host paths, full XML, or secrets.
 - Default safety cap and mapping have been reviewed.
 - README, architecture, protocol, development, and release notes are current.

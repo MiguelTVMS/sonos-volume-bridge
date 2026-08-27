@@ -13,7 +13,9 @@ returns to `Connecting` and reconciles from Sonos.
 
 An application-originated local callback is suppressed. Windows identifies it
 through a stable Core Audio event-context GUID; macOS compares it with a
-short-lived expected write using an adapter-configured tolerance. A Sonos
+short-lived expected write using an adapter-configured tolerance; Ubuntu uses
+the PulseAudio-compatible `pactl` event stream with short-lived expected-write
+tracking. A Sonos
 confirmation always clears pending intents. It wins over any requested value
 only when two-way synchronization is enabled.
 

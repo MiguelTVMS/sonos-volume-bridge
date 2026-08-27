@@ -16,7 +16,7 @@ flowchart TB
     I[integration crate\nports and coordinator]
   end
   subgraph Platform
-    P1[platform-audio crate\nWindows/macOS callbacks]
+    P1[platform-audio crate\nWindows/macOS/Linux callbacks]
     P2[sonos crate\ndiscovery, SOAP, callbacks]
   end
   subgraph Shell
@@ -55,6 +55,7 @@ flowchart TB
   - updates timing metrics.
 - `sonos`: local-network client for SSDP, SOAP, GENA subscribe/renew/unsubscribe, and callback listener validation.
 - `platform-audio`: OS adapters for local output change events and setting local volume or mute.
+  Linux uses PulseAudio's `pactl` interface, which is also supplied by PipeWire on Ubuntu.
 - `src-tauri`: composition root.
   - reads validated settings,
   - owns runtime lifecycle and tray status snapshots,
