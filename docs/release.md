@@ -13,8 +13,9 @@ choose one increment:
 - `Minor` increases the minor number and resets the patch number.
 - `Major` increases the major number and resets the minor and patch numbers.
 
-The workflow validates `develop`, commits the version bump to `develop`, builds
-both platform packages from that exact commit, creates and pushes its annotated
+The workflow validates `develop`, commits the version bump to `develop`, checks
+out the trusted `develop` branch for each package build and verifies the exact
+release commit before building, creates and pushes its annotated
 `vX.Y.Z` tag with the GitHub Actions bot identity, then creates or updates the
 GitHub Release with downloadable assets, a channel-aware installation and signing summary, and GitHub-generated change notes. Pull requests with `feature`, `enhancement`, `bug`, `fix`, `maintenance`, `refactor`, or `documentation` labels are grouped in those notes. It never merges branches. Merge
 `develop` into `main` only after the release workflow succeeds.

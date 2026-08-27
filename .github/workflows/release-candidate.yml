@@ -137,7 +137,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
+          ref: develop
+      - name: Verify the checked-out release commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@1.88.0
       - uses: Swatinem/rust-cache@v2
         with:
@@ -181,7 +185,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
+          ref: develop
+      - name: Verify the checked-out release commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - name: Cache Linux desktop package archives
         uses: actions/cache@v6
         with:
@@ -237,7 +245,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
+          ref: develop
+      - name: Verify the checked-out release commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@1.88.0
       - uses: Swatinem/rust-cache@v2
         with:
@@ -349,7 +361,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
+          ref: develop
+      - name: Verify the checked-out release commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@1.88.0
       - uses: Swatinem/rust-cache@v2
         with:
@@ -444,7 +460,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
+          ref: develop
+      - name: Verify the checked-out release commit
+        shell: pwsh
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
+            throw 'The checked-out revision does not match the release commit.'
+          }
       - uses: dtolnay/rust-toolchain@1.88.0
       - uses: Swatinem/rust-cache@v2
         with:
@@ -485,7 +509,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
+          ref: develop
+      - name: Verify the checked-out release commit
+        shell: pwsh
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
+            throw 'The checked-out revision does not match the release commit.'
+          }
       - uses: dtolnay/rust-toolchain@1.88.0
       - uses: Swatinem/rust-cache@v2
         with:
@@ -518,7 +550,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
+          ref: develop
+      - name: Verify the checked-out release commit
+        shell: pwsh
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
+            throw 'The checked-out revision does not match the release commit.'
+          }
       - uses: dtolnay/rust-toolchain@1.88.0
       - uses: actions/download-artifact@v8
         with:
