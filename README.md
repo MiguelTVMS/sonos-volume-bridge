@@ -64,6 +64,21 @@ replace the Sonos app as a full speaker controller.
 Your settings are saved automatically. After setup, you can close the settings
 window and leave the app running from the menu bar or system tray.
 
+## Documentation and help
+
+The [project wiki](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki)
+contains the complete user guide:
+
+- [Installation](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Installation)
+- [Getting started](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Getting-Started)
+- [Settings guide](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Settings)
+- [Tray and menu bar](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Tray-and-Menu-Bar)
+- [Compatibility and limitations](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Compatibility-and-Limitations)
+- [Diagnostics and troubleshooting](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Diagnostics-and-Troubleshooting)
+- [Updating and uninstalling](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Updating-and-Uninstalling)
+- [Privacy and security](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Privacy-and-Security)
+- [Frequently asked questions](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/FAQ)
+
 > [!IMPORTANT]
 > macOS downloads are signed with Developer ID and notarized by Apple. The
 > Windows installer is not yet digitally signed, so Windows SmartScreen may
