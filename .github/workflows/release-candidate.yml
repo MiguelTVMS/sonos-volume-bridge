@@ -358,7 +358,6 @@ jobs:
     env:
       APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_APP_STORE_SIGNING_IDENTITY }}
       APPLE_MAC_INSTALLER_IDENTITY: ${{ vars.APPLE_MAC_INSTALLER_IDENTITY }}
-      APPLE_APP_STORE_KEYCHAIN_PATH: ${{ runner.temp }}/apple-app-store.keychain-db
     steps:
       - uses: actions/checkout@v7
         with:
@@ -389,7 +388,7 @@ jobs:
           APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          keychain_path="$APPLE_APP_STORE_KEYCHAIN_PATH"
+          keychain_path="$RUNNER_TEMP/apple-app-store.keychain-db"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
           security set-keychain-settings -lut 21600 "$keychain_path"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
@@ -475,8 +474,8 @@ jobs:
           app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
           app_executable="$app_path/Contents/MacOS/sonos-volume-bridge"
           xattr -cr "$app_path"
-          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_APP_STORE_KEYCHAIN_PATH" --options runtime --entitlements src-tauri/Entitlements.appstore.plist "$app_executable"
-          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_APP_STORE_KEYCHAIN_PATH" --options runtime --entitlements src-tauri/Entitlements.appstore.plist "$app_path"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" --options runtime --entitlements src-tauri/Entitlements.appstore.plist "$app_executable"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" --options runtime --entitlements src-tauri/Entitlements.appstore.plist "$app_path"
       - name: Verify the signed App Store application and package it
         env:
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
@@ -486,7 +485,7 @@ jobs:
           package_path="sonos-volume-bridge-${RELEASE_TAG}-macos-app-store.pkg"
           unsigned_package_path="${package_path}.unsigned"
           xcrun productbuild --component "$app_path" /Applications "$unsigned_package_path"
-          xcrun productsign --sign "$APPLE_MAC_INSTALLER_IDENTITY" --keychain "$APPLE_APP_STORE_KEYCHAIN_PATH" "$unsigned_package_path" "$package_path"
+          xcrun productsign --sign "$APPLE_MAC_INSTALLER_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" "$unsigned_package_path" "$package_path"
           rm -f "$unsigned_package_path"
           pkgutil --check-signature "$package_path" 2>&1 | grep -F '3rd Party Mac Developer Installer:'
       - uses: actions/upload-artifact@v7
@@ -497,7 +496,7 @@ jobs:
       - name: Remove temporary Apple credentials
         if: always()
         run: |
-          security delete-keychain "$APPLE_APP_STORE_KEYCHAIN_PATH" || true
+          security delete-keychain "$RUNNER_TEMP/apple-app-store.keychain-db" || true
           rm -f "$RUNNER_TEMP/AppleWWDRCAG3.cer" "$RUNNER_TEMP/app-store.p12" "$RUNNER_TEMP/mac-installer.p12"
           rm -f src-tauri/macos-app-store.provisionprofile
           rm -f src-tauri/Entitlements.appstore.plist
