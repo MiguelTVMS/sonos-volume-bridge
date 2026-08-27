@@ -686,7 +686,7 @@ jobs:
           if ($packages.Count -ne 1) {
             throw "Expected exactly one MSIX package, found $($packages.Count)."
           }
-          msstore publish $packages[0].FullName -id $env:MICROSOFT_STORE_PRODUCT_ID
+          msstore publish $packages[0].FullName -id $env:MICROSOFT_STORE_PRODUCT_ID --uploadTimeout 300
           if ($LASTEXITCODE -ne 0) {
             throw 'Microsoft Store submission failed.'
           }
