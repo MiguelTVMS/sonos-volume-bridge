@@ -22,7 +22,7 @@ jobs:
       APPLE_API_KEY: ${{ vars.APPLE_API_KEY }}
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.120.0
       - uses: Swatinem/rust-cache@v2.9.2
         with:
           shared-key: workspace

@@ -60,7 +60,7 @@ jobs:
           key: external-pr-${{ runner.os }}-apt-desktop-v1
       - name: Install Linux desktop build dependencies
         run: sudo apt-get update && sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.120.0
         with:
           components: rustfmt, clippy
       - uses: pnpm/action-setup@v6
@@ -105,7 +105,7 @@ jobs:
           key: external-pr-${{ runner.os }}-apt-desktop-v1
       - name: Install Linux desktop build dependencies
         run: sudo apt-get update && sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.120.0
       - uses: pnpm/action-setup@v6
         with:
           version: 11

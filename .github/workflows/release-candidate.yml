@@ -55,7 +55,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.120.0
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
@@ -142,7 +142,7 @@ jobs:
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
         run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.120.0
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
@@ -199,7 +199,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.120.0
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
@@ -250,7 +250,7 @@ jobs:
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
         run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.120.0
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
@@ -366,7 +366,7 @@ jobs:
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
         run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.120.0
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
@@ -515,7 +515,7 @@ jobs:
           if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
             throw 'The checked-out revision does not match the release commit.'
           }
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.120.0
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
@@ -564,7 +564,7 @@ jobs:
           if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
             throw 'The checked-out revision does not match the release commit.'
           }
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.120.0
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
@@ -605,7 +605,7 @@ jobs:
           if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
             throw 'The checked-out revision does not match the release commit.'
           }
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.120.0
       - uses: actions/download-artifact@v8
         with:
           name: windows-build-${{ needs.prepare-version.outputs.tag }}
