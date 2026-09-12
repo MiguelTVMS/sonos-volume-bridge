@@ -1,0 +1,26 @@
+name: Website validation
+
+on:
+  pull_request:
+    branches-ignore: [main]
+    paths:
+      - "pages/**"
+      - "scripts/generate-page-markdown.py"
+      - "scripts/tests/consent.test.cjs"
+      - ".github/workflows/website-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  consent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: node --test scripts/tests/consent.test.cjs
+      - run: python3 scripts/generate-page-markdown.py --check
