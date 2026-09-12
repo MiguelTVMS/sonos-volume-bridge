@@ -40,20 +40,20 @@ pub fn parse_last_change(body: &[u8], sequence: Option<u32>) -> Result<GenaEvent
     loop {
         match reader.read_event_into(&mut buffer) {
             Ok(Event::Empty(event) | Event::Start(event)) => {
-                let tag = tag(event.name().as_ref())?.to_owned();
+                let tag = event.name().as_ref().to_owned();
                 if tag == "Volume"
-                    && attribute(&event, "channel", reader.decoder())?
+                    && attribute(&event, "channel")?
                         .as_deref()
                         .is_none_or(|channel| channel == "Master")
                 {
-                    volume = attribute(&event, "val", reader.decoder())?;
+                    volume = attribute(&event, "val")?;
                 }
                 if tag == "Mute"
-                    && attribute(&event, "channel", reader.decoder())?
+                    && attribute(&event, "channel")?
                         .as_deref()
                         .is_none_or(|channel| channel == "Master")
                 {
-                    muted = attribute(&event, "val", reader.decoder())?;
+                    muted = attribute(&event, "val")?;
                 }
             }
             Ok(Event::Eof) => break,
@@ -90,24 +90,18 @@ pub(crate) fn first_text(xml: &[u8], wanted: &str) -> Result<Option<String>, Son
     loop {
         match reader.read_event_into(&mut buffer) {
             Ok(Event::Start(event)) => {
-                current = tag(event.name().as_ref())? == wanted;
+                current = event.name().as_ref() == wanted;
             }
-            Ok(Event::End(event)) if current && tag(event.name().as_ref())? == wanted => {
+            Ok(Event::End(event)) if current && event.name().as_ref() == wanted => {
                 return unescape(&value)
                     .map(|text| Some(text.into_owned()))
                     .map_err(|error| SonosError::Xml(error.to_string()));
             }
             Ok(Event::End(_)) => current = false,
             Ok(Event::Text(text)) if current => {
-                let text = text
-                    .decode()
-                    .map_err(|error| SonosError::Xml(error.to_string()))?;
                 value.push_str(&text);
             }
             Ok(Event::GeneralRef(reference)) if current => {
-                let reference = reference
-                    .decode()
-                    .map_err(|error| SonosError::Xml(error.to_string()))?;
                 value.push('&');
                 value.push_str(&reference);
                 value.push(';');
@@ -119,21 +113,14 @@ pub(crate) fn first_text(xml: &[u8], wanted: &str) -> Result<Option<String>, Son
         buffer.clear();
     }
 }
-fn tag(bytes: &[u8]) -> Result<&str, SonosError> {
-    std::str::from_utf8(bytes).map_err(|error| SonosError::Xml(error.to_string()))
-}
 fn attribute(
     event: &quick_xml::events::BytesStart<'_>,
     wanted: &str,
-    decoder: quick_xml::encoding::Decoder,
 ) -> Result<Option<String>, SonosError> {
     for attribute in event.attributes() {
         let attribute = attribute.map_err(|error| SonosError::Xml(error.to_string()))?;
-        if tag(attribute.key.as_ref())? == wanted {
-            let raw_value = decoder
-                .decode(attribute.value.as_ref())
-                .map_err(|error| SonosError::Xml(error.to_string()))?;
-            return unescape(&raw_value)
+        if attribute.key.as_ref() == wanted {
+            return unescape(&attribute.value)
                 .map(|value| Some(value.into_owned()))
                 .map_err(|error| SonosError::Xml(error.to_string()));
         }

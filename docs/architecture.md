@@ -129,3 +129,7 @@ Both modes still enforce local intent deduplication and Sonos confirmation autho
 - Protocol URLs and callback targets are validated before network calls.
 - Diagnostics and frontend status are redacted and human friendly.
 - Configuration writes are atomic with `.json.tmp` staging and schema validation.
+
+The protocol adapter uses Reqwest 0.13 and quick-xml 0.42. XML decoding is
+performed by the streaming reader; protocol parsing retains explicit reference
+unescaping and typed errors. See [ADR 0002](decisions/0002-local-sonos-client.md).
