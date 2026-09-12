@@ -1,0 +1,30 @@
+# Sonos Volume Bridge
+
+> An independent, free, MIT-licensed desktop utility that synchronizes the volume and optional mute state of one computer audio output and one Sonos speaker over the local network.
+
+## Product facts
+
+- Supports system volume controls, keyboard volume keys, and supported audio-device controls.
+- Optional two-way synchronization reflects speaker volume changes on the computer.
+- Settings include a maximum speaker volume, volume mapping, output selection, and start at login.
+- Does not play, stream, capture, or redirect audio. It does not replace the Sonos app.
+- macOS download: Apple Silicon (ARM64) only, macOS 13 or later. Intel Macs are not supported by this download.
+- Windows: Microsoft Store and a separate unsigned direct installer.
+- Linux: Ubuntu on AMD64 with PulseAudio or PipeWire and pactl.
+- Hands-on speaker testing is currently limited to Sonos Ray; other models need validation.
+- The app has no advertising, analytics, or publisher telemetry. Settings and diagnostic logs are stored locally unless the user chooses to share them.
+- Not affiliated with, sponsored by, endorsed by, or supported by Sonos.
+
+## Website
+
+- [Overview and features](https://svb.miguel.ms/index.md): Product capabilities and limitations.
+- [Downloads](https://svb.miguel.ms/#downloads): Current platform download options.
+- [Privacy policy](https://svb.miguel.ms/privacy.md): Application data practices and website hosting information.
+- [MIT license](https://svb.miguel.ms/license.txt): License terms.
+
+## Detailed documentation
+
+- [User wiki](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki): Installation, settings, compatibility, and troubleshooting.
+- [Source repository](https://github.com/MiguelTVMS/sonos-volume-bridge): Code and project documentation.
+- [Latest stable release](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest): Current release and packages; versions are not hardcoded in this guide.
+- [Support](https://github.com/MiguelTVMS/sonos-volume-bridge/issues): Public issue tracker.

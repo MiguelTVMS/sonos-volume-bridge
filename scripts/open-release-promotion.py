@@ -9,6 +9,17 @@ def gh(*args):
     return subprocess.check_output(['gh', *args], text=True).strip()
 
 
+def verify_merge_tree(commit):
+    """Accept main's prior merge commits only when release content is preserved."""
+    subprocess.run(['git', 'fetch', 'origin', 'refs/heads/main:refs/remotes/origin/main'], check=True)
+    result = subprocess.run(['git', 'merge-tree', '--write-tree', 'origin/main', commit], capture_output=True, text=True)
+    if result.returncode:
+        raise ValueError('Release promotion has merge conflicts; resolve manually')
+    release_tree = subprocess.check_output(['git', 'rev-parse', f'{commit}^{{tree}}'], text=True).strip()
+    if result.stdout.strip() != release_tree:
+        raise ValueError('Promotion would include files outside the validated release; resolve manually')
+
+
 def promote(tag, commit):
     if not re.fullmatch(r'v\d+\.\d+\.\d+', tag):
         raise ValueError('Promotion requires a stable version tag')
@@ -25,8 +36,10 @@ def promote(tag, commit):
     if comparison['status'] in ('identical', 'behind'):
         print('Release is already contained in main.')
         return
-    if comparison['status'] != 'ahead':
-        raise ValueError('main has diverged; resolve manually before promotion')
+    if comparison['status'] == 'diverged':
+        verify_merge_tree(commit)
+    elif comparison['status'] != 'ahead':
+        raise ValueError('Unexpected comparison status')
     branch = f'release/{tag[1:]}'
     refs = json.loads(gh('api', f'repos/{repo}/git/matching-refs/heads/{branch}'))
     exact = [ref for ref in refs if ref['ref'] == f'refs/heads/{branch}']
