@@ -15,6 +15,11 @@ on:
         default: Beta
         type: choice
         options: [GA, Beta, Alpha]
+      publish_microsoft_store:
+        description: Submit release to Microsoft Store (GA only)
+        required: false
+        default: false
+        type: boolean
       build_app_store:
         description: Build Mac App Store package
         required: false
@@ -721,7 +726,7 @@ jobs:
 
   publish-microsoft-store:
     name: Submit GA release to Microsoft Store
-    if: ${{ inputs.channel == 'GA' }}
+    if: ${{ inputs.channel == 'GA' && inputs.publish_microsoft_store }}
     needs: [prepare-version, windows-msix, publish-release]
     runs-on: windows-latest
     environment: microsoft-store
