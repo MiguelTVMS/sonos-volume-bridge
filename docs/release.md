@@ -34,6 +34,9 @@ The repository must allow GitHub Actions to create pull requests. PR validation 
 application CI. Normal development PRs still run CI. Only promote validated
 release commits into main; route fixes through develop first. Required-check
 rules targeting main must not require these excluded PR workflows.
+Repository-managed security scanning, including default CodeQL, is separate
+from these workflow files and may still run. The promotion unit tests run in CI
+for changes to the helper, tests, or release workflows.
 No branch protection bypass or automatic approval is used. If PR creation fails,
 the release remains published; rerun the failed job after resolving the cause.
 Repeated runs reuse the release branch and open PR. Diverged main, a conflicting

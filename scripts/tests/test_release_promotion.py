@@ -13,12 +13,12 @@ SHA = 'a' * 40
 
 
 class PromotionTests(unittest.TestCase):
-    def run_case(self, status='ahead', refs=None, prs=None, prerelease=False):
+    def run_case(self, status='ahead', refs=None, prs=None, prerelease=False, draft=False, resolved=SHA):
         calls = []
         def fake(*args):
             calls.append(args)
             if args[:2] == ('release', 'view'):
-                return json.dumps({'isDraft': False, 'isPrerelease': prerelease})
+                return json.dumps({'isDraft': draft, 'isPrerelease': prerelease})
             if args[0] == 'api' and '/compare/' in args[1]:
                 return json.dumps({'status': status})
             if args[0] == 'api' and '/matching-refs/' in args[1]:
@@ -26,7 +26,7 @@ class PromotionTests(unittest.TestCase):
             if args[:2] == ('pr', 'list'):
                 return json.dumps(prs or [])
             return '{}'
-        with patch.object(promotion, 'gh', side_effect=fake), patch.object(promotion.subprocess, 'check_output', return_value=SHA), patch.dict(os.environ, GITHUB_REPOSITORY='owner/project'):
+        with patch.object(promotion, 'gh', side_effect=fake), patch.object(promotion.subprocess, 'check_output', return_value=resolved), patch.dict(os.environ, GITHUB_REPOSITORY='owner/project'):
             promotion.promote('v1.2.3', SHA)
         return calls
 
@@ -48,6 +48,24 @@ class PromotionTests(unittest.TestCase):
         for kwargs in ({'status':'diverged'}, {'prerelease':True}, {'refs':[{'ref':'refs/heads/release/1.2.3','object':{'sha':'b'*40}}]}, {'prs':[{'state':'CLOSED'}]}):
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
                 self.run_case(**kwargs)
+
+    def test_draft_and_mismatched_tag_fail(self):
+        for kwargs in ({'draft': True}, {'resolved': 'b' * 40}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                self.run_case(**kwargs)
+
+    def test_invalid_inputs_never_call_github(self):
+        with patch.object(promotion, 'gh') as github:
+            for tag, commit in [('v1.2.3-beta.1', SHA), ('invalid', SHA), ('v1.2.3', 'invalid')]:
+                with self.assertRaises(ValueError):
+                    promotion.promote(tag, commit)
+            github.assert_not_called()
+
+    def test_api_failure_stops_promotion(self):
+        with patch.object(promotion, 'gh', side_effect=RuntimeError('API unavailable')) as github:
+            with self.assertRaises(RuntimeError):
+                promotion.promote('v1.2.3', SHA)
+            self.assertEqual(github.call_count, 1)
 
 
 if __name__ == '__main__':
