@@ -57,3 +57,13 @@ reviews, or unverified compatibility claims are added to structured data.
 After deployment, submit the sitemap in Google Search Console and Bing Webmaster
 Tools. Validate structured data with their inspection tools. Updating these files
 does not itself submit the site or guarantee indexing or rich results.
+
+## Markdown versions
+
+Every HTML page has a generated Markdown counterpart (`index.md`, `privacy.md`).
+The HTML alternate link and llms.txt point to these files. Run
+`python3 scripts/generate-page-markdown.py` after editing page content, and
+`python3 scripts/generate-page-markdown.py --check` to detect stale copies.
+The conversion includes main content and footer notices, preserves absolute
+links, and omits navigation and decorative graphics. The sitemap continues to
+list the canonical HTML pages only.

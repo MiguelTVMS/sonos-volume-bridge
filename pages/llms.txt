@@ -17,9 +17,9 @@
 
 ## Website
 
-- [Overview and features](https://svb.miguel.ms/): Product capabilities and limitations.
+- [Overview and features](https://svb.miguel.ms/index.md): Product capabilities and limitations.
 - [Downloads](https://svb.miguel.ms/#downloads): Current platform download options.
-- [Privacy policy](https://svb.miguel.ms/privacy.html): Application data practices and website hosting information.
+- [Privacy policy](https://svb.miguel.ms/privacy.md): Application data practices and website hosting information.
 - [MIT license](https://svb.miguel.ms/license.txt): License terms.
 
 ## Detailed documentation
