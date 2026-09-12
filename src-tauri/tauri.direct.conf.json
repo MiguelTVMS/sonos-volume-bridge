@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "macOS": {
+      "entitlements": "./Entitlements.direct.plist",
+      "files": {
+        "embedded.provisionprofile": "macos-developer-id.provisionprofile"
+      }
+    }
+  }
+}

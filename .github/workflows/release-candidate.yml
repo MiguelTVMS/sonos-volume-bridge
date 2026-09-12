@@ -1,0 +1,748 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version increment for the final release
+        required: true
+        default: Fix
+        type: choice
+        options: [Fix, Minor, Major]
+      channel:
+        description: Publication channel
+        required: true
+        default: Beta
+        type: choice
+        options: [GA, Beta, Alpha]
+      build_app_store:
+        description: Build Mac App Store package
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: final-release-develop
+  cancel-in-progress: false
+
+jobs:
+  prepare-version:
+    name: Validate and version develop
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.commit.outputs.commit }}
+    steps:
+      - name: Require a develop dispatch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/develop" ]; then
+            echo "Release workflow must be dispatched from develop; received $GITHUB_REF." >&2
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Cache Linux desktop package archives
+        uses: actions/cache@v6
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-linux-desktop-v1
+      - name: Install Linux desktop build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
+      - uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: pnpm run ci:rustfmt
+      - run: pnpm run ci:clippy
+      - run: pnpm run ci:test
+      - run: pnpm run ci:ui-format
+      - run: pnpm run ci:ui-lint
+      - run: pnpm run ci:ui-build
+      - name: Bump the workspace version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          next_version="$(python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          manifest = Path("Cargo.toml")
+          contents = manifest.read_text()
+          match = re.search(r'(?m)^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"$', contents)
+          if match is None:
+              raise SystemExit("The workspace version was not found.")
+          major, minor, patch = (int(part) for part in match.groups())
+          bump = os.environ["BUMP"].lower()
+          if bump == "fix":
+              patch += 1
+          elif bump == "minor":
+              minor += 1
+              patch = 0
+          elif bump == "major":
+              major += 1
+              minor = 0
+              patch = 0
+          else:
+              raise SystemExit(f"Unsupported version increment: {bump}")
+          version = f"{major}.{minor}.{patch}"
+          manifest.write_text(
+              contents[:match.start()] + f'version = "{version}"' + contents[match.end():]
+          )
+          print(version)
+          PY
+          )"
+          echo "version=$next_version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$next_version" >> "$GITHUB_OUTPUT"
+      - name: Verify the new version
+        run: cargo check --workspace
+      - name: Commit the version bump to develop
+        id: commit
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock
+          git commit -m "chore: release v$RELEASE_VERSION"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git push origin HEAD:develop
+          git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
+          git push origin "$RELEASE_TAG"
+
+  macos-app:
+    name: Build unsigned macOS app
+    needs: prepare-version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+      - name: Verify the checked-out release commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+      - uses: dtolnay/rust-toolchain@1.98.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: cargo install tauri-cli --version '^2' --locked
+      - name: Verify the tag matches the application version
+        env:
+          RELEASE_VERSION: ${{ needs.prepare-version.outputs.version }}
+        run: |
+          application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "sonos-volume-bridge"))')"
+          test "$RELEASE_VERSION" = "$application_version"
+      - run: cargo tauri build --no-bundle
+      - run: test -x target/release/sonos-volume-bridge
+      - name: Archive the unsigned macOS executable
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+        run: |
+          tar -czf \
+            "sonos-volume-bridge-${RELEASE_TAG}-macos-unsigned.tar.gz" \
+            target/release/sonos-volume-bridge ui/dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-unsigned-${{ needs.prepare-version.outputs.tag }}
+          path: sonos-volume-bridge-*-macos-unsigned.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  linux-deb:
+    name: Build Ubuntu Debian package
+    needs: prepare-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+      - name: Verify the checked-out release commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+      - name: Cache Linux desktop package archives
+        uses: actions/cache@v6
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-linux-desktop-v1
+      - name: Install Linux desktop build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
+      - uses: dtolnay/rust-toolchain@1.98.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: cargo install tauri-cli --version '^2' --locked
+      - name: Verify the tag matches the application version
+        env:
+          RELEASE_VERSION: ${{ needs.prepare-version.outputs.version }}
+        run: |
+          application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "sonos-volume-bridge"))')"
+          test "$RELEASE_VERSION" = "$application_version"
+      - run: cargo tauri build --bundles deb
+      - name: Collect the Debian installer
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+        run: |
+          installer="$(find target/release/bundle/deb -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          test -n "$installer"
+          cp "$installer" "sonos-volume-bridge-${RELEASE_TAG}-linux-amd64.deb"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-release
+          path: sonos-volume-bridge-*-linux-amd64.deb
+          if-no-files-found: error
+  macos-direct:
+    name: Sign and notarize macOS direct-download app
+    needs: [prepare-version, macos-app]
+    runs-on: macos-latest
+    environment: apple-signing
+    env:
+      APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      APPLE_API_ISSUER: ${{ vars.APPLE_API_ISSUER }}
+      APPLE_API_KEY: ${{ vars.APPLE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+      - name: Verify the checked-out release commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+      - uses: dtolnay/rust-toolchain@1.98.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace
+      - run: cargo install tauri-cli --version '^2' --locked
+      - uses: actions/download-artifact@v8
+        with:
+          name: macos-unsigned-${{ needs.prepare-version.outputs.tag }}
+          path: macos-unsigned
+      - name: Restore the unsigned macOS executable
+        run: |
+          tar -xzf macos-unsigned/sonos-volume-bridge-*-macos-unsigned.tar.gz
+          test -x target/release/sonos-volume-bridge
+          test -d ui/dist
+      - name: Import the Developer ID certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+          keychain_path="$RUNNER_TEMP/apple-signing.keychain-db"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$certificate_path"
+          chmod 600 "$certificate_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$certificate_path" \
+            -k "$keychain_path" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          security default-keychain -s "$keychain_path"
+          security find-identity -v -p codesigning "$keychain_path" \
+            | grep -F "\"$APPLE_SIGNING_IDENTITY\""
+      - name: Prepare the notarization key
+        env:
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: |
+          api_key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+          printf '%s' "$APPLE_API_PRIVATE_KEY" > "$api_key_path"
+          chmod 600 "$api_key_path"
+          echo "APPLE_API_KEY_PATH=$api_key_path" >> "$GITHUB_ENV"
+      - name: Materialize an optional Developer ID provisioning profile
+        env:
+          APPLE_DEVELOPER_ID_PROVISIONING_PROFILE: ${{ secrets.APPLE_DEVELOPER_ID_PROVISIONING_PROFILE }}
+        run: |
+          if [ -n "$APPLE_DEVELOPER_ID_PROVISIONING_PROFILE" ]; then
+            printf '%s' "$APPLE_DEVELOPER_ID_PROVISIONING_PROFILE" | base64 --decode > src-tauri/macos-developer-id.provisionprofile
+            chmod 600 src-tauri/macos-developer-id.provisionprofile
+            ./scripts/prepare-profile-entitlements.sh \
+              src-tauri/macos-developer-id.provisionprofile \
+              src-tauri/Entitlements.direct.plist
+            echo "HAS_DEVELOPER_ID_PROFILE=true" >> "$GITHUB_ENV"
+          fi
+      - name: Verify the tag matches the application version
+        env:
+          RELEASE_VERSION: ${{ needs.prepare-version.outputs.version }}
+        run: |
+          application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "sonos-volume-bridge"))')"
+          test "$RELEASE_VERSION" = "$application_version"
+      - name: Bundle, sign, notarize, and staple the existing executable
+        run: |
+          if [ "${HAS_DEVELOPER_ID_PROFILE:-false}" = true ]; then
+            cargo tauri bundle --bundles app --config src-tauri/tauri.direct.conf.json
+          else
+            cargo tauri bundle --bundles app
+          fi
+      - name: Verify the signed and notarized app
+        run: |
+          app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
+          ./scripts/verify-macos-artifact.sh direct "$app_path"
+          xcrun stapler validate "$app_path"
+          spctl --assess --type execute --verbose=4 "$app_path"
+      - name: Archive the notarized app bundle
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            'target/release/bundle/macos/Sonos Volume Bridge.app' \
+            "sonos-volume-bridge-${RELEASE_TAG}-macos.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-release
+          path: sonos-volume-bridge-*-macos.zip
+          if-no-files-found: error
+      - name: Remove temporary Apple credentials
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/apple-signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/developer-id.p12"
+          rm -f "$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+          rm -f src-tauri/macos-developer-id.provisionprofile
+          rm -f src-tauri/Entitlements.direct.plist
+
+  macos-app-store:
+    name: Sign macOS App Store package
+    if: ${{ inputs.build_app_store }}
+    needs: [prepare-version, macos-app]
+    runs-on: macos-latest
+    environment: apple-app-store
+    env:
+      APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_APP_STORE_SIGNING_IDENTITY }}
+      APPLE_MAC_INSTALLER_IDENTITY: ${{ vars.APPLE_MAC_INSTALLER_IDENTITY }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+      - name: Verify the checked-out release commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+      - uses: dtolnay/rust-toolchain@1.98.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace
+      - run: cargo install tauri-cli --version '^2' --locked
+      - uses: actions/download-artifact@v8
+        with:
+          name: macos-unsigned-${{ needs.prepare-version.outputs.tag }}
+          path: macos-unsigned
+      - name: Restore the unsigned macOS executable
+        run: |
+          tar -xzf macos-unsigned/sonos-volume-bridge-*-macos-unsigned.tar.gz
+          test -x target/release/sonos-volume-bridge
+          test -d ui/dist
+      - name: Import App Store signing certificates
+        env:
+          APPLE_APP_STORE_CERTIFICATE: ${{ secrets.APPLE_APP_STORE_CERTIFICATE }}
+          APPLE_APP_STORE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_APP_STORE_CERTIFICATE_PASSWORD }}
+          APPLE_MAC_INSTALLER_CERTIFICATE: ${{ secrets.APPLE_MAC_INSTALLER_CERTIFICATE }}
+          APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          keychain_path="$RUNNER_TEMP/apple-app-store.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          curl --fail --silent --show-error --location \
+            https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer \
+            --output "$RUNNER_TEMP/AppleWWDRCAG3.cer"
+          security import "$RUNNER_TEMP/AppleWWDRCAG3.cer" -k "$keychain_path"
+          printf '%s' "$APPLE_APP_STORE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/app-store.p12"
+          printf '%s' "$APPLE_MAC_INSTALLER_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/mac-installer.p12"
+          security import "$RUNNER_TEMP/app-store.p12" -k "$keychain_path" -P "$APPLE_APP_STORE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productsign
+          security import "$RUNNER_TEMP/mac-installer.p12" -k "$keychain_path" -P "$APPLE_MAC_INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productsign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          security default-keychain -s "$keychain_path"
+          codesigning_identities="$(security find-identity -v -p codesigning "$keychain_path")"
+          basic_identities="$(security find-identity -v -p basic "$keychain_path")"
+          echo "Codesigning identities:"
+          echo "$codesigning_identities"
+          echo "Installer identities:"
+          echo "$basic_identities"
+          find_identity_line() {
+            identities="$1"
+            identity_hint="$2"
+            fallback_pattern="$3"
+            identity_line="$(printf '%s\n' "$identities" | awk -v identity_hint="$identity_hint" 'index(tolower($0), tolower(identity_hint)) > 0 { print; exit }')"
+            if [ -z "$identity_line" ] && [ -n "$fallback_pattern" ]; then
+              identity_line="$(printf '%s\n' "$identities" | awk -v pattern="$fallback_pattern" 'tolower($0) ~ pattern { print; exit }')"
+            fi
+            if [ -z "$identity_line" ]; then
+              identity_line="$(printf '%s\n' "$identities" | awk '/^[[:space:]]*[0-9]+\)/ { print; exit }')"
+            fi
+            printf '%s' "$identity_line"
+          }
+          app_signing_identity_hint="$(printf '%b' "$APPLE_SIGNING_IDENTITY")"
+          installer_signing_identity_hint="$(printf '%b' "$APPLE_MAC_INSTALLER_IDENTITY")"
+          app_signing_identity_line="$(find_identity_line "$codesigning_identities" "$app_signing_identity_hint" '3rd party mac developer application|developer id application|apple distribution')"
+          installer_signing_identity_line="$(find_identity_line "$basic_identities" "$installer_signing_identity_hint" '3rd party mac developer installer|developer id installer|mac installer distribution')"
+          if [ -z "$app_signing_identity_line" ] || [ -z "$installer_signing_identity_line" ]; then
+            echo "::error::Failed to resolve signing identities from imported certificates."
+            exit 1
+          fi
+          app_signing_identity="$(echo "$app_signing_identity_line" | awk '{print $2}')"
+          installer_signing_identity="$(echo "$installer_signing_identity_line" | awk '{print $2}')"
+          if ! echo "$app_signing_identity_line" | grep -qiE '3rd party mac developer application|developer id application|apple distribution'; then
+            echo "::error::App signing identity is missing expected certificate type. Got: $app_signing_identity_line"
+            exit 1
+          fi
+          if ! echo "$installer_signing_identity_line" | grep -qiE '3rd party mac developer installer|developer id installer|mac installer distribution'; then
+            echo "::error::Installer signing identity is missing expected installer certificate type. Got: $installer_signing_identity_line"
+            exit 1
+          fi
+          if [ -z "$app_signing_identity" ]; then
+            echo "::error::App signing identity is empty. Check APPLE_APP_STORE_SIGNING_IDENTITY and certificate import."
+            exit 1
+          fi
+          if [ -z "$installer_signing_identity" ]; then
+            echo "::error::Installer signing identity is empty. Check APPLE_MAC_INSTALLER_IDENTITY and certificate import."
+            exit 1
+          fi
+          if [ "$app_signing_identity" = "$installer_signing_identity" ]; then
+            echo "::error::App Store app and installer identities are identical. APPLE_MAC_INSTALLER_CERTIFICATE likely contains the app certificate by mistake."
+            exit 1
+          fi
+          test -n "$installer_signing_identity"
+          test -n "$app_signing_identity"
+          echo "APPLE_SIGNING_IDENTITY=$app_signing_identity" >> "$GITHUB_ENV"
+          echo "APPLE_MAC_INSTALLER_IDENTITY=$installer_signing_identity" >> "$GITHUB_ENV"
+      - name: Materialize the Mac App Store provisioning profile
+        env:
+          APPLE_APP_STORE_PROVISIONING_PROFILE: ${{ secrets.APPLE_APP_STORE_PROVISIONING_PROFILE }}
+        run: |
+          printf '%s' "$APPLE_APP_STORE_PROVISIONING_PROFILE" | base64 --decode > src-tauri/macos-app-store.provisionprofile
+          chmod 644 src-tauri/macos-app-store.provisionprofile
+          security cms -D -i src-tauri/macos-app-store.provisionprofile >/dev/null
+          ./scripts/prepare-profile-entitlements.sh \
+            src-tauri/macos-app-store.provisionprofile \
+            src-tauri/Entitlements.appstore.plist
+      - name: Bundle and sign the App Store application
+        run: |
+          cargo tauri bundle --bundles app --config src-tauri/tauri.appstore.conf.json --no-sign
+          app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
+          app_executable="$app_path/Contents/MacOS/sonos-volume-bridge"
+          xattr -cr "$app_path"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" --options runtime --entitlements src-tauri/Entitlements.appstore.plist "$app_executable"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" --options runtime --entitlements src-tauri/Entitlements.appstore.plist "$app_path"
+      - name: Verify the signed App Store application and package it
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+        run: |
+          app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
+          ./scripts/verify-macos-artifact.sh app-store "$app_path"
+          package_path="sonos-volume-bridge-${RELEASE_TAG}-macos-app-store.pkg"
+          unsigned_package_path="${package_path}.unsigned"
+          xcrun productbuild --component "$app_path" /Applications "$unsigned_package_path"
+          xcrun productsign --sign "$APPLE_MAC_INSTALLER_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" "$unsigned_package_path" "$package_path"
+          rm -f "$unsigned_package_path"
+          pkgutil --check-signature "$package_path" 2>&1 | grep -F '3rd Party Mac Developer Installer:'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-app-store-${{ needs.prepare-version.outputs.tag }}
+          path: sonos-volume-bridge-*-macos-app-store.pkg
+          if-no-files-found: error
+      - name: Remove temporary Apple credentials
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/apple-app-store.keychain-db" || true
+          rm -f "$RUNNER_TEMP/AppleWWDRCAG3.cer" "$RUNNER_TEMP/app-store.p12" "$RUNNER_TEMP/mac-installer.p12"
+          rm -f src-tauri/macos-app-store.provisionprofile
+          rm -f src-tauri/Entitlements.appstore.plist
+
+  windows-app:
+    name: Build Windows executable
+    needs: prepare-version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+      - name: Verify the checked-out release commit
+        shell: pwsh
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
+            throw 'The checked-out revision does not match the release commit.'
+          }
+      - uses: dtolnay/rust-toolchain@1.98.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: cargo install tauri-cli --version '^2' --locked
+      - run: cargo tauri build --no-bundle
+      - name: Verify the compiled executable
+        shell: pwsh
+        run: |
+          if (-not (Test-Path -LiteralPath 'target/release/sonos-volume-bridge.exe' -PathType Leaf)) {
+            throw 'The Windows release executable was not generated.'
+          }
+          if (-not (Test-Path -LiteralPath 'ui/dist' -PathType Container)) {
+            throw 'The frontend distribution was not generated.'
+          }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-build-${{ needs.prepare-version.outputs.tag }}
+          path: |
+            target/release/sonos-volume-bridge.exe
+            ui/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  windows-nsis:
+    name: Package Windows NSIS installer
+    needs: [prepare-version, windows-app]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+      - name: Verify the checked-out release commit
+        shell: pwsh
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
+            throw 'The checked-out revision does not match the release commit.'
+          }
+      - uses: dtolnay/rust-toolchain@1.98.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace
+      - run: cargo install tauri-cli --version '^2' --locked
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-build-${{ needs.prepare-version.outputs.tag }}
+          path: .
+      - name: Bundle NSIS from the compiled executable
+        run: cargo tauri bundle --bundles nsis
+      - name: Collect the unsigned installer
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+        run: |
+          $installer = Get-ChildItem target/release/bundle -Recurse -Filter '*.exe' | Select-Object -First 1
+          if ($null -eq $installer) { throw 'No NSIS installer was generated.' }
+          Copy-Item $installer.FullName "sonos-volume-bridge-$env:RELEASE_TAG-windows-unsigned.exe"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-release
+          path: sonos-volume-bridge-*-windows-unsigned.exe
+          if-no-files-found: error
+
+  windows-msix:
+    name: Package Microsoft Store MSIX
+    needs: [prepare-version, windows-app]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+      - name: Verify the checked-out release commit
+        shell: pwsh
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
+            throw 'The checked-out revision does not match the release commit.'
+          }
+      - uses: dtolnay/rust-toolchain@1.98.1
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-build-${{ needs.prepare-version.outputs.tag }}
+          path: .
+      - name: Build and validate the MSIX from the compiled executable
+        shell: pwsh
+        run: ./scripts/build-msix.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: microsoft-store-msix-${{ needs.prepare-version.outputs.tag }}
+          path: target/release/bundle/msix/*.msix
+          if-no-files-found: error
+  publish-release:
+    name: Publish GitHub Release
+    needs:
+      [prepare-version, macos-direct, linux-deb, windows-nsis, windows-msix]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: "*-release"
+          path: release-assets
+          merge-multiple: true
+      - name: Prepare permanent download filenames
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+        run: bash scripts/prepare-release-downloads.sh release-assets "$RELEASE_TAG"
+      - name: Create or update the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+        run: |
+          mapfile -t release_assets < <(find release-assets -type f -print)
+          test "${#release_assets[@]}" -gt 0
+          release_flags=()
+          case "$RELEASE_CHANNEL" in
+            GA)
+              channel_message="This is the generally available release."
+              ;;
+            Beta)
+              release_flags+=(--prerelease)
+              channel_message="This beta release is ready for broader testing but may still change before general availability."
+              ;;
+            Alpha)
+              release_flags+=(--prerelease)
+              channel_message="This alpha release is an early preview intended for testing."
+              ;;
+            *) echo "Unsupported release channel: $RELEASE_CHANNEL" >&2; exit 1 ;;
+          esac
+          release_intro="$(cat <<EOF
+          ## Sonos Volume Bridge $RELEASE_TAG
+
+          **Release channel:** $RELEASE_CHANNEL
+
+          $channel_message
+
+          ### Downloads
+
+          - **Windows:** Download and run the Windows installer.
+          - **macOS:** Download the macOS archive, then move the app to Applications.
+          - **Ubuntu:** Download and install the Debian package.
+
+          ### Important
+
+          The macOS app is signed with Developer ID and notarized by Apple. The Windows installer is currently unsigned, so Windows SmartScreen may ask you to confirm that you want to run it.
+
+          The generated change list follows this summary.
+          EOF
+          )"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${release_assets[@]}" --clobber
+          else
+            gh release create "$RELEASE_TAG" "${release_assets[@]}" "${release_flags[@]}" \
+              --title "Sonos Volume Bridge $RELEASE_TAG" \
+              --notes "$release_intro" \
+              --generate-notes
+          fi
+
+  publish-microsoft-store:
+    name: Submit GA release to Microsoft Store
+    if: ${{ inputs.channel == 'GA' }}
+    needs: [prepare-version, windows-msix, publish-release]
+    runs-on: windows-latest
+    environment: microsoft-store
+    env:
+      MICROSOFT_STORE_PRODUCT_ID: ${{ vars.MICROSOFT_STORE_PRODUCT_ID }}
+    steps:
+      - name: Validate Microsoft Store configuration
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:MICROSOFT_STORE_PRODUCT_ID)) {
+            throw 'MICROSOFT_STORE_PRODUCT_ID is not configured in the microsoft-store environment.'
+          }
+      - uses: actions/download-artifact@v8
+        with:
+          name: microsoft-store-msix-${{ needs.prepare-version.outputs.tag }}
+          path: microsoft-store-msix
+      - name: Configure Microsoft Store Developer CLI
+        uses: microsoft/microsoft-store-apppublisher@v1.4
+      - name: Authenticate with Partner Center
+        shell: pwsh
+        env:
+          AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+          SELLER_ID: ${{ secrets.SELLER_ID }}
+          AZURE_AD_APPLICATION_CLIENT_ID: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          AZURE_AD_APPLICATION_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+        run: |
+          msstore reconfigure `
+            --tenantId $env:AZURE_AD_TENANT_ID `
+            --sellerId $env:SELLER_ID `
+            --clientId $env:AZURE_AD_APPLICATION_CLIENT_ID `
+            --clientSecret $env:AZURE_AD_APPLICATION_SECRET
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Microsoft Store authentication failed.'
+          }
+      - name: Submit the package to Microsoft Store
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem 'microsoft-store-msix' -Filter '*.msix')
+          if ($packages.Count -ne 1) {
+            throw "Expected exactly one MSIX package, found $($packages.Count)."
+          }
+          msstore publish $packages[0].FullName -id $env:MICROSOFT_STORE_PRODUCT_ID --uploadTimeout 300
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Microsoft Store submission failed.'
+          }

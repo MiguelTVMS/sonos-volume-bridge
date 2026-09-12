@@ -1,0 +1,97 @@
+name: Feature request
+about: Suggest an improvement or new capability for Sonos Volume Bridge.
+title: "[Feature] "
+labels: ["enhancement"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. This template uses labels that match the current app sections.
+
+  - type: input
+    id: summary
+    attributes:
+      label: Short summary
+      description: One-line summary of the feature.
+      placeholder: e.g. Add separate mute sync toggle for output devices
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: target_area
+    attributes:
+      label: Target section
+      description: Which app section should change?
+      options:
+        - label: Devices
+        - label: Volume
+        - label: General
+        - label: Diagnostics
+        - label: About
+
+  - type: checkboxes
+    id: platforms
+    attributes:
+      label: Affected platforms
+      description: Select all that apply.
+      options:
+        - label: Windows
+        - label: macOS
+
+  - type: textarea
+    id: user_problem
+    attributes:
+      label: Problem to solve
+      description: What workflow is hard or missing today?
+      placeholder: Explain the scenario and who it affects.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the feature behavior and expected user flow.
+      placeholder: Include concrete steps and UI/interaction details.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: How do you currently work around this? What else did you try?
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Expected impact
+      description: What improves (reliability, usability, speed, or user comfort)?
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How urgent is this for your workflow?
+      options:
+        - Nice to have
+        - Useful soon
+        - Important
+        - Blocking
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version context (optional)
+      description: If this affects a specific version or regression window, note it.
+      placeholder: e.g. Started after 1.2.0
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Attach related behavior notes, UI mockups, acceptance criteria, or links.

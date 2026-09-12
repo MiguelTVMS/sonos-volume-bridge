@@ -1,0 +1,898 @@
+//! macOS Core Audio adapter using a focused FFI surface.
+//!
+//! Core Audio invokes property callbacks on implementation-controlled threads.
+//! Each callback only reads the changed state and sends a bounded event; it never
+//! waits for synchronization or network work.
+
+#![allow(
+    clippy::borrow_as_ptr,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_ptr_alignment,
+    clippy::needless_pass_by_value,
+    clippy::semicolon_if_nothing_returned
+)]
+
+use crate::{
+    AudioDeviceSelection, AudioOutputDevice, PlatformAudioError, SystemAudioController,
+    SystemAudioEvent,
+};
+use async_trait::async_trait;
+use sonos_volume_bridge_domain::{
+    ExpectedLocalWrite, LocalAudioState, LocalOrigin, MuteState, NormalizedVolume,
+};
+use std::{
+    ffi::c_void,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        mpsc::{self, Receiver, RecvTimeoutError, SyncSender},
+    },
+    thread::{self, JoinHandle},
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+use tokio::sync::{broadcast, oneshot};
+
+type AudioObjectID = u32;
+type OSStatus = i32;
+type UInt32 = u32;
+type Boolean = u8;
+
+const NO_ERR: OSStatus = 0;
+const SYSTEM_OBJECT: AudioObjectID = 1;
+const SCOPE_GLOBAL: UInt32 = 0x676c_6f62; // 'glob'
+const SCOPE_OUTPUT: UInt32 = 0x6f75_7470; // 'outp'
+const ELEMENT_MASTER: UInt32 = 0;
+const DEFAULT_OUTPUT_DEVICE: UInt32 = 0x644f_7574; // 'dOut'
+const DEVICES: UInt32 = 0x6465_7623; // 'dev#'
+const OBJECT_NAME: UInt32 = 0x6c6e_616d; // 'lnam'
+const DEVICE_UID: UInt32 = 0x7569_6420; // 'uid '
+const VOLUME_SCALAR: UInt32 = 0x766f_6c6d; // 'volm'
+const MUTE: UInt32 = 0x6d75_7465; // 'mute'
+const STREAM_CONFIGURATION: UInt32 = 0x736c_6179; // 'slay'
+const EXPECTED_WRITE_LIFETIME_MS: u64 = 500;
+const DEVICE_UNAVAILABLE: OSStatus = -2;
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct AudioObjectPropertyAddress {
+    selector: UInt32,
+    scope: UInt32,
+    element: UInt32,
+}
+
+type Listener = unsafe extern "C" fn(
+    AudioObjectID,
+    UInt32,
+    *const AudioObjectPropertyAddress,
+    *mut c_void,
+) -> OSStatus;
+
+#[link(name = "CoreAudio", kind = "framework")]
+unsafe extern "C" {
+    fn AudioObjectHasProperty(
+        object: AudioObjectID,
+        address: *const AudioObjectPropertyAddress,
+    ) -> Boolean;
+    fn AudioObjectIsPropertySettable(
+        object: AudioObjectID,
+        address: *const AudioObjectPropertyAddress,
+        settable: *mut Boolean,
+    ) -> OSStatus;
+    fn AudioObjectGetPropertyData(
+        object: AudioObjectID,
+        address: *const AudioObjectPropertyAddress,
+        qualifier_size: UInt32,
+        qualifier: *const c_void,
+        data_size: *mut UInt32,
+        data: *mut c_void,
+    ) -> OSStatus;
+    fn AudioObjectGetPropertyDataSize(
+        object: AudioObjectID,
+        address: *const AudioObjectPropertyAddress,
+        qualifier_size: UInt32,
+        qualifier: *const c_void,
+        data_size: *mut UInt32,
+    ) -> OSStatus;
+    fn AudioObjectSetPropertyData(
+        object: AudioObjectID,
+        address: *const AudioObjectPropertyAddress,
+        qualifier_size: UInt32,
+        qualifier: *const c_void,
+        data_size: UInt32,
+        data: *const c_void,
+    ) -> OSStatus;
+    fn AudioObjectAddPropertyListener(
+        object: AudioObjectID,
+        address: *const AudioObjectPropertyAddress,
+        listener: Listener,
+        client_data: *mut c_void,
+    ) -> OSStatus;
+    fn AudioObjectRemovePropertyListener(
+        object: AudioObjectID,
+        address: *const AudioObjectPropertyAddress,
+        listener: Listener,
+        client_data: *mut c_void,
+    ) -> OSStatus;
+}
+
+#[link(name = "CoreFoundation", kind = "framework")]
+unsafe extern "C" {
+    fn CFStringGetCString(
+        string: *const c_void,
+        buffer: *mut i8,
+        size: isize,
+        encoding: u32,
+    ) -> Boolean;
+}
+
+const UTF8: u32 = 0x0800_0100;
+
+/// Lists physical or virtual devices that expose output streams.
+pub fn list_output_devices() -> Result<Vec<AudioOutputDevice>, PlatformAudioError> {
+    // SAFETY: all FFI calls use correctly sized buffers and only copy Core Audio-owned values.
+    unsafe { output_devices().map_err(map_error) }
+}
+
+/// Converts a legacy numeric Core Audio object ID to its persistent device UID.
+///
+/// Core Audio object IDs may change when a USB output reconnects. This is only
+/// used to migrate existing settings while that output is still available.
+pub fn migrate_legacy_device_id(id: &str) -> Option<String> {
+    let id = legacy_audio_object_id(id)?;
+    // SAFETY: this only reads the UID property from the currently registered device.
+    unsafe { device_uid(id) }
+}
+
+#[derive(Clone)]
+pub struct MacosAudioController {
+    worker: Arc<WorkerHandle>,
+    events: broadcast::Sender<SystemAudioEvent>,
+}
+
+struct WorkerHandle {
+    commands: SyncSender<Command>,
+    shutdown: Arc<AtomicBool>,
+    thread: Mutex<Option<JoinHandle<()>>>,
+}
+
+impl Drop for WorkerHandle {
+    fn drop(&mut self) {
+        self.shutdown.store(true, Ordering::Release);
+        let thread = self
+            .thread
+            .get_mut()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
+        if let Some(thread) = thread {
+            let _ = thread.join();
+        }
+    }
+}
+
+impl MacosAudioController {
+    pub fn start(
+        selection: AudioDeviceSelection,
+        tolerance: u8,
+    ) -> Result<Self, PlatformAudioError> {
+        let (commands, receiver) = mpsc::sync_channel(32);
+        let (events, _) = broadcast::channel(64);
+        let worker_events = events.clone();
+        let worker_commands = commands.clone();
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let worker_shutdown = Arc::clone(&shutdown);
+        let thread = thread::Builder::new()
+            .name("sonos-volume-bridge-core-audio".to_owned())
+            .spawn(move || {
+                run_worker(
+                    selection,
+                    tolerance,
+                    receiver,
+                    worker_commands,
+                    worker_events,
+                    &worker_shutdown,
+                )
+            })
+            .map_err(|error| PlatformAudioError::Platform(error.to_string()))?;
+        Ok(Self {
+            worker: Arc::new(WorkerHandle {
+                commands,
+                shutdown,
+                thread: Mutex::new(Some(thread)),
+            }),
+            events,
+        })
+    }
+
+    async fn request<T>(
+        &self,
+        command: impl FnOnce(oneshot::Sender<Result<T, PlatformAudioError>>) -> Command,
+    ) -> Result<T, PlatformAudioError> {
+        let (response, receiver) = oneshot::channel();
+        self.worker
+            .commands
+            .try_send(command(response))
+            .map_err(|_| PlatformAudioError::DeviceUnavailable)?;
+        receiver
+            .await
+            .map_err(|_| PlatformAudioError::DeviceUnavailable)?
+    }
+}
+
+#[async_trait]
+impl SystemAudioController for MacosAudioController {
+    async fn current_state(&self) -> Result<LocalAudioState, PlatformAudioError> {
+        self.request(Command::Current).await
+    }
+    async fn set_volume(
+        &self,
+        volume: NormalizedVolume,
+        _: LocalOrigin,
+    ) -> Result<(), PlatformAudioError> {
+        self.request(|response| Command::SetVolume { volume, response })
+            .await
+    }
+    async fn set_muted(&self, muted: bool, _: LocalOrigin) -> Result<(), PlatformAudioError> {
+        self.request(|response| Command::SetMuted { muted, response })
+            .await
+    }
+    fn subscribe(&self) -> broadcast::Receiver<SystemAudioEvent> {
+        self.events.subscribe()
+    }
+}
+
+enum Command {
+    Current(oneshot::Sender<Result<LocalAudioState, PlatformAudioError>>),
+    SetVolume {
+        volume: NormalizedVolume,
+        response: oneshot::Sender<Result<(), PlatformAudioError>>,
+    },
+    SetMuted {
+        muted: bool,
+        response: oneshot::Sender<Result<(), PlatformAudioError>>,
+    },
+    Reattach,
+}
+
+struct CallbackContext {
+    events: broadcast::Sender<SystemAudioEvent>,
+    commands: SyncSender<Command>,
+    expected: Mutex<Option<ExpectedLocalWrite>>,
+    generation: AtomicU64,
+    tolerance: u8,
+}
+
+fn run_worker(
+    selection: AudioDeviceSelection,
+    tolerance: u8,
+    receiver: Receiver<Command>,
+    commands: SyncSender<Command>,
+    events: broadcast::Sender<SystemAudioEvent>,
+    shutdown: &AtomicBool,
+) {
+    let context = Arc::new(CallbackContext {
+        events: events.clone(),
+        commands,
+        expected: Mutex::new(None),
+        generation: AtomicU64::new(0),
+        tolerance,
+    });
+    let mut endpoint = match unsafe { Endpoint::attach(&selection, Arc::clone(&context)) } {
+        Ok(endpoint) => endpoint,
+        Err(error) => {
+            eprintln!("Core Audio selected output attachment failed with OSStatus {error}");
+            let _ = events.send(SystemAudioEvent::DeviceUnavailable { device_id: None });
+            return;
+        }
+    };
+    loop {
+        if shutdown.load(Ordering::Acquire) {
+            break;
+        }
+        let command = match receiver.recv_timeout(Duration::from_millis(250)) {
+            Ok(command) => command,
+            Err(RecvTimeoutError::Timeout) => continue,
+            Err(RecvTimeoutError::Disconnected) => break,
+        };
+        match command {
+            Command::Current(response) => {
+                let _ = response.send(unsafe { endpoint.state() }.map_err(map_error));
+            }
+            Command::SetVolume { volume, response } => {
+                let _ = response.send(unsafe { endpoint.set_volume(volume) }.map_err(map_error));
+            }
+            Command::SetMuted { muted, response } => {
+                let _ = response.send(unsafe { endpoint.set_muted(muted) });
+            }
+            Command::Reattach => {
+                match unsafe { Endpoint::attach(&selection, Arc::clone(&context)) } {
+                    Ok(next) => {
+                        endpoint.detach();
+                        endpoint = next;
+                        let _ = events.send(SystemAudioEvent::DefaultOutputChanged);
+                    }
+                    Err(_) => {
+                        let _ =
+                            events.send(SystemAudioEvent::DeviceUnavailable { device_id: None });
+                    }
+                }
+            }
+        }
+    }
+    endpoint.detach();
+}
+
+struct Endpoint {
+    id: AudioObjectID,
+    channels: Vec<UInt32>,
+    has_mute: bool,
+    context: Arc<CallbackContext>,
+}
+
+impl Endpoint {
+    unsafe fn attach(
+        selection: &AudioDeviceSelection,
+        context: Arc<CallbackContext>,
+    ) -> Result<Self, OSStatus> {
+        let id = match selection {
+            AudioDeviceSelection::FollowDefault => unsafe { default_output_device()? },
+            AudioDeviceSelection::Fixed { device_id } => unsafe {
+                resolve_fixed_output(device_id)?
+            },
+        };
+        let master = address(VOLUME_SCALAR, SCOPE_OUTPUT, ELEMENT_MASTER);
+        let has_master = unsafe { AudioObjectHasProperty(id, &master) != 0 }
+            && matches!(unsafe { settable(id, &master) }, Ok(true));
+        let channels = if has_master {
+            vec![ELEMENT_MASTER]
+        } else {
+            unsafe { output_channels(id)? }
+        };
+        if channels.is_empty() {
+            return Err(-1);
+        }
+        let mute_address = address(MUTE, SCOPE_OUTPUT, ELEMENT_MASTER);
+        let has_mute = unsafe { AudioObjectHasProperty(id, &mute_address) != 0 }
+            && matches!(unsafe { settable(id, &mute_address) }, Ok(true));
+        let endpoint = Self {
+            id,
+            channels,
+            has_mute,
+            context,
+        };
+        unsafe {
+            endpoint.listen();
+        }
+        Ok(endpoint)
+    }
+    unsafe fn state(&self) -> Result<LocalAudioState, OSStatus> {
+        let mut total = 0.0_f32;
+        for channel in &self.channels {
+            total += unsafe { scalar(self.id, address(VOLUME_SCALAR, SCOPE_OUTPUT, *channel))? };
+        }
+        let volume = normalize(total / self.channels.len() as f32);
+        let muted = if self.has_mute {
+            unsafe { boolean(self.id, address(MUTE, SCOPE_OUTPUT, ELEMENT_MASTER))? }
+        } else {
+            false
+        };
+        Ok(LocalAudioState {
+            volume,
+            muted: MuteState(muted),
+        })
+    }
+    unsafe fn set_volume(&self, volume: NormalizedVolume) -> Result<(), OSStatus> {
+        let state = LocalAudioState {
+            volume,
+            muted: unsafe { self.state()? }.muted,
+        };
+        self.expect(state);
+        let value = f32::from(volume.get()) / 100.0;
+        for channel in &self.channels {
+            unsafe {
+                set_scalar(
+                    self.id,
+                    address(VOLUME_SCALAR, SCOPE_OUTPUT, *channel),
+                    value,
+                )?;
+            }
+        }
+        Ok(())
+    }
+    unsafe fn set_muted(&self, muted: bool) -> Result<(), PlatformAudioError> {
+        if !self.has_mute {
+            return Err(PlatformAudioError::MuteUnavailable);
+        }
+        let state = LocalAudioState {
+            volume: unsafe { self.state().map_err(map_error)? }.volume,
+            muted: MuteState(muted),
+        };
+        self.expect(state);
+        unsafe { set_boolean(self.id, address(MUTE, SCOPE_OUTPUT, ELEMENT_MASTER), muted) }
+            .map_err(map_error)
+    }
+    fn expect(&self, state: LocalAudioState) {
+        let generation = self.context.generation.fetch_add(1, Ordering::Relaxed) + 1;
+        if let Ok(mut expected) = self.context.expected.lock() {
+            *expected = Some(ExpectedLocalWrite {
+                state,
+                expires_at_ms: now_ms() + EXPECTED_WRITE_LIFETIME_MS,
+                generation,
+                tolerance: self.context.tolerance,
+            });
+        }
+    }
+    unsafe fn listen(&self) {
+        let data = Arc::as_ptr(&self.context).cast_mut().cast::<c_void>();
+        for channel in &self.channels {
+            let status = unsafe {
+                AudioObjectAddPropertyListener(
+                    self.id,
+                    &address(VOLUME_SCALAR, SCOPE_OUTPUT, *channel),
+                    property_changed,
+                    data,
+                )
+            };
+            if status != NO_ERR {
+                eprintln!("Core Audio volume listener registration failed with OSStatus {status}");
+            }
+        }
+        if self.has_mute {
+            let status = unsafe {
+                AudioObjectAddPropertyListener(
+                    self.id,
+                    &address(MUTE, SCOPE_OUTPUT, ELEMENT_MASTER),
+                    property_changed,
+                    data,
+                )
+            };
+            if status != NO_ERR {
+                eprintln!("Core Audio mute listener registration failed with OSStatus {status}");
+            }
+        }
+        let status = unsafe {
+            AudioObjectAddPropertyListener(
+                SYSTEM_OBJECT,
+                &address(DEFAULT_OUTPUT_DEVICE, SCOPE_GLOBAL, ELEMENT_MASTER),
+                default_output_changed,
+                data,
+            )
+        };
+        if status != NO_ERR {
+            eprintln!(
+                "Core Audio default-output listener registration failed with OSStatus {status}"
+            );
+        }
+        let status = unsafe {
+            AudioObjectAddPropertyListener(
+                SYSTEM_OBJECT,
+                &address(DEVICES, SCOPE_GLOBAL, ELEMENT_MASTER),
+                device_list_changed,
+                data,
+            )
+        };
+        if status != NO_ERR {
+            eprintln!("Core Audio device-list listener registration failed with OSStatus {status}");
+        }
+    }
+    fn detach(&self) {
+        // SAFETY: registrations use this endpoint's stable context pointer; Core Audio no longer invokes it after removal returns.
+        unsafe {
+            let data = Arc::as_ptr(&self.context).cast_mut().cast::<c_void>();
+            for channel in &self.channels {
+                let _ = AudioObjectRemovePropertyListener(
+                    self.id,
+                    &address(VOLUME_SCALAR, SCOPE_OUTPUT, *channel),
+                    property_changed,
+                    data,
+                );
+            }
+            if self.has_mute {
+                let _ = AudioObjectRemovePropertyListener(
+                    self.id,
+                    &address(MUTE, SCOPE_OUTPUT, ELEMENT_MASTER),
+                    property_changed,
+                    data,
+                );
+            }
+            let _ = AudioObjectRemovePropertyListener(
+                SYSTEM_OBJECT,
+                &address(DEFAULT_OUTPUT_DEVICE, SCOPE_GLOBAL, ELEMENT_MASTER),
+                default_output_changed,
+                data,
+            );
+            let _ = AudioObjectRemovePropertyListener(
+                SYSTEM_OBJECT,
+                &address(DEVICES, SCOPE_GLOBAL, ELEMENT_MASTER),
+                device_list_changed,
+                data,
+            );
+        }
+    }
+}
+
+unsafe extern "C" fn property_changed(
+    object: AudioObjectID,
+    _: UInt32,
+    _: *const AudioObjectPropertyAddress,
+    data: *mut c_void,
+) -> OSStatus {
+    let Some(context) = (unsafe { data.cast::<CallbackContext>().as_ref() }) else {
+        return -1;
+    };
+    let state = unsafe { state_for_callback(object) };
+    if let Ok(state) = state {
+        let origin = context
+            .expected
+            .lock()
+            .ok()
+            .and_then(|mut expected| expected.take())
+            .map_or(LocalOrigin::User, |expected| {
+                match expected.classify(state, now_ms()) {
+                    sonos_volume_bridge_domain::SuppressionDecision::Suppress => {
+                        LocalOrigin::Application
+                    }
+                    sonos_volume_bridge_domain::SuppressionDecision::Forward => LocalOrigin::User,
+                }
+            });
+        let _ = context
+            .events
+            .send(SystemAudioEvent::StateChanged { state, origin });
+    }
+    NO_ERR
+}
+
+unsafe extern "C" fn default_output_changed(
+    _: AudioObjectID,
+    _: UInt32,
+    _: *const AudioObjectPropertyAddress,
+    data: *mut c_void,
+) -> OSStatus {
+    if let Some(context) = unsafe { data.cast::<CallbackContext>().as_ref() } {
+        let _ = context.commands.try_send(Command::Reattach);
+    }
+    NO_ERR
+}
+
+unsafe extern "C" fn device_list_changed(
+    _: AudioObjectID,
+    _: UInt32,
+    _: *const AudioObjectPropertyAddress,
+    data: *mut c_void,
+) -> OSStatus {
+    if let Some(context) = unsafe { data.cast::<CallbackContext>().as_ref() } {
+        let _ = context.commands.try_send(Command::Reattach);
+    }
+    NO_ERR
+}
+
+unsafe fn state_for_callback(id: AudioObjectID) -> Result<LocalAudioState, OSStatus> {
+    let master = address(VOLUME_SCALAR, SCOPE_OUTPUT, ELEMENT_MASTER);
+    if unsafe { AudioObjectHasProperty(id, &master) != 0 } {
+        return Ok(LocalAudioState {
+            volume: normalize(unsafe { scalar(id, master)? }),
+            muted: MuteState(unsafe {
+                boolean_if_present(id, address(MUTE, SCOPE_OUTPUT, ELEMENT_MASTER))?
+            }),
+        });
+    }
+    let channels = unsafe { output_channels(id)? };
+    if channels.is_empty() {
+        return Err(-1);
+    }
+    let total = channels.iter().try_fold(0.0_f32, |total, channel| unsafe {
+        scalar(id, address(VOLUME_SCALAR, SCOPE_OUTPUT, *channel)).map(|value| total + value)
+    })?;
+    Ok(LocalAudioState {
+        volume: normalize(total / channels.len() as f32),
+        muted: MuteState(unsafe {
+            boolean_if_present(id, address(MUTE, SCOPE_OUTPUT, ELEMENT_MASTER))?
+        }),
+    })
+}
+
+fn address(selector: UInt32, scope: UInt32, element: UInt32) -> AudioObjectPropertyAddress {
+    AudioObjectPropertyAddress {
+        selector,
+        scope,
+        element,
+    }
+}
+unsafe fn default_output_device() -> Result<AudioObjectID, OSStatus> {
+    unsafe {
+        get(
+            SYSTEM_OBJECT,
+            address(DEFAULT_OUTPUT_DEVICE, SCOPE_GLOBAL, ELEMENT_MASTER),
+        )
+    }
+}
+unsafe fn resolve_fixed_output(device_id: &str) -> Result<AudioObjectID, OSStatus> {
+    if let Some(id) = legacy_audio_object_id(device_id) {
+        return Ok(id);
+    }
+    let devices = unsafe { audio_object_ids()? };
+    devices
+        .into_iter()
+        .find(|id| unsafe { device_uid(*id).as_deref() == Some(device_id) })
+        .ok_or(DEVICE_UNAVAILABLE)
+}
+unsafe fn scalar(id: AudioObjectID, address: AudioObjectPropertyAddress) -> Result<f32, OSStatus> {
+    unsafe { get(id, address) }
+}
+unsafe fn boolean(
+    id: AudioObjectID,
+    address: AudioObjectPropertyAddress,
+) -> Result<bool, OSStatus> {
+    Ok(unsafe { get::<u32>(id, address)? } != 0)
+}
+unsafe fn boolean_if_present(
+    id: AudioObjectID,
+    address: AudioObjectPropertyAddress,
+) -> Result<bool, OSStatus> {
+    if unsafe { AudioObjectHasProperty(id, &address) != 0 } {
+        unsafe { boolean(id, address) }
+    } else {
+        Ok(false)
+    }
+}
+unsafe fn set_scalar(
+    id: AudioObjectID,
+    address: AudioObjectPropertyAddress,
+    value: f32,
+) -> Result<(), OSStatus> {
+    unsafe { set(id, address, &value) }
+}
+unsafe fn set_boolean(
+    id: AudioObjectID,
+    address: AudioObjectPropertyAddress,
+    value: bool,
+) -> Result<(), OSStatus> {
+    unsafe { set(id, address, &(u32::from(value))) }
+}
+unsafe fn get<T: Copy>(
+    id: AudioObjectID,
+    address: AudioObjectPropertyAddress,
+) -> Result<T, OSStatus> {
+    let mut value = std::mem::MaybeUninit::<T>::uninit();
+    let mut size = std::mem::size_of::<T>() as u32;
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            id,
+            &address,
+            0,
+            std::ptr::null(),
+            &mut size,
+            value.as_mut_ptr().cast(),
+        )
+    };
+    if status == NO_ERR && size == std::mem::size_of::<T>() as u32 {
+        Ok(unsafe { value.assume_init() })
+    } else {
+        Err(status)
+    }
+}
+unsafe fn set<T>(
+    id: AudioObjectID,
+    address: AudioObjectPropertyAddress,
+    value: &T,
+) -> Result<(), OSStatus> {
+    let status = unsafe {
+        AudioObjectSetPropertyData(
+            id,
+            &address,
+            0,
+            std::ptr::null(),
+            std::mem::size_of::<T>() as u32,
+            std::ptr::from_ref(value).cast(),
+        )
+    };
+    if status == NO_ERR {
+        Ok(())
+    } else {
+        Err(status)
+    }
+}
+unsafe fn settable(
+    id: AudioObjectID,
+    address: &AudioObjectPropertyAddress,
+) -> Result<bool, OSStatus> {
+    let mut settable = 0;
+    let status = unsafe { AudioObjectIsPropertySettable(id, address, &mut settable) };
+    if status == NO_ERR {
+        Ok(settable != 0)
+    } else {
+        Err(status)
+    }
+}
+unsafe fn output_channels(id: AudioObjectID) -> Result<Vec<UInt32>, OSStatus> {
+    let stream_address = address(STREAM_CONFIGURATION, SCOPE_OUTPUT, ELEMENT_MASTER);
+    let mut size = 0_u32;
+    let status = unsafe {
+        AudioObjectGetPropertyDataSize(id, &stream_address, 0, std::ptr::null(), &mut size)
+    };
+    if status != NO_ERR || size < 8 {
+        return Err(status);
+    }
+    // AudioBufferList starts with `mNumberBuffers`; each buffer contributes its channel count.
+    let mut bytes = vec![0_u8; size as usize];
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            id,
+            &stream_address,
+            0,
+            std::ptr::null(),
+            &mut size,
+            bytes.as_mut_ptr().cast(),
+        )
+    };
+    if status != NO_ERR {
+        return Err(status);
+    }
+    let buffers = unsafe { *(bytes.as_ptr().cast::<u32>()) } as usize;
+    let mut offset = 8_usize;
+    let mut channels = Vec::new();
+    for _ in 0..buffers {
+        if offset + 16 > bytes.len() {
+            return Err(-1);
+        }
+        let count = unsafe { *(bytes.as_ptr().add(offset).cast::<u32>()) };
+        for channel in 1..=count {
+            let volume_address = address(VOLUME_SCALAR, SCOPE_OUTPUT, channel);
+            if unsafe {
+                AudioObjectHasProperty(id, &volume_address) != 0
+                    && matches!(settable(id, &volume_address), Ok(true))
+            } {
+                channels.push(channel);
+            }
+        }
+        offset += 16;
+    }
+    Ok(channels)
+}
+
+unsafe fn output_devices() -> Result<Vec<AudioOutputDevice>, OSStatus> {
+    let ids = unsafe { audio_object_ids()? };
+    Ok(ids
+        .into_iter()
+        .filter_map(|id| unsafe { output_device(id) })
+        .collect())
+}
+
+unsafe fn audio_object_ids() -> Result<Vec<AudioObjectID>, OSStatus> {
+    let devices_address = address(DEVICES, SCOPE_GLOBAL, ELEMENT_MASTER);
+    let mut size = 0_u32;
+    let status = unsafe {
+        AudioObjectGetPropertyDataSize(
+            SYSTEM_OBJECT,
+            &devices_address,
+            0,
+            std::ptr::null(),
+            &mut size,
+        )
+    };
+    if status != NO_ERR || !size.is_multiple_of(std::mem::size_of::<AudioObjectID>() as u32) {
+        return Err(status);
+    }
+    let mut ids = vec![0_u32; size as usize / std::mem::size_of::<AudioObjectID>()];
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            SYSTEM_OBJECT,
+            &devices_address,
+            0,
+            std::ptr::null(),
+            &mut size,
+            ids.as_mut_ptr().cast(),
+        )
+    };
+    if status != NO_ERR {
+        return Err(status);
+    }
+    Ok(ids)
+}
+
+unsafe fn output_device(id: AudioObjectID) -> Option<AudioOutputDevice> {
+    let stream = address(STREAM_CONFIGURATION, SCOPE_OUTPUT, ELEMENT_MASTER);
+    if unsafe { AudioObjectHasProperty(id, &stream) == 0 } {
+        return None;
+    }
+    let master = address(VOLUME_SCALAR, SCOPE_OUTPUT, ELEMENT_MASTER);
+    let writable_volume = (unsafe { AudioObjectHasProperty(id, &master) != 0 }
+        && matches!(unsafe { settable(id, &master) }, Ok(true)))
+        || unsafe { output_channels(id).is_ok_and(|channels| !channels.is_empty()) };
+    Some(AudioOutputDevice {
+        id: unsafe { device_uid(id) }?,
+        name: unsafe { device_name(id) }.unwrap_or_else(|| format!("Output device {id}")),
+        writable_volume,
+    })
+}
+
+unsafe fn device_name(id: AudioObjectID) -> Option<String> {
+    unsafe { string_property(id, OBJECT_NAME) }
+}
+unsafe fn device_uid(id: AudioObjectID) -> Option<String> {
+    unsafe { string_property(id, DEVICE_UID) }
+}
+unsafe fn string_property(id: AudioObjectID, selector: UInt32) -> Option<String> {
+    let mut value: *const c_void = std::ptr::null();
+    let mut size = std::mem::size_of_val(&value) as u32;
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            id,
+            &address(selector, SCOPE_GLOBAL, ELEMENT_MASTER),
+            0,
+            std::ptr::null(),
+            &mut size,
+            std::ptr::from_mut(&mut value).cast(),
+        )
+    };
+    if status != NO_ERR || value.is_null() {
+        return None;
+    }
+    let mut bytes = [0_i8; 512];
+    if unsafe { CFStringGetCString(value, bytes.as_mut_ptr(), 512, UTF8) } == 0 {
+        return None;
+    }
+    std::ffi::CStr::from_bytes_until_nul(unsafe {
+        std::slice::from_raw_parts(bytes.as_ptr().cast::<u8>(), bytes.len())
+    })
+    .ok()?
+    .to_str()
+    .ok()
+    .map(str::to_owned)
+}
+fn map_error(status: OSStatus) -> PlatformAudioError {
+    if status == DEVICE_UNAVAILABLE {
+        PlatformAudioError::DeviceUnavailable
+    } else if status == -1 {
+        PlatformAudioError::UnsupportedDevice
+    } else {
+        PlatformAudioError::Platform(format!("Core Audio OSStatus {status}"))
+    }
+}
+fn legacy_audio_object_id(id: &str) -> Option<AudioObjectID> {
+    id.parse().ok()
+}
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(u64::MAX)
+}
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn normalize(value: f32) -> NormalizedVolume {
+    NormalizedVolume::new((value.clamp(0.0, 1.0) * 100.0).round() as u8)
+        .unwrap_or(NormalizedVolume::MIN)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn expected_writes_suppress_matching_callbacks() {
+        let expected = ExpectedLocalWrite {
+            state: LocalAudioState {
+                volume: NormalizedVolume::new(42).unwrap(),
+                muted: MuteState(false),
+            },
+            expires_at_ms: 10,
+            generation: 1,
+            tolerance: 1,
+        };
+        let observed = LocalAudioState {
+            volume: NormalizedVolume::new(43).unwrap(),
+            muted: MuteState(false),
+        };
+        assert_eq!(
+            expected.classify(observed, 9),
+            sonos_volume_bridge_domain::SuppressionDecision::Suppress
+        );
+    }
+
+    #[test]
+    fn recognizes_legacy_numeric_device_ids_only() {
+        assert_eq!(legacy_audio_object_id("331"), Some(331));
+        assert_eq!(legacy_audio_object_id("com.example.output"), None);
+    }
+}

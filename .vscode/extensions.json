@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "openai.chatgpt",
+    "rust-lang.rust-analyzer",
+    "ms-vscode.cpptools",
+    "tauri-apps.tauri-vscode",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "tamasfe.even-better-toml",
+    "fill-labs.dependi",
+    "bierner.markdown-mermaid",
+    "davidanson.vscode-markdownlint"
+  ]
+}

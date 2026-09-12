@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "pnpm not found; falling back to local script execution."
+  "$ROOT_DIR/scripts/pre-commit.sh"
+  exit $?
+fi
+
+cd "$ROOT_DIR" && pnpm precommit

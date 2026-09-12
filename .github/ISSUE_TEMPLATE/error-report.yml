@@ -1,0 +1,209 @@
+name: Error report
+about: Report a functional error or failure in app behavior with reproducible details.
+title: "[Error] "
+labels: ["bug"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. Use the exact labels shown in-app to speed debugging.
+
+        Please remove private identifiers before posting (credentials, tokens, hostnames,
+        local paths, exact logs, IP/MAC addresses, and user/device identifiers).
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: From Settings → About.
+      placeholder: e.g. 1.2.3
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: OS and architecture
+      placeholder: e.g. Windows 11 x64 / macOS 15
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Installation method
+      description: How was Sonos Volume Bridge installed?
+      options:
+        - Windows installer (NSIS/EXE)
+        - Microsoft Store (MSIX)
+        - macOS app bundle (DMG/Pkg)
+        - Source build
+    validations:
+      required: true
+
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection
+      description: Value shown in the Diagnostics section and tray (Connected/Disconnected).
+      options:
+        - Connected
+        - Disconnected
+    validations:
+      required: true
+
+  - type: input
+    id: status
+    attributes:
+      label: Status
+      description: Value shown in diagnostics payload `status` (snapshot status enum).
+      placeholder: e.g. SonosUnavailable
+
+  - type: textarea
+    id: speaker
+    attributes:
+      label: Speaker
+      description: Current speaker name shown in Diagnostics.
+
+  - type: input
+    id: speaker_volume
+    attributes:
+      label: Speaker volume
+      description: Current speaker volume shown in Diagnostics.
+      placeholder: e.g. 37
+
+  - type: input
+    id: selected_output
+    attributes:
+      label: Selected output
+      description: Current output shown in Diagnostics.
+      placeholder: e.g. Follow system output
+
+  - type: input
+    id: output_volume
+    attributes:
+      label: Output volume
+      description: Current local output volume shown in Diagnostics.
+      placeholder: e.g. 42
+
+  - type: dropdown
+    id: mute
+    attributes:
+      label: Mute
+      description: Mute state shown in Diagnostics.
+      options:
+        - On
+        - Muted
+        - —
+
+  - type: input
+    id: speaker_search
+    attributes:
+      label: Speaker search
+      description: Value shown in Diagnostics → Speaker search.
+      placeholder: e.g. Not checked yet / Searching… / Found 2 speakers / No speakers found / Unable to search this network
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: affected_area
+    attributes:
+      label: Affected area
+      description: Which section is impacted?
+      options:
+        - label: Devices
+        - label: Volume
+        - label: General
+        - label: Diagnostics
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List exact steps to reproduce this error in order.
+      placeholder: |
+        1. Open app
+        2. Go to Devices
+        3. Trigger playback/volume change
+        4. Observe the issue
+    validations:
+      required: true
+
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: What happened instead of the expected result?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics payload
+      description: Open Settings → Diagnostics and paste the JSON from the diagnostics section or Export diagnostics.
+      render: text
+      placeholder: |
+        {
+          "configurationPresent": true,
+          "sanitized": true,
+          "status": "SonosUnavailable",
+          "speakerName": "Office",
+          "sonosVolume": 25,
+          "localVolume": 30,
+          "muted": false,
+          "followsSystemOutput": true,
+          "fixedAudioDeviceId": null,
+          "synchronizeMute": true,
+          "twoWaySynchronization": false,
+          "fallbackPolling": true
+        }
+    validations:
+      required: true
+
+  - type: textarea
+    id: error_text
+    attributes:
+      label: Error text / toast message
+      description: Paste exact error text shown to the user (including Test speaker volume errors).
+      render: text
+      placeholder: |
+        Sonos discovery is unavailable on this network.
+        Select a Sonos device before testing volume.
+
+  - type: textarea
+    id: network
+    attributes:
+      label: Network and Sonos environment
+      description: Include LAN/subnet setup, guest Wi-Fi, VLAN, VPN, firewall notes.
+      placeholder: |
+        - Sonos devices and computer are on same subnet: yes/no
+        - Wired / Wi-Fi
+        - Guest Wi-Fi or VLAN
+        - VPN / firewall / filtering in place
+
+  - type: textarea
+    id: audio_output
+    attributes:
+      label: Audio output
+      description: Selected output mode and whether volume is software writable.
+      placeholder: |
+        - Follow system output / fixed device ID
+        - Writable output shown in Output dropdown
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Optional context, screenshots, or other relevant details.

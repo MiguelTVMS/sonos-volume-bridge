@@ -1,0 +1,14 @@
+/target/
+/.pnpm-store/
+/ui/node_modules/
+/ui/dist/
+/src-tauri/gen/
+/src-tauri/*.provisionprofile
+/src-tauri/Entitlements.appstore.plist
+/src-tauri/Entitlements.direct.plist
+.env
+.env.development
+.env.local
+.env.production
+.env.test
+.env.*.local
