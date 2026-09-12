@@ -13,6 +13,13 @@ choose one increment:
 - `Minor` increases the minor number and resets the patch number.
 - `Major` increases the major number and resets the minor and patch numbers.
 
+Leave **Build Mac App Store package** unchecked (the default) while the app is
+under Apple evaluation. Check it only when a new signed App Store package is
+needed. This option controls package creation; the workflow does not submit the
+package to Apple automatically. Other release packages and GitHub publication
+continue when the App Store job is skipped. The standalone App Store signing
+verification workflow remains available for manual checks.
+
 The workflow validates `develop`, commits the version bump to `develop`, checks
 out the trusted `develop` branch for each package build and verifies the exact
 release commit before building, creates and pushes its annotated
@@ -28,7 +35,8 @@ executable produced by the unprivileged build job, imports the Developer ID
 identity into an ephemeral keychain, bundles a sandboxed application, signs it
 with Hardened Runtime, submits it to Apple for notarization, staples the ticket,
 and verifies the result before the archive is published. The protected Mac App
-Store job independently imports its Apple Distribution and Mac Installer
+Store job runs only when **Build Mac App Store package** is checked. It
+independently imports its Apple Distribution and Mac Installer
 Distribution identities, embeds the Mac App Store provisioning profile, verifies
 the sandbox entitlements and profile, then produces a signed upload `.pkg`.
 The Windows build job uploads its one
