@@ -15,6 +15,8 @@
 - The app has no advertising, analytics, or publisher telemetry. Settings and diagnostic logs are stored locally unless the user chooses to share them.
 - Not affiliated with, sponsored by, endorsed by, or supported by Sonos.
 
+The website offers optional analytics and advertising through Google Tag Manager after consent. This is separate from the desktop app. See the website privacy notice for choices and storage details.
+
 ## Website
 
 - [Overview and features](https://svb.miguel.ms/index.md): Product capabilities and limitations.

@@ -1,7 +1,8 @@
 # Public website
 
 The user-facing website lives in `pages/`. It uses static HTML and CSS with local
-assets, no build dependencies, no analytics, and no third-party fonts. The desktop
+assets, no build dependencies, and no third-party fonts. Optional tracking is
+managed through a consent-gated Google Tag Manager integration. The desktop
 application and its build remain separate.
 
 ## Preview
@@ -67,3 +68,36 @@ The HTML alternate link and llms.txt point to these files. Run
 The conversion includes main content and footer notices, preserves absolute
 links, and omits navigation and decorative graphics. The sitemap continues to
 list the canonical HTML pages only.
+
+## Website consent and Google Tag Manager
+
+The head loads local consent.js with defer. It queues denied Consent Mode defaults
+before loading container GTM-P7RPRQBZ only after an optional category is granted.
+There is intentionally no unconditional GTM script or noscript iframe: either
+would contact Google before consent. JavaScript-disabled visits remain untracked.
+
+Advanced choices map to analytics_storage, ad_storage/ad_user_data, and separately
+ad_personalization. Personalized advertising requires advertising consent. Choice
+storage expires after 180 days; invalid records fail closed. Withdrawal reloads
+and attempts cleanup of accessible Google first-party cookies. Cross-tab changes
+and back/forward cache restoration reload to honor the latest saved preference.
+
+### Container configuration required before publishing tags
+
+The website cannot sandbox tags inside GTM. In the container, configure additional
+consent checks on every analytics, advertising, custom HTML, and third-party tag.
+Analytics tags require analytics_storage. Advertising tags require ad_storage and
+ad_user_data; personalized advertising additionally requires ad_personalization.
+Use svb_consent_update triggers with the corresponding svb_analytics,
+svb_advertising, or svb_personalization boolean data-layer variables. Include an
+appropriate permitted page-load trigger for returning visitors. Never trigger
+optional tags unconditionally on All Pages or Consent Initialization. Built-in
+Google consent checks alone may permit cookieless pings when a category is denied.
+
+Verify each consent combination in GTM Preview/Tag Assistant before publishing the
+container. Container access and its configured tags are outside this repository;
+website tests cover the loader and signals, not tag-level enforcement. Keep the
+privacy notice and cookie retention details aligned with the actual published tags.
+
+Run `node --test scripts/tests/consent.test.cjs` and regenerate Markdown after HTML
+changes. The preference is website-only; the desktop app has no new telemetry.

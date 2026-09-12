@@ -58,11 +58,25 @@ Questions about this policy or requests concerning application data can be submi
 
 [Project issue tracker ↗](https://github.com/MiguelTVMS/sonos-volume-bridge/issues)
 
-## About this website
+## Website privacy and tracking
 
-This website adds no analytics, advertising, cookies, third-party fonts, or embedded media. It is designed to be hosted on GitHub Pages. GitHub may process visitor information, including IP addresses, as the hosting provider. See [GitHub’s privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement) .
+This notice covers the website. The desktop application's local-only data practices described above are unchanged.
 
-Download, wiki, source, and support links take you to GitHub, where GitHub’s privacy terms apply.
+The site is hosted on GitHub Pages. GitHub may process visitor information, including IP addresses, to deliver and secure the site. See [GitHub’s privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement) .
+
+### Your consent choices
+
+Optional website tracking is off by default. Google Tag Manager is loaded only after you enable analytics or advertising. You can accept all, reject optional tracking, or choose categories in Advanced. Reopen Privacy choices in the footer at any time to change or withdraw consent. Withdrawal reloads the page to stop previously loaded tags; it does not undo data already sent.
+
+Analytics allows measurement of page visits and interactions. Advertising measurement allows advertising cookies and the sharing of advertising-related data with Google. Personalized advertising is separately optional and requires advertising measurement. Which measurements are collected depends on the tags configured in Google Tag Manager. Google may receive information such as your IP address, browser details, page URL, and interactions when permitted tags run. See [Google’s privacy policy](https://policies.google.com/privacy) .
+
+### Storage and retention
+
+Your choice is saved in this browser’s local storage under `svb-consent-v1` for up to 180 days, then requested again. This preference storage is used to remember your decision. If storage is unavailable, optional tags remain off on new visits. JavaScript-disabled visits do not load Google Tag Manager.
+
+When you withdraw a category, the site attempts to remove accessible Google Analytics or advertising cookies for that category. It cannot delete third-party or HTTP-only cookies. Other service retention periods depend on the tags and Google service settings; the 180-day period applies only to your consent preference.
+
+Download, wiki, and support links lead to GitHub; the Microsoft Store link leads to Microsoft. Those services apply their own privacy terms. Questions about this website’s data practices can be raised through the [project issue tracker](https://github.com/MiguelTVMS/sonos-volume-bridge/issues) . Do not post private data in a public issue.
 
 [Sonos Volume Bridge](https://svb.miguel.ms/)
 
