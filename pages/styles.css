@@ -419,14 +419,32 @@ footer {
 }
 .footer-top {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 24px;
 }
 .footer-top > div {
   display: flex;
-  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+.footer-top > div > a,
+.footer-top > div > button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  font-family: inherit;
   font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  text-underline-offset: 5px;
+  white-space: nowrap;
+}
+.footer-top > div > button:hover {
+  color: #0369a1;
 }
 footer p {
   font-size: 11px;
@@ -557,6 +575,7 @@ code {
   }
   .footer-top {
     flex-direction: column;
+    align-items: flex-start;
   }
   .footer-top > div {
     flex-wrap: wrap;
