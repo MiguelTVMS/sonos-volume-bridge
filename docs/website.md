@@ -44,3 +44,16 @@ The website does not need to be rebuilt when a release is published. Before
 first deploying these links, publish a stable release with the updated workflow
 or upload the matching fixed-name copies to the existing latest stable release.
 Older releases do not gain these files automatically.
+
+## Search and assistant discovery
+
+The canonical origin is `https://svb.miguel.ms`. Both HTML pages declare canonical,
+Open Graph, social-card, and JSON-LD metadata. The sitemap lists only canonical
+HTML pages. robots.txt allows crawling and links to the sitemap. llms.txt is a
+curated project guide, an emerging convention rather than a ranking guarantee.
+Keep its claims consistent with the visible page and privacy policy. No ratings,
+reviews, or unverified compatibility claims are added to structured data.
+
+After deployment, submit the sitemap in Google Search Console and Bing Webmaster
+Tools. Validate structured data with their inspection tools. Updating these files
+does not itself submit the site or guarantee indexing or rich results.

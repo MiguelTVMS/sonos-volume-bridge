@@ -39,7 +39,8 @@ from these workflow files and may still run. The promotion unit tests run in CI
 for changes to the helper, tests, or release workflows.
 No branch protection bypass or automatic approval is used. If PR creation fails,
 the release remains published; rerun the failed job after resolving the cause.
-Repeated runs reuse the release branch and open PR. Diverged main, a conflicting
+Repeated runs reuse the release branch and open PR. Divergence caused by previous promotion merges is allowed only when a trial
+merge produces exactly the validated release tree. Conflicts, extra content, a conflicting
 release branch, or a previously closed PR require manual review.
 
 The current published release is [v0.3.0](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/tag/v0.3.0).
