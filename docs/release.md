@@ -20,6 +20,11 @@ package to Apple automatically. Other release packages and GitHub publication
 continue when the App Store job is skipped. The standalone App Store signing
 verification workflow remains available for manual checks.
 
+Leave **Submit release to Microsoft Store (GA only)** unchecked (the default)
+to skip Store submission. Check it for a GA release when you want to upload the
+MSIX after GitHub publication succeeds. Alpha and Beta never submit, even when
+checked. Windows installers and MSIX packages are still built normally.
+
 The workflow validates `develop`, commits the version bump to `develop`, checks
 out the trusted `develop` branch for each package build and verifies the exact
 release commit before building, creates and pushes its annotated
@@ -39,7 +44,8 @@ from these workflow files and may still run. The promotion unit tests run in CI
 for changes to the helper, tests, or release workflows.
 No branch protection bypass or automatic approval is used. If PR creation fails,
 the release remains published; rerun the failed job after resolving the cause.
-Repeated runs reuse the release branch and open PR. Diverged main, a conflicting
+Repeated runs reuse the release branch and open PR. Divergence caused by previous promotion merges is allowed only when a trial
+merge produces exactly the validated release tree. Conflicts, extra content, a conflicting
 release branch, or a previously closed PR require manual review.
 
 The current published release is [v0.3.0](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/tag/v0.3.0).
@@ -95,8 +101,8 @@ MSIX declares `en-US`, so its upload enables the English Store listing.
 
 After the first Store submission is certified and live, the `Release` workflow
 builds and validates the MSIX from the same versioned commit as the other
-platform packages. For a GA release, it publishes the GitHub Release first and
-then submits the MSIX to Store product `9N7JKGXCMST0`. Alpha and Beta releases
+platform packages. For a GA release with **Submit release to Microsoft Store (GA only)** checked,
+it publishes the GitHub Release first and then submits the MSIX to Store product `9N7JKGXCMST0`. Alpha and Beta releases
 still build the MSIX for validation but intentionally skip Store submission.
 
 Create a GitHub environment named `microsoft-store` and configure these secrets

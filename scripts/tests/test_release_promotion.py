@@ -45,7 +45,7 @@ class PromotionTests(unittest.TestCase):
             self.assertFalse(any('--method' in call or call[:2] == ('pr', 'create') for call in calls))
 
     def test_unsafe_states_fail(self):
-        for kwargs in ({'status':'diverged'}, {'prerelease':True}, {'refs':[{'ref':'refs/heads/release/1.2.3','object':{'sha':'b'*40}}]}, {'prs':[{'state':'CLOSED'}]}):
+        for kwargs in ({'prerelease':True}, {'refs':[{'ref':'refs/heads/release/1.2.3','object':{'sha':'b'*40}}]}, {'prs':[{'state':'CLOSED'}]}):
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
                 self.run_case(**kwargs)
 
@@ -66,6 +66,28 @@ class PromotionTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 promotion.promote('v1.2.3', SHA)
             self.assertEqual(github.call_count, 1)
+
+    def test_merge_history_divergence_can_promote(self):
+        with patch.object(promotion, 'verify_merge_tree') as verify:
+            calls = self.run_case(status='diverged')
+            verify.assert_called_once_with(SHA)
+            self.assertTrue(any(c[:2] == ('pr', 'create') for c in calls))
+
+    def test_divergent_content_cannot_promote(self):
+        with patch.object(promotion, 'verify_merge_tree', side_effect=ValueError('Different content')):
+            with self.assertRaises(ValueError):
+                self.run_case(status='diverged')
+
+    def test_trial_merge_content_and_conflicts(self):
+        import subprocess
+        for code, tree, accepted in [(0, SHA, True), (0, 'b' * 40, False), (1, SHA, False)]:
+            result = subprocess.CompletedProcess([], code, stdout=tree, stderr='')
+            with patch.object(promotion.subprocess, 'run', return_value=result), patch.object(promotion.subprocess, 'check_output', return_value=SHA):
+                if accepted:
+                    promotion.verify_merge_tree(SHA)
+                else:
+                    with self.assertRaises(ValueError):
+                        promotion.verify_merge_tree(SHA)
 
 
 if __name__ == '__main__':
