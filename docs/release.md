@@ -24,8 +24,23 @@ The workflow validates `develop`, commits the version bump to `develop`, checks
 out the trusted `develop` branch for each package build and verifies the exact
 release commit before building, creates and pushes its annotated
 `vX.Y.Z` tag with the GitHub Actions bot identity, then creates or updates the
-GitHub Release with downloadable assets, a channel-aware installation and signing summary, and GitHub-generated change notes. Pull requests with `feature`, `enhancement`, `bug`, `fix`, `maintenance`, `refactor`, or `documentation` labels are grouped in those notes. It never merges branches. Merge
-`develop` into `main` only after the release workflow succeeds.
+GitHub Release with downloadable assets, a channel-aware installation and signing summary, and GitHub-generated change notes. Pull requests with `feature`, `enhancement`, `bug`, `fix`, `maintenance`, `refactor`, or `documentation` labels are grouped in those notes. It never merges branches. After a GA release is published, a separate job opens
+an approval-required PR from a release branch pinned to the validated release
+commit into `main`. Publication does not wait for this PR. Alpha and beta
+releases do not open promotion PRs. Merge the PR using a merge commit to retain
+the tagged commit in main's history; do not squash or rebase it.
+
+The repository must allow GitHub Actions to create pull requests. PR validation workflows exclude `main`, so release-promotion PRs do not rerun
+application CI. Normal development PRs still run CI. Only promote validated
+release commits into main; route fixes through develop first. Required-check
+rules targeting main must not require these excluded PR workflows.
+Repository-managed security scanning, including default CodeQL, is separate
+from these workflow files and may still run. The promotion unit tests run in CI
+for changes to the helper, tests, or release workflows.
+No branch protection bypass or automatic approval is used. If PR creation fails,
+the release remains published; rerun the failed job after resolving the cause.
+Repeated runs reuse the release branch and open PR. Diverged main, a conflicting
+release branch, or a previously closed PR require manual review.
 
 The current published release is [v0.3.0](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/tag/v0.3.0).
 
@@ -165,7 +180,7 @@ are not migrated and must be configured again.
   ready to start.
 - Approve the protected `apple-app-store` environment when the Mac App Store
   signing job is ready to start, then upload its signed `.pkg` after validation.
-- Run the `Release` workflow from `develop`, then merge `develop` into `main`
+- Run the `Release` workflow from `develop`, then merge the pinned release PR into `main`
   after its GitHub Release and downloads have been verified. Do not add Apple
   credentials to this repository.
 
