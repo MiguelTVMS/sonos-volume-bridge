@@ -121,3 +121,21 @@ code, post concise progress and validation updates while working, then commit
 and push `develop`. Close a phase issue only after the work is complete. Create
 the next phase's issue before stopping and wait for explicit approval before
 implementing it.
+
+## Codex local environments
+
+`.codex/environments/environment.toml` defines macOS, Windows, and Linux
+worktree setup and platform-specific Run app, Check all, and Build app actions.
+Setup fetches the locked dependencies and builds the frontend. Build app creates
+an unbundled native build for the current operating system.
+
+Install the toolchain listed above and Tauri CLI 2 (`cargo install tauri-cli
+--version "^2" --locked`) before setup. macOS requires Xcode Command Line Tools.
+Windows requires Visual Studio Build Tools with Desktop development with C++,
+a Windows SDK, and WebView2 Runtime. Linux requires `pkg-config`, a C/C++ build
+toolchain, the desktop development libraries listed in the Ubuntu section, and
+`pulseaudio-utils`. Setup reports missing native prerequisites.
+
+Windows actions use PowerShell and check native command exit codes. macOS and
+Linux actions use Bash. Check all runs Rust formatting, Clippy, workspace tests,
+and frontend formatting, lint, tests, and build without requiring signing secrets.

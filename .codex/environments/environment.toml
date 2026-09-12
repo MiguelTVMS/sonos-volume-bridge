@@ -1,0 +1,68 @@
+version = 1
+name = "Sonos Volume Bridge"
+
+[setup]
+script = ""
+
+[setup.darwin]
+script = "bash scripts/local/codex-environment.sh setup"
+
+[setup.win32]
+script = "powershell.exe -NoProfile -File scripts/local/codex-environment.ps1 -Action setup"
+
+[setup.linux]
+script = "bash scripts/local/codex-environment.sh setup"
+
+[[actions]]
+name = "Run app"
+icon = "run"
+command = "bash scripts/local/codex-environment.sh run"
+platform = "darwin"
+
+[[actions]]
+name = "Check all"
+icon = "test"
+command = "bash scripts/local/codex-environment.sh check"
+platform = "darwin"
+
+[[actions]]
+name = "Build app"
+icon = "tool"
+command = "bash scripts/local/codex-environment.sh build"
+platform = "darwin"
+
+[[actions]]
+name = "Run app"
+icon = "run"
+command = "powershell.exe -NoProfile -File scripts/local/codex-environment.ps1 -Action run"
+platform = "win32"
+
+[[actions]]
+name = "Check all"
+icon = "test"
+command = "powershell.exe -NoProfile -File scripts/local/codex-environment.ps1 -Action check"
+platform = "win32"
+
+[[actions]]
+name = "Build app"
+icon = "tool"
+command = "powershell.exe -NoProfile -File scripts/local/codex-environment.ps1 -Action build"
+platform = "win32"
+
+[[actions]]
+name = "Run app"
+icon = "run"
+command = "bash scripts/local/codex-environment.sh run"
+platform = "linux"
+
+[[actions]]
+name = "Check all"
+icon = "test"
+command = "bash scripts/local/codex-environment.sh check"
+platform = "linux"
+
+[[actions]]
+name = "Build app"
+icon = "tool"
+command = "bash scripts/local/codex-environment.sh build"
+platform = "linux"
