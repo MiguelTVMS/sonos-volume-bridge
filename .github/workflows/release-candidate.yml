@@ -698,6 +698,27 @@ jobs:
               --generate-notes
           fi
 
+  propose-main-promotion:
+    name: Open stable release PR into main
+    if: ${{ inputs.channel == 'GA' }}
+    needs: [prepare-version, publish-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare-version.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Propose the exact published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: python3 scripts/open-release-promotion.py
+
   publish-microsoft-store:
     name: Submit GA release to Microsoft Store
     if: ${{ inputs.channel == 'GA' }}
