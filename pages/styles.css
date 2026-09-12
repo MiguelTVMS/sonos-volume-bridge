@@ -746,3 +746,114 @@ code {
     margin-top: 40px;
   }
 }
+
+/* Consent is non-modal: the site remains usable without accepting tracking. */
+.consent-banner[hidden],
+.consent-banner [hidden] {
+  display: none;
+}
+.consent-banner {
+  position: fixed;
+  bottom: 18px;
+  left: 18px;
+  right: 18px;
+  max-width: 1088px;
+  margin: auto;
+  z-index: 100;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 22px 26px;
+  box-shadow: 0 10px 48px #0f172a30;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.consent-banner h2 {
+  font-size: 23px;
+  letter-spacing: -0.5px;
+  margin: 0 0 8px;
+}
+.consent-banner p {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+.consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+.consent-banner button {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 18px;
+  background: var(--ink);
+  color: #fff;
+  border: 1px solid var(--ink);
+  border-radius: 7px;
+  cursor: pointer;
+}
+.consent-banner button:hover {
+  background: #172554;
+}
+.consent-banner button:focus-visible,
+.consent-open:focus-visible,
+.consent-banner input:focus-visible {
+  outline: 3px solid #0284c7;
+  outline-offset: 3px;
+}
+.consent-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.consent-option strong,
+.consent-option span span {
+  display: block;
+}
+.consent-option span span,
+.consent-option p {
+  font-size: 13px;
+  color: var(--muted);
+}
+.consent-option input {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  accent-color: #0369a1;
+}
+#consent-save {
+  margin-top: 16px;
+}
+#consent-status:not(:empty) {
+  margin-top: 14px;
+}
+.consent-open {
+  background: none;
+  border: 0;
+  padding: 8px 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  text-decoration: underline;
+  cursor: pointer;
+  display: block;
+}
+@media (max-width: 620px) {
+  .consent-banner {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    padding: 18px;
+  }
+  .consent-actions button {
+    flex: 1 1 auto;
+  }
+}

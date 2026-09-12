@@ -41,7 +41,7 @@ def render(node, base):
     if isinstance(node, str):
         return re.sub(r'\s+', ' ', node)
     tag, attrs, children = node
-    if tag in {'svg', 'script', 'style', 'nav', 'header'} or attrs.get('aria-hidden') == 'true' or attrs.get('role') == 'img':
+    if tag in {'svg', 'script', 'style', 'nav', 'header', 'button', 'noscript'} or attrs.get('aria-hidden') == 'true' or attrs.get('role') == 'img':
         return ''
     body = ''.join(render(child, base) for child in children).strip()
     if tag == 'br':
