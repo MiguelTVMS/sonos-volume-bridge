@@ -12,7 +12,6 @@ on:
       - ".github/dependabot.yml"
       - ".github/ISSUE_TEMPLATE/**"
       - ".github/FUNDING.md"
-      - "Cargo.lock"
 
 permissions:
   contents: read
@@ -40,6 +39,9 @@ jobs:
           filters: |
             rust:
               - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+              - '.github/workflows/**'
               - 'crates/**'
               - 'src-tauri/**'
             ui:
@@ -60,7 +62,7 @@ jobs:
           key: external-pr-${{ runner.os }}-apt-desktop-v1
       - name: Install Linux desktop build dependencies
         run: sudo apt-get update && sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.98.1
         with:
           components: rustfmt, clippy
       - uses: pnpm/action-setup@v6
@@ -105,7 +107,7 @@ jobs:
           key: external-pr-${{ runner.os }}-apt-desktop-v1
       - name: Install Linux desktop build dependencies
         run: sudo apt-get update && sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.98.1
       - uses: pnpm/action-setup@v6
         with:
           version: 11

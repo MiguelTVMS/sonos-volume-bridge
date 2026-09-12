@@ -66,10 +66,10 @@ impl MockSonosServer {
                     let read = stream.read(&mut request).await.unwrap_or_default();
                     let request = String::from_utf8_lossy(&request[..read]);
                     let mut state = state.lock().await;
-                    if let Some(volume) = xml_value(&request, "DesiredVolume") {
-                        if let Ok(volume) = volume.parse() {
-                            state.volume = SonosVolume::new(volume).unwrap_or(state.volume);
-                        }
+                    if let Some(volume) = xml_value(&request, "DesiredVolume")
+                        && let Ok(volume) = volume.parse()
+                    {
+                        state.volume = SonosVolume::new(volume).unwrap_or(state.volume);
                     }
                     if let Some(muted) = xml_value(&request, "DesiredMute") {
                         state.muted = MuteState(muted == "1");

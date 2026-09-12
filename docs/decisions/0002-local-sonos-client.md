@@ -24,3 +24,11 @@ keeps parsing bounded. It intentionally rejects hostname-based locations,
 including `.local`, rather than performing an unsafe DNS resolution path. A
 future discovery implementation may safely resolve such names only after
 checking every resolved address.
+
+## Stable dependency refresh (2026-09-12)
+
+Reqwest 0.13 uses the renamed `rustls` feature. Local HTTP-only URL validation
+and disabled proxy behavior remain in place. quick-xml 0.42 returns decoded
+strings directly, so the parsers consume those strings and continue to unescape
+XML references explicitly. Regression coverage checks numeric references in
+GENA attributes and rejection of invalid UTF-8 in device and event payloads.

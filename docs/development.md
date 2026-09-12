@@ -1,6 +1,6 @@
 # Development
 
-Install Rust 1.88.0 (including `clippy` and `rustfmt`), Node.js 22, and pnpm
+Install Rust 1.98.1 (including `clippy` and `rustfmt`), Node.js 22, and pnpm
 11. Run the complete local verification suite with:
 
 ```sh
@@ -139,3 +139,18 @@ toolchain, the desktop development libraries listed in the Ubuntu section, and
 Windows actions use PowerShell and check native command exit codes. macOS and
 Linux actions use Bash. Check all runs Rust formatting, Clippy, workspace tests,
 and frontend formatting, lint, tests, and build without requiring signing secrets.
+
+## Stable dependency baseline
+
+The workspace and CI use Rust 1.98.1. Update `rust-toolchain.toml`, the workspace
+`rust-version`, and workflow toolchain pins together, then run all validation.
+Lockfile and workflow changes also trigger Rust checks.
+
+The frontend uses TypeScript 7 for builds. Its `typescript` dependency aliases
+`@typescript/typescript6` to supply the compiler API required by typescript-eslint;
+`@typescript/native` aliases the stable TypeScript 7 package and provides `tsc`.
+See [Microsoft's compatibility guidance](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6.0).
+
+Windows bindings remain on the compatible 0.62 family. Upgrade `windows` and
+`windows-core` together and validate on Windows before changing this baseline.
+The vendored Linux GLib patch remains tied to Tauri's dependency graph.

@@ -161,3 +161,24 @@ async fn mock_server_supports_rendering_control_round_trip() {
         }
     );
 }
+
+#[test]
+fn parses_numeric_references_in_last_change_attributes() {
+    let body = br#"<LastChange>&lt;Event&gt;&lt;Volume channel="M&amp;#97;ster" val="&amp;#50;4"/&gt;&lt;Mute channel="Master" val="&amp;#49;"/&gt;&lt;/Event&gt;</LastChange>"#;
+    let event = parse_last_change(body, Some(9)).unwrap();
+    assert_eq!(event.state.volume.get(), 24);
+    assert!(event.state.muted.0);
+}
+
+#[test]
+fn rejects_invalid_utf8_in_xml_payloads() {
+    let location = Url::parse(LOCATION).unwrap();
+    assert!(matches!(
+        parse_device_description(b"<root><friendlyName>\xff</friendlyName></root>", &location),
+        Err(SonosError::Xml(_))
+    ));
+    assert!(matches!(
+        parse_last_change(b"<LastChange>\xff</LastChange>", None),
+        Err(SonosError::Xml(_))
+    ));
+}

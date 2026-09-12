@@ -29,14 +29,14 @@ pub fn parse_device_description(xml: &[u8], location: &Url) -> Result<SonosDevic
     loop {
         match reader.read_event_into(&mut buffer) {
             Ok(Event::Start(event)) => {
-                let tag = tag_name(event.name().as_ref())?;
+                let tag = event.name().as_ref().to_owned();
                 if tag == "service" {
                     service = Some(ServiceCandidate::default());
                 }
                 stack.push(tag);
             }
             Ok(Event::End(event)) => {
-                let tag = tag_name(event.name().as_ref())?;
+                let tag = event.name().as_ref().to_owned();
                 if tag == "service"
                     && let Some(candidate) = service.take()
                 {
@@ -60,10 +60,7 @@ pub fn parse_device_description(xml: &[u8], location: &Url) -> Result<SonosDevic
                 stack.pop();
             }
             Ok(Event::Text(text)) => {
-                let decoded = text
-                    .decode()
-                    .map_err(|error| SonosError::Xml(error.to_string()))?;
-                let value = unescape(&decoded)
+                let value = unescape(&text)
                     .map_err(|error| SonosError::Xml(error.to_string()))?
                     .into_owned();
                 match stack.last().map(String::as_str) {
@@ -143,10 +140,4 @@ struct ServiceCandidate {
     kind: Option<String>,
     control_url: Option<String>,
     event_url: Option<String>,
-}
-
-fn tag_name(bytes: &[u8]) -> Result<String, SonosError> {
-    std::str::from_utf8(bytes)
-        .map(str::to_owned)
-        .map_err(|error| SonosError::Xml(error.to_string()))
 }

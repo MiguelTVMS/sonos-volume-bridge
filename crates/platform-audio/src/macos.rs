@@ -770,7 +770,7 @@ unsafe fn audio_object_ids() -> Result<Vec<AudioObjectID>, OSStatus> {
             &mut size,
         )
     };
-    if status != NO_ERR || size % std::mem::size_of::<AudioObjectID>() as u32 != 0 {
+    if status != NO_ERR || !size.is_multiple_of(std::mem::size_of::<AudioObjectID>() as u32) {
         return Err(status);
     }
     let mut ids = vec![0_u32; size as usize / std::mem::size_of::<AudioObjectID>()];

@@ -226,7 +226,7 @@ fn sink_name(selection: &AudioDeviceSelection) -> Result<String, PlatformAudioEr
 
 fn parse_percent(value: &str) -> Option<NormalizedVolume> {
     let value = value.trim().trim_end_matches('%');
-    let (whole, fractional) = value.split_once('.').map_or((value, ""), |parts| parts);
+    let (whole, fractional) = value.split_once('.').unwrap_or((value, ""));
     let whole = whole.parse::<u16>().ok()?;
     if !fractional.chars().all(|digit| digit.is_ascii_digit()) {
         return None;
