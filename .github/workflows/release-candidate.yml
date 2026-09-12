@@ -15,6 +15,11 @@ on:
         default: Beta
         type: choice
         options: [GA, Beta, Alpha]
+      build_app_store:
+        description: Build Mac App Store package
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -352,6 +357,7 @@ jobs:
 
   macos-app-store:
     name: Sign macOS App Store package
+    if: ${{ inputs.build_app_store }}
     needs: [prepare-version, macos-app]
     runs-on: macos-latest
     environment: apple-app-store
