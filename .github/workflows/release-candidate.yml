@@ -642,6 +642,10 @@ jobs:
           pattern: "*-release"
           path: release-assets
           merge-multiple: true
+      - name: Prepare permanent download filenames
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+        run: bash scripts/prepare-release-downloads.sh release-assets "$RELEASE_TAG"
       - name: Create or update the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

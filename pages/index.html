@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sonos Volume Bridge | Device volume, in sync.</title>
+    <meta
+      name="description"
+      content="Synchronize your computer’s audio device volume with your Sonos speaker. Free and open source for macOS, Windows, and Linux."
+    />
+    <meta name="theme-color" content="#f8fafc" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="header wrap">
+      <a class="brand" href="./"
+        ><img class="mark" src="icon.svg" width="32" height="32" alt="" /> Sonos
+        Volume Bridge</a
+      >
+      <nav aria-label="Main navigation">
+        <a href="./#features">Features</a><a href="./#downloads">Downloads</a
+        ><a href="privacy.html">Privacy</a
+        ><a href="https://github.com/MiguelTVMS/sonos-volume-bridge/wiki"
+          >Wiki ↗</a
+        >
+        <a
+          class="github-link"
+          href="https://github.com/MiguelTVMS/sonos-volume-bridge"
+          aria-label="View source on GitHub"
+          title="View source on GitHub"
+          ><svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              d="M12 .297C5.37.297 0 5.67 0 12.297c0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.043-1.61-4.043-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.083-.729.083-.729 1.205.084 1.838 1.237 1.838 1.237 1.07 1.835 2.809 1.305 3.495.998.108-.776.418-1.305.762-1.605-2.665-.305-5.467-1.334-5.467-5.93 0-1.31.469-2.38 1.236-3.22-.124-.303-.536-1.524.117-3.176 0 0 1.008-.322 3.301 1.23a11.52 11.52 0 0 1 3.003-.404c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.655 1.652.243 2.873.12 3.176.77.84 1.235 1.91 1.235 3.22 0 4.61-2.807 5.622-5.479 5.92.43.372.823 1.102.823 2.222 0 1.606-.015 2.898-.015 3.293 0 .322.216.694.825.576C20.565 22.092 24 17.595 24 12.297c0-6.627-5.373-12-12-12"
+            /></svg
+        ></a>
+      </nav>
+    </header>
+    <main id="main">
+      <section class="hero wrap">
+        <div>
+          <p class="eyebrow">
+            <span class="dot"></span> FOR macOS, WINDOWS &amp; LINUX
+          </p>
+          <h1>Your device.<br />Your speaker.<br /><span>In sync.</span></h1>
+          <p class="intro">
+            Keep your computer’s audio output and your Sonos speaker volume in
+            sync. Adjust volume through system controls, keyboard keys, or
+            supported audio-device controls.
+          </p>
+          <div class="actions">
+            <a class="button" href="#downloads"
+              >Download the app <span aria-hidden="true">↓</span></a
+            ><a
+              class="text-link"
+              href="https://github.com/MiguelTVMS/sonos-volume-bridge/wiki"
+              >Read the guide ↗</a
+            >
+          </div>
+          <div class="platforms">
+            <div class="platform-list" aria-label="Available platforms">
+              <span class="platform"
+                ><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    fill="currentColor"
+                    d="M17.05 12.54c.03 3.18 2.79 4.24 2.82 4.25-.02.07-.44 1.51-1.45 3-.88 1.28-1.8 2.56-3.24 2.59-1.41.03-1.87-.84-3.48-.84-1.61 0-2.12.82-3.45.87-1.39.05-2.45-1.39-3.34-2.67-1.82-2.62-3.21-7.41-1.34-10.65.93-1.61 2.59-2.63 4.39-2.66 1.37-.03 2.67.93 3.5.93.83 0 2.39-1.15 4.03-.98.69.03 2.62.28 3.86 2.1-.1.06-2.3 1.34-2.3 4.06ZM14.39 4.65c.74-.9 1.24-2.16 1.1-3.41-1.07.04-2.37.71-3.14 1.61-.69.8-1.3 2.08-1.14 3.3 1.2.09 2.43-.61 3.18-1.5Z"
+                  /></svg
+                >macOS</span
+              >
+              <span class="platform"
+                ><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    fill="currentColor"
+                    d="M2 3h9v8H2zm11 0h9v8h-9zM2 13h9v8H2zm11 0h9v8h-9z"
+                  /></svg
+                >Windows</span
+              >
+              <span class="platform"
+                ><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    fill="currentColor"
+                    d="M12 2c-3 0-4 2.5-4 5.5 0 2-1.4 3.8-2.2 6.1-.7 2-.3 4.3 1.2 5.4h10c1.5-1.1 1.9-3.4 1.2-5.4C17.4 11.3 16 9.5 16 7.5 16 4.5 15 2 12 2Z"
+                  />
+                  <ellipse
+                    cx="12"
+                    cy="14.7"
+                    rx="3.6"
+                    ry="4.7"
+                    fill="var(--paper)"
+                  />
+                  <ellipse
+                    cx="10.4"
+                    cy="7"
+                    rx="1"
+                    ry="1.5"
+                    fill="var(--paper)"
+                  />
+                  <ellipse
+                    cx="13.6"
+                    cy="7"
+                    rx="1"
+                    ry="1.5"
+                    fill="var(--paper)"
+                  />
+                  <path
+                    d="m10 9 2 1.5L14 9l-2-.8Z M8 18l-4 2 5 1 1-2m6-1 4 2-5 1-1-2"
+                    fill="currentColor"
+                  /></svg
+                >Linux</span
+              >
+            </div>
+          </div>
+        </div>
+        <div
+          class="visual"
+          role="img"
+          aria-label="Illustration: computer volume controls synchronize with a speaker on your local network"
+        >
+          <div class="visual-label">
+            <span class="dot"></span> A LITTLE LOCAL CONNECTION
+          </div>
+          <div class="speaker">
+            <div class="speaker-grille"></div>
+            <span class="speaker-light"></span>
+          </div>
+          <div class="connection"><i></i><span>↕</span><i></i></div>
+          <div class="volume-card">
+            <div>
+              <span>Computer volume</span><strong>42<span>%</span></strong>
+            </div>
+            <div class="track"><span></span></div>
+            <div class="keys">
+              <kbd>−</kbd><span>Audio device volume</span><kbd>+</kbd>
+            </div>
+          </div>
+          <p class="visual-caption">Your computer ↔ Your speaker</p>
+        </div>
+      </section>
+      <div class="strip">
+        <div class="wrap">
+          <span>Runs quietly in the background</span
+          ><span>No app account needed</span
+          ><span>Connects over your local network</span>
+        </div>
+      </div>
+      <section id="features" class="section wrap">
+        <p class="eyebrow">LESS FIDDLING. MORE LISTENING.</p>
+        <h2>A familiar way to<br />turn it up. Or down.</h2>
+        <div class="features">
+          <article>
+            <span class="number">01 / CONTROL</span>
+            <h3>Connect your device volume.</h3>
+            <p>
+              Changes to your selected computer audio output’s volume are
+              reflected on your Sonos speaker. Use system volume controls,
+              keyboard keys, or supported device controls.
+            </p>
+          </article>
+          <article>
+            <span class="number">02 / SYNCHRONIZE</span>
+            <h3>Keep both sides in step.</h3>
+            <p>
+              Enable two-way synchronization to reflect speaker volume changes
+              on your computer too. You can also choose to synchronize mute.
+            </p>
+          </article>
+          <article>
+            <span class="number">03 / PERSONALIZE</span>
+            <h3>Find your comfort zone.</h3>
+            <p>
+              Set a maximum speaker volume and choose how volume changes feel,
+              including a gentler curve for finer control at low volumes.
+            </p>
+          </article>
+          <article>
+            <span class="number">04 / KEEP GOING</span>
+            <h3>Set it. Get on with your day.</h3>
+            <p>
+              Follow your current audio output or select a fixed one. Start at
+              login and reconnect automatically after interruptions.
+            </p>
+          </article>
+        </div>
+      </section>
+      <section id="downloads" class="section wrap downloads">
+        <p class="eyebrow">DOWNLOAD SONOS VOLUME BRIDGE</p>
+        <h2>At home on your computer.</h2>
+        <p class="intro">
+          Free and open source. Choose the download for your operating system.
+        </p>
+        <p class="download-version">
+          Latest stable release ·
+          <a
+            href="https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest"
+            >Check the latest release ↗</a
+          >
+        </p>
+        <div class="download-grid">
+          <article class="download-card">
+            <div class="download-details">
+              <h3 class="platform-heading">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    fill="currentColor"
+                    d="M17.05 12.54c.03 3.18 2.79 4.24 2.82 4.25-.02.07-.44 1.51-1.45 3-.88 1.28-1.8 2.56-3.24 2.59-1.41.03-1.87-.84-3.48-.84-1.61 0-2.12.82-3.45.87-1.39.05-2.45-1.39-3.34-2.67-1.82-2.62-3.21-7.41-1.34-10.65.93-1.61 2.59-2.63 4.39-2.66 1.37-.03 2.67.93 3.5.93.83 0 2.39-1.15 4.03-.98.69.03 2.62.28 3.86 2.1-.1.06-2.3 1.34-2.3 4.06ZM14.39 4.65c.74-.9 1.24-2.16 1.1-3.41-1.07.04-2.37.71-3.14 1.61-.69.8-1.3 2.08-1.14 3.3 1.2.09 2.43-.61 3.18-1.5Z"
+                  /></svg
+                >macOS
+              </h3>
+              <p>
+                For Macs running macOS 13 or later. Signed with Developer ID and
+                notarized by Apple.
+              </p>
+              <div class="download-note">
+                <small
+                  >Apple Silicon (ARM64) only. Intel Macs are not
+                  supported.</small
+                >
+              </div>
+            </div>
+            <div class="download-options">
+              <div class="download-actions">
+                <a
+                  class="button"
+                  href="https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-macos.zip"
+                  >Download for macOS ↓</a
+                >
+              </div>
+            </div>
+          </article>
+          <article class="download-card">
+            <div class="download-details">
+              <h3 class="platform-heading">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    fill="currentColor"
+                    d="M2 3h9v8H2zm11 0h9v8h-9zM2 13h9v8H2zm11 0h9v8h-9z"
+                  /></svg
+                >Windows
+              </h3>
+              <p>
+                Install from Microsoft Store or download the installer directly.
+              </p>
+              <div class="download-note">
+                <small
+                  >The direct installer is unsigned. Windows SmartScreen may
+                  show a warning.</small
+                >
+              </div>
+            </div>
+            <div class="download-options">
+              <div class="download-actions">
+                <a
+                  class="button"
+                  href="https://apps.microsoft.com/detail/9N7JKGXCMST0"
+                  ><svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path
+                      d="M4 7h16l1 15H3L4 7Z"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                    />
+                    <path
+                      d="M8 7V5a4 4 0 0 1 8 0v2"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                    />
+                    <path
+                      d="M7 11h4v4H7zm6 0h4v4h-4zm-6 6h4v3H7zm6 0h4v3h-4z"
+                      fill="currentColor"
+                    /></svg
+                  >Microsoft Store ↗</a
+                ><a
+                  class="button button-secondary"
+                  href="https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-windows-unsigned.exe"
+                  >Windows installer ↓</a
+                >
+              </div>
+            </div>
+          </article>
+          <article class="download-card">
+            <div class="download-details">
+              <h3 class="platform-heading">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="11" fill="#000000" />
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="5.6"
+                    fill="none"
+                    stroke="white"
+                    stroke-width="2"
+                  />
+                  <path
+                    d="M5 12h4m5-3 2-3m-2 9 2 3"
+                    stroke="#000000"
+                    stroke-width="2"
+                  />
+                  <g fill="white" stroke="#000000" stroke-width="1.2">
+                    <circle cx="5.5" cy="12" r="2.3" />
+                    <circle cx="15.3" cy="6.3" r="2.3" />
+                    <circle cx="15.3" cy="17.7" r="2.3" />
+                  </g></svg
+                >Ubuntu
+              </h3>
+              <p>
+                For Ubuntu on x86-64, with PulseAudio or PipeWire and
+                <code>pactl</code>.
+              </p>
+              <div class="download-note">
+                <small>DEB package · AMD64.</small>
+              </div>
+            </div>
+            <div class="download-options">
+              <div class="download-actions">
+                <a
+                  class="button"
+                  href="https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-linux-amd64.deb"
+                  >Download for Ubuntu ↓</a
+                >
+              </div>
+            </div>
+          </article>
+        </div>
+        <p class="download-help">
+          Need a hand?
+          <a
+            href="https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Installation"
+            >Read the installation guide ↗</a
+          >
+        </p>
+      </section>
+      <section class="setup section">
+        <div class="wrap setup-grid">
+          <div>
+            <p class="eyebrow">A FEW CLICKS, THEN BACK TO YOUR MUSIC.</p>
+            <h2>Make the connection.</h2>
+            <p class="intro">
+              You’ll need a Sonos speaker on the same local network and a
+              computer audio output with software volume control.
+            </p>
+            <a
+              class="text-link"
+              href="https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Installation"
+              >Full installation guide ↗</a
+            >
+          </div>
+          <ol class="steps">
+            <li>
+              <h3>Install and open.</h3>
+              <p>
+                Download the package for your operating system from the
+                project’s releases.
+              </p>
+            </li>
+            <li>
+              <h3>Choose your speaker.</h3>
+              <p>
+                Select the Sonos speaker and the computer audio output you want
+                to connect.
+              </p>
+            </li>
+            <li>
+              <h3>Make it yours.</h3>
+              <p>
+                Choose your sync and volume preferences. Close the settings
+                window and use your normal volume controls.
+              </p>
+            </li>
+          </ol>
+        </div>
+      </section>
+      <section class="wrap privacy-callout">
+        <div>
+          <p class="eyebrow">LOCAL BY DESIGN</p>
+          <h2>Your volume stays<br />between your devices.</h2>
+          <p>
+            No advertising, analytics, or publisher telemetry in the app.
+            Preferences and diagnostic logs stay on your computer unless you
+            choose to share them.
+          </p>
+          <a class="text-link" href="privacy.html">Read the privacy policy →</a>
+        </div>
+        <div class="privacy-symbol" aria-hidden="true">
+          ⌂<span>ON YOUR NETWORK</span>
+        </div>
+      </section>
+      <section class="section wrap details">
+        <div>
+          <p class="eyebrow">GOOD TO KNOW</p>
+          <h2>Volume control.<br />That’s the idea.</h2>
+        </div>
+        <div>
+          <p>
+            This app synchronizes volume and optional mute state. It does not
+            play, stream, capture, or redirect audio.
+          </p>
+          <p>
+            It’s an early community project, with hands-on testing currently
+            limited to a Sonos Ray. Other models and hardware combinations may
+            need validation.
+          </p>
+          <p>
+            macOS requires version 13 or later. Linux support targets Ubuntu
+            with PulseAudio or PipeWire with <code>pactl</code>. Check the
+            installation guide for available packages and platform notes.
+          </p>
+          <a
+            class="text-link"
+            href="https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Compatibility-and-Limitations"
+            >Compatibility &amp; limitations ↗</a
+          >
+        </div>
+      </section>
+      <section class="section wrap end">
+        <p class="eyebrow">A SMALL BRIDGE. AN OPEN PROJECT.</p>
+        <h2>Ready to find your volume?</h2>
+        <p>
+          Free to use and open source under the
+          <a href="license.txt">MIT license</a>.<br />Explore the wiki for
+          detailed settings, troubleshooting, and help.
+        </p>
+        <div class="actions">
+          <a class="button" href="#downloads">Choose your download ↓</a
+          ><a
+            class="text-link"
+            href="https://github.com/MiguelTVMS/sonos-volume-bridge/wiki"
+            >Explore the wiki ↗</a
+          >
+        </div>
+      </section>
+    </main>
+    <footer class="wrap">
+      <div class="footer-top">
+        <a class="brand" href="./"
+          ><img
+            class="mark"
+            src="icon.svg"
+            width="32"
+            height="32"
+            alt=""
+          />Sonos Volume Bridge</a
+        >
+        <div>
+          <a href="privacy.html">Privacy policy</a
+          ><a href="license.txt">MIT license</a
+          ><a href="https://github.com/MiguelTVMS/sonos-volume-bridge"
+            >Source code ↗</a
+          >
+        </div>
+      </div>
+      <p>
+        Independent software. Not affiliated with, sponsored by, endorsed by, or
+        supported by Sonos. Sonos and related product names are trademarks of
+        their respective owners and are used only to identify compatibility.
+        This project contains no Sonos source code.
+      </p>
+      <small>Made for the volume controls you already use.</small>
+    </footer>
+  </body>
+</html>

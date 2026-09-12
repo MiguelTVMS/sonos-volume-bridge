@@ -168,3 +168,17 @@ are not migrated and must be configured again.
 - Run the `Release` workflow from `develop`, then merge `develop` into `main`
   after its GitHub Release and downloads have been verified. Do not add Apple
   credentials to this repository.
+
+### Website download aliases
+
+The GitHub Release publishing job runs `scripts/prepare-release-downloads.sh`
+to add fixed filenames for direct downloads, alongside the versioned installers:
+
+- `sonos-volume-bridge-macos.zip`
+- `sonos-volume-bridge-windows-unsigned.exe`
+- `sonos-volume-bridge-linux-amd64.deb`
+
+The website uses `releases/latest/download/<filename>` so stable downloads follow
+the latest non-prerelease without a website deployment. Missing or empty source
+installers fail preparation before any aliases are created. Store packages are
+not used as direct-download aliases.
