@@ -2,6 +2,8 @@ name: CI
 
 on:
   pull_request:
+    # main receives already validated stable releases via promotion PRs.
+    branches-ignore: [main]
     paths-ignore:
       - "**/*.md"
       - "README*"
