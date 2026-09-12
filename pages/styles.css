@@ -766,7 +766,25 @@ code {
   }
 }
 
-/* Consent is non-modal: the site remains usable without accepting tracking. */
+/* Visually dim the site while keeping consent non-modal. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: rgb(15 23 42 / 45%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+body:has(.consent-banner:not([hidden]))::after {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  body::after {
+    transition: none;
+  }
+}
 .consent-banner[hidden],
 .consent-banner [hidden] {
   display: none;
