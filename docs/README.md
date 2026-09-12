@@ -13,6 +13,7 @@ operational perspectives.
 - [`development.md`](development.md): local development and verification steps.
 - [`verification-matrix.md`](verification-matrix.md): release validation checks.
 - [`release.md`](release.md): release process and packaging constraints.
+- [`website.md`](website.md): public website content, local preview, and Pages deployment.
 - [`decisions`](decisions): architecture decision records.
 
 When changing behavior or public options, update the docs listed above before
