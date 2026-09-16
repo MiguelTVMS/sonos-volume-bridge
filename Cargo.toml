@@ -31,7 +31,7 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
 tokio = { version = "1", features = ["io-util", "macros", "net", "rt", "sync", "time"] }
 url = "2"
 windows = "0.62.2"
-windows-core = "0.62.2"
+windows-core = "0.100.0"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
