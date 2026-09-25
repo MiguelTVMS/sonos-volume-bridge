@@ -1,5 +1,7 @@
 import { getVersion } from '@tauri-apps/api/app';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { bindWindowFocus } from './window-appearance';
 import { connectionLabel } from './connection';
 import { diagnosticsDisclosureState } from './diagnostics';
 import { desktopPlatform } from './platform';
@@ -8,6 +10,30 @@ import './style.css';
 import './platform.css';
 
 document.documentElement.dataset.platform = desktopPlatform(navigator.userAgent);
+
+if (document.documentElement.dataset.platform === 'macos') {
+  const applyFocus = (focused: boolean): void => {
+    document.documentElement.dataset.windowActive = String(focused);
+  };
+  applyFocus(document.hasFocus());
+  if (isTauri()) {
+    const nativeWindow = getCurrentWindow();
+    void bindWindowFocus(
+      {
+        listen: (update) => nativeWindow.onFocusChanged(({ payload }) => update(payload)),
+        current: () => nativeWindow.isFocused(),
+      },
+      applyFocus,
+    ).catch(() => {
+      window.addEventListener('focus', () => applyFocus(true));
+      window.addEventListener('blur', () => applyFocus(false));
+      applyFocus(document.hasFocus());
+    });
+  } else {
+    window.addEventListener('focus', () => applyFocus(true));
+    window.addEventListener('blur', () => applyFocus(false));
+  }
+}
 
 type MappingPoint = { local: number; sonos: number };
 type SettingsPage = 'devices' | 'speaker' | 'volume' | 'general' | 'diagnostics' | 'about';

@@ -376,3 +376,14 @@
   height: 24px;
   padding-left: 8px;
 }
+
+[data-platform='macos'][data-window-active='true'] button.page-button.active {
+  background: var(--accent);
+  color: #fff;
+}
+[data-platform='macos'][data-window-active='false'] button.page-button {
+  color: var(--secondary-text);
+}
+[data-platform='macos'][data-window-active='false'] .toggle input[type='checkbox']:checked {
+  background: color-mix(in srgb, var(--text) 22%, transparent);
+}
