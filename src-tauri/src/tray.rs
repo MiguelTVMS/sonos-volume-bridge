@@ -112,7 +112,8 @@ fn register_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| match event {
-            TrayIconEvent::Click {
+            TrayIconEvent::Enter { .. }
+            | TrayIconEvent::Click {
                 button: MouseButton::Left | MouseButton::Right,
                 button_state: MouseButtonState::Down,
                 ..
@@ -135,7 +136,7 @@ fn register_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     Ok(())
 }
 
-fn refresh_speaker_controls<R: Runtime>(app: &AppHandle<R>) {
+pub(crate) fn refresh_speaker_controls<R: Runtime>(app: &AppHandle<R>) {
     let configuration = app
         .try_state::<AppState>()
         .and_then(|state| state.configuration.lock().ok().map(|value| value.clone()));
@@ -248,8 +249,10 @@ fn toggle_speaker_setting<R: Runtime>(app: &AppHandle<R>, setting: SpeakerSettin
         .try_state::<AppState>()
         .and_then(|state| state.configuration.lock().ok().map(|value| value.clone()));
     if let (Some(enabled), Some(configuration)) = (enabled, configuration) {
+        let app = app.clone();
         tauri::async_runtime::spawn(async move {
             let _ = runtime::set_speaker_setting(configuration, setting, enabled).await;
+            refresh_speaker_controls(&app);
         });
     }
 }

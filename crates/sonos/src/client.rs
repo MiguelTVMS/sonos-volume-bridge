@@ -3,6 +3,7 @@ use crate::{
     discovery::{response_bytes, retrieve_device, validate_local_url},
     event::first_text,
 };
+use serde::Serialize;
 use sonos_volume_bridge_domain::{MuteState, SonosVolume};
 use std::time::Duration;
 use url::Url;
@@ -54,11 +55,52 @@ pub struct SonosClient {
     max_response_bytes: usize,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// A successful read confirms support even when its value is false or zero.
+/// Failures are retryable unless the device explicitly rejects the action.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FeatureAvailability {
+    Supported,
+    Unsupported,
+    #[default]
+    Unavailable,
+}
+
+impl FeatureAvailability {
+    pub fn from_read<T>(result: &Result<T, SonosError>) -> Self {
+        match result {
+            Ok(_) => Self::Supported,
+            Err(SonosError::UnsupportedService | SonosError::SoapFault(401 | 602)) => {
+                Self::Unsupported
+            }
+            // Invalid arguments, authorization errors, and generic failures do
+            // not establish lack of support for a feature.
+            Err(_) => Self::Unavailable,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpeakerCapabilities {
+    pub loudness: FeatureAvailability,
+    pub night_sound: FeatureAvailability,
+    pub speech_enhancement: FeatureAvailability,
+    pub status_light: FeatureAvailability,
+    pub treble: FeatureAvailability,
+    pub bass: FeatureAvailability,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SpeakerSettings {
     pub loudness: Option<bool>,
     pub night_sound: Option<bool>,
     pub speech_enhancement: Option<bool>,
+    pub status_light: Option<bool>,
+    pub treble: Option<i8>,
+    pub bass: Option<i8>,
+    pub capabilities: SpeakerCapabilities,
 }
 
 impl SonosClient {
@@ -67,6 +109,25 @@ impl SonosClient {
     }
     pub async fn retrieve_device(&self, location: Url) -> Result<DiscoveredDevice, SonosError> {
         retrieve_device(&self.http, location, self.max_response_bytes).await
+    }
+    /// Resolve partial event payloads through authoritative reads. Never guess
+    /// a missing mute/volume or write values back while observing a notification.
+    pub async fn notification_state(
+        &self,
+        device: &SonosDevice,
+        notification: &crate::RenderingControlNotification,
+    ) -> Result<Option<crate::GenaEvent>, SonosError> {
+        if let Some(state) = &notification.volume_state {
+            return Ok(Some(state.clone()));
+        }
+        if !notification.volume_changed {
+            return Ok(None);
+        }
+        let (volume, muted) = tokio::try_join!(self.get_volume(device), self.get_mute(device))?;
+        Ok(Some(crate::GenaEvent {
+            sequence: notification.sequence,
+            state: crate::GenaState { volume, muted },
+        }))
     }
     pub async fn get_volume(&self, device: &SonosDevice) -> Result<SonosVolume, SonosError> {
         let response = self
@@ -210,10 +271,16 @@ impl SonosClient {
                 "<InstanceID>0</InstanceID><Channel>Master</Channel>",
             )
             .await?;
-        first_text(&r, &format!("Current{name}"))?
+        let value: i8 = first_text(&r, &format!("Current{name}"))?
             .ok_or(SonosError::MissingSoapValue("tone"))?
             .parse()
-            .map_err(|e: std::num::ParseIntError| SonosError::Protocol(e.to_string()))
+            .map_err(|e: std::num::ParseIntError| SonosError::Protocol(e.to_string()))?;
+        if !(-10..=10).contains(&value) {
+            return Err(SonosError::Protocol(
+                "Tone value outside supported range".to_owned(),
+            ));
+        }
+        Ok(value)
     }
     pub async fn set_tone(
         &self,
@@ -229,17 +296,58 @@ impl SonosClient {
         .await?;
         Ok(())
     }
+    pub async fn get_speech_enhancement(&self, device: &SonosDevice) -> Result<bool, SonosError> {
+        self.get_eq(device, speech_eq_type(device.model_name.as_deref()))
+            .await
+    }
+
+    pub async fn set_speech_enhancement(
+        &self,
+        device: &SonosDevice,
+        enabled: bool,
+    ) -> Result<(), SonosError> {
+        self.set_eq(
+            device,
+            speech_eq_type(device.model_name.as_deref()),
+            enabled,
+        )
+        .await?;
+        if self.get_speech_enhancement(device).await? != enabled {
+            return Err(SonosError::Protocol(
+                "Speaker did not confirm Speech Enhancement change".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
     pub async fn get_speaker_settings(&self, device: &SonosDevice) -> SpeakerSettings {
+        // Probe independently so an unsupported feature cannot suppress others.
+        let (loudness, night_sound, speech, status_light, treble, bass) = tokio::join!(
+            self.get_loudness(device),
+            self.get_eq(device, "NightMode"),
+            self.get_speech_enhancement(device),
+            self.get_status_light(device),
+            self.get_tone(device, "Treble"),
+            self.get_tone(device, "Bass"),
+        );
         SpeakerSettings {
-            loudness: self.get_loudness(device).await.ok(),
-            night_sound: self.get_eq(device, "NightMode").await.ok(),
-            speech_enhancement: self
-                .get_eq(device, "SpeechEnhanceEnabled")
-                .await
-                .ok()
-                .or(self.get_eq(device, "DialogLevel").await.ok()),
+            capabilities: SpeakerCapabilities {
+                loudness: FeatureAvailability::from_read(&loudness),
+                night_sound: FeatureAvailability::from_read(&night_sound),
+                speech_enhancement: FeatureAvailability::from_read(&speech),
+                status_light: FeatureAvailability::from_read(&status_light),
+                treble: FeatureAvailability::from_read(&treble),
+                bass: FeatureAvailability::from_read(&bass),
+            },
+            loudness: loudness.ok(),
+            night_sound: night_sound.ok(),
+            speech_enhancement: speech.ok(),
+            status_light: status_light.ok(),
+            treble: treble.ok(),
+            bass: bass.ok(),
         }
     }
+
     pub async fn get_audio_input_format(
         &self,
         device: &SonosDevice,
@@ -319,12 +427,11 @@ impl SonosClient {
         arguments: &str,
     ) -> Result<Vec<u8>, SonosError> {
         let endpoint = device
-            .rendering_control
-            .control_url
-            .join("/DeviceProperties/Control")
-            .map_err(|error| SonosError::Protocol(error.to_string()))?;
+            .device_properties
+            .as_ref()
+            .ok_or(SonosError::UnsupportedService)?;
         self.soap_at(
-            &endpoint,
+            endpoint,
             "urn:schemas-upnp-org:service:DeviceProperties:1",
             action,
             arguments,
@@ -363,9 +470,20 @@ impl SonosClient {
             .header("SOAPACTION", format!("\"{service}#{action}\""))
             .body(body)
             .send()
-            .await?
-            .error_for_status()?;
-        response_bytes(response, self.max_response_bytes).await
+            .await?;
+        let status_error = response.error_for_status_ref().err();
+        let body = response_bytes(response, self.max_response_bytes).await?;
+        // Faults commonly arrive with HTTP 500; preserve their structured code.
+        if let Some(code) = first_text(&body, "errorCode")? {
+            let code = code
+                .parse()
+                .map_err(|_| SonosError::Protocol("Invalid SOAP fault code".to_owned()))?;
+            return Err(SonosError::SoapFault(code));
+        }
+        if let Some(error) = status_error {
+            return Err(error.into());
+        }
+        Ok(body)
     }
 }
 
@@ -378,5 +496,43 @@ fn parse_boolean(response: &[u8], field: &'static str) -> Result<bool, SonosErro
             value: value.to_owned(),
         }),
         None => Err(SonosError::MissingSoapValue(field)),
+    }
+}
+
+// Ultra soundbars expose a separate on/off switch. Legacy soundbars (including
+// Ray) can return a successful but non-authoritative zero for that EQ type.
+fn speech_eq_type(model_name: Option<&str>) -> &'static str {
+    let model = model_name.unwrap_or_default().to_ascii_lowercase();
+    if model.ends_with("arc ultra") || model.ends_with("beam ultra") {
+        "SpeechEnhanceEnabled"
+    } else {
+        "DialogLevel"
+    }
+}
+
+#[cfg(test)]
+mod speech_tests {
+    use super::*;
+    #[test]
+    fn legacy_and_ultra_models_use_consistent_eq_variants() {
+        for model in [
+            Some("Sonos Ray"),
+            Some("Sonos Beam"),
+            Some("Sonos Arc"),
+            None,
+        ] {
+            assert_eq!(speech_eq_type(model), "DialogLevel");
+        }
+        for model in ["Sonos Arc Ultra", "Sonos Beam Ultra"] {
+            assert_eq!(speech_eq_type(Some(model)), "SpeechEnhanceEnabled");
+        }
+    }
+    #[test]
+    fn speech_read_errors_are_not_confirmed_off() {
+        assert!(parse_boolean(b"<CurrentValue>1</CurrentValue>", "CurrentValue").unwrap());
+        assert!(!parse_boolean(b"<CurrentValue>0</CurrentValue>", "CurrentValue").unwrap());
+        assert!(parse_boolean(b"<CurrentValue>unknown</CurrentValue>", "CurrentValue").is_err());
+        assert!(parse_boolean(b"<CurrentValue>3</CurrentValue>", "CurrentValue").is_err());
+        assert!(parse_boolean(b"<Response/>", "CurrentValue").is_err());
     }
 }

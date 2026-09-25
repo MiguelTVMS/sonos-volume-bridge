@@ -1,9 +1,9 @@
 //! Local GENA subscription and callback listener primitives.
 
 use crate::{
-    GenaEvent, SonosDevice, SonosError,
+    RenderingControlNotification, SonosDevice, SonosError,
     discovery::{response_bytes, validate_local_url},
-    event::parse_last_change,
+    event::parse_rendering_control_notification,
 };
 use rand::RngExt;
 use std::{
@@ -135,7 +135,7 @@ fn parse_timeout(value: &str) -> Option<Duration> {
 pub struct CallbackListener {
     callback_url: Url,
     expected_sid: Arc<Mutex<Option<String>>>,
-    events: mpsc::Receiver<GenaEvent>,
+    events: mpsc::Receiver<RenderingControlNotification>,
 }
 
 impl CallbackListener {
@@ -165,7 +165,9 @@ impl CallbackListener {
                     let subscription_id = expected.lock().ok().and_then(|sid| sid.clone());
                     let accepted = peer.ip() == sonos_peer
                         && parse_notify(&bytes, &path, subscription_id.as_deref())
-                            .and_then(|(body, sequence)| parse_last_change(body, sequence).ok())
+                            .and_then(|(body, sequence)| {
+                                parse_rendering_control_notification(body, sequence).ok()
+                            })
                             .is_some_and(|event| sender.try_send(event).is_ok());
                     let response = if accepted {
                         "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
@@ -190,7 +192,7 @@ impl CallbackListener {
             *sid = Some(subscription.id.clone());
         }
     }
-    pub async fn recv(&mut self) -> Option<GenaEvent> {
+    pub async fn recv(&mut self) -> Option<RenderingControlNotification> {
         self.events.recv().await
     }
 }

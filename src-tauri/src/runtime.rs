@@ -26,7 +26,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use tokio::{
     net::UdpSocket,
     sync::watch,
@@ -157,17 +157,7 @@ pub async fn test_selected_device(configuration: AppConfiguration) -> Result<(),
         .map_err(|_| "The selected Sonos device rejected the volume test.".to_owned())
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SpeakerSettings {
-    pub loudness: Option<bool>,
-    pub status_light: Option<bool>,
-    pub night_sound: Option<bool>,
-    pub speech_enhancement: Option<bool>,
-    pub balance: Option<i8>,
-    pub treble: Option<i8>,
-    pub bass: Option<i8>,
-}
+pub use sonos_volume_bridge_sonos::SpeakerSettings;
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -188,17 +178,7 @@ pub async fn speaker_settings(configuration: AppConfiguration) -> SpeakerSetting
     let Ok(device) = resolve_device(&client, &configuration).await else {
         return SpeakerSettings::default();
     };
-    let settings = client.get_speaker_settings(&device).await;
-    SpeakerSettings {
-        loudness: settings.loudness,
-        status_light: client.get_status_light(&device).await.ok(),
-        night_sound: settings.night_sound,
-        speech_enhancement: settings.speech_enhancement,
-        balance: None,
-
-        treble: client.get_tone(&device, "Treble").await.ok(),
-        bass: client.get_tone(&device, "Bass").await.ok(),
-    }
+    client.get_speaker_settings(&device).await
 }
 
 pub async fn set_speaker_setting(
@@ -218,15 +198,9 @@ pub async fn set_speaker_setting(
         SpeakerSetting::StatusLight => client.set_status_light(&device, enabled).await,
         SpeakerSetting::NightSound => client.set_eq(&device, "NightMode", enabled).await,
         SpeakerSetting::Balance | SpeakerSetting::Treble | SpeakerSetting::Bass => unreachable!(),
-        SpeakerSetting::SpeechEnhancement => match client
-            .set_eq(&device, "SpeechEnhanceEnabled", enabled)
-            .await
-        {
-            Ok(()) => Ok(()),
-            Err(_) => client.set_eq(&device, "DialogLevel", enabled).await,
-        },
+        SpeakerSetting::SpeechEnhancement => client.set_speech_enhancement(&device, enabled).await,
     }
-    .map_err(|_| "The selected speaker does not support that setting.".to_owned())
+    .map_err(|_| "Could not confirm the speaker setting. Refresh and try again.".to_owned())
 }
 
 pub async fn set_speaker_level(
@@ -257,7 +231,9 @@ pub async fn set_speaker_level(
                 value,
             )
             .await
-            .map_err(|_| "The selected speaker does not support that setting.".to_owned()),
+            .map_err(|_| {
+                "Could not confirm the speaker setting. Refresh and try again.".to_owned()
+            }),
         _ => Err("Invalid speaker setting value.".to_owned()),
     }
 }
@@ -508,9 +484,10 @@ async fn run_session(
         .map_or_else(|| Instant::now() + Duration::from_secs(5), renewal_at);
     let mut last_local = Some(local_state);
     let mut deduplicator = EventDeduplicator::default();
+    let mut last_settings_sequence = None;
+    let mut health_at = Instant::now() + Duration::from_secs(5);
 
     loop {
-        let poll_delay = coordinator.next_poll_interval();
         tokio::select! {
             changed = shutdown.changed() => {
                 if changed.is_err() || *shutdown.borrow() {
@@ -518,8 +495,17 @@ async fn run_session(
                     return Err(RuntimeError::Cancelled);
                 }
             }
-            event = listener.recv() => {
-                if let Some(event) = event.filter(|event| deduplicator.accept(event.clone())) {
+            notification = listener.recv() => {
+                let Some(notification) = notification else { return Err(RuntimeError::SonosUnavailable); };
+                let current_generation = snapshot.lock().is_ok_and(|state| state.runtime_generation == generation);
+                if current_generation && notification.settings_changed
+                    && (notification.sequence.is_none() || notification.sequence != last_settings_sequence) {
+                    last_settings_sequence = notification.sequence;
+                    let _ = app.emit("speaker-settings-changed", ());
+                    tray::refresh_speaker_controls(app);
+                }
+                let volume_state = client.notification_state(&device, &notification).await.map_err(|_| RuntimeError::SonosUnavailable)?;
+                if let Some(event) = volume_state.filter(|event| deduplicator.accept(event.clone())) {
                     coordinator.on_sonos_event(event.state.volume, event.state.muted).await.map_err(RuntimeError::from)?;
                     let local_state = audio.current_state().await.map_err(RuntimeError::Local)?;
                     update_snapshot(snapshot, app, generation, UiStatus::Synchronized, Some(SnapshotValues { name: &speaker_name, sonos_volume: Some(event.state.volume.get()), local_volume: Some(local_state.volume.get()), muted: Some(event.state.muted.0) }));
@@ -554,9 +540,18 @@ async fn run_session(
                     if let Some(next) = subscription.as_ref() { listener.set_subscription(next); renew_at = renewal_at(next); } else { renew_at = Instant::now() + Duration::from_secs(5); }
                 }
             }
-            () = sleep(poll_delay), if subscription.is_none() && configuration.fallback_polling => {
-                coordinator.poll_once().await.map_err(RuntimeError::from)?;
-                update_snapshot(snapshot, app, generation, UiStatus::PollingFallback, None);
+            () = sleep_until(health_at), if configuration.fallback_polling => {
+                // A fixed deadline cannot be starved by unrelated audio/events.
+                let volume = client.get_volume(&device).await.map_err(|_| RuntimeError::SonosUnavailable)?;
+                let muted = client.get_mute(&device).await.map_err(|_| RuntimeError::SonosUnavailable)?;
+                coordinator.on_sonos_event(volume, muted).await.map_err(RuntimeError::from)?;
+                let local = audio.current_state().await.map_err(RuntimeError::Local)?;
+                update_snapshot(snapshot, app, generation,
+                    if subscription.is_some() { UiStatus::Synchronized } else { UiStatus::PollingFallback },
+                    Some(SnapshotValues { name: &speaker_name, sonos_volume: Some(volume.get()), local_volume: Some(local.volume.get()), muted: Some(muted.0) }));
+                let _ = app.emit("speaker-settings-changed", ());
+                tray::refresh_speaker_controls(app);
+                health_at = Instant::now() + if subscription.is_some() { Duration::from_secs(5) } else { Duration::from_secs(1) };
             }
         }
     }
@@ -762,7 +757,7 @@ fn update_snapshot(
     status: UiStatus,
     values: Option<SnapshotValues<'_>>,
 ) {
-    if let Ok(mut current) = snapshot.lock() {
+    let updated = if let Ok(mut current) = snapshot.lock() {
         // A stopped generation may not overwrite a newer runtime's state.
         if current.runtime_generation != generation {
             return;
@@ -780,8 +775,13 @@ fn update_snapshot(
                 current.muted = values.muted;
             }
         }
+        Some(current.clone())
+    } else {
+        None
+    };
+    if let Some(updated) = updated {
+        let _ = app.emit("runtime-status-changed", updated);
     }
-    let _ = generation;
     tray::refresh(app);
 }
 
@@ -907,6 +907,7 @@ mod tests {
                 event_url: Url::parse("http://192.168.1.10:1400/event").unwrap(),
             },
             av_transport: None,
+            device_properties: None,
         };
         assert!(is_sonos_speaker(&sonos_device));
     }
@@ -923,6 +924,7 @@ mod tests {
                 event_url: Url::parse("http://192.168.1.11:1400/event").unwrap(),
             },
             av_transport: None,
+            device_properties: None,
         };
         assert!(!is_sonos_speaker(&media_renderer_device));
     }

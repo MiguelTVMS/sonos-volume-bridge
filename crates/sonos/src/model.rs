@@ -38,6 +38,7 @@ pub struct SonosDevice {
     pub model_number: Option<String>,
     pub rendering_control: RenderingControlService,
     pub av_transport: Option<AvTransportService>,
+    pub device_properties: Option<Url>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -89,3 +89,31 @@ do not create write loops.
 Settings can be saved on first launch with Start at login disabled. The login
 service is contacted only when that option changes, so login-service errors do
 not block unrelated settings updates.
+
+Speaker sound controls update from local Sonos RenderingControl push notifications.
+Settings-only events no longer require accompanying volume/mute fields. The app
+reads the speaker after a notification and updates Settings and the tray. Focus
+and page changes also refresh device data. Devices/settings without event support
+remain dependent on these refreshes; subscription failures use a polling fallback.
+
+Speaker controls show “Not supported by this speaker” only for an absent required
+service or an explicit unsupported-action response. Failed or ambiguous reads show
+“Temporarily unavailable” and are retried on refresh; they are not treated as off.
+An off switch or zero tone value can still be fully supported. Detection performs
+no setting writes.
+
+Runtime volume/mute/status changes are pushed to Settings immediately; the one-second
+cached snapshot poll remains a UI-delivery backup. Volume-only and mute-only GENA
+notifications trigger authoritative reads rather than being rejected. With fallback
+polling enabled, fixed-deadline speaker health reads run every five seconds when
+subscribed and every second when unsubscribed, updating both synchronization and
+visible diagnostics. Optional settings also receive periodic backup refreshes,
+including controls that do not publish RenderingControl events.
+
+Slider gestures preview locally and commit on release (keyboard: key release).
+Active gestures block background form replacement and control refresh. Settings
+writes from explicit user actions are serialized; device reads only update display
+properties, never dispatch input/change events or enqueue writes. Existing audio
+origin/expected-write suppression remains in the synchronization adapters. Sonos
+notifications do not identify the originating controller, so an echoed value is
+not treated as proof of authorship and genuine external changes remain observable.

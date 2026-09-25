@@ -16,6 +16,7 @@ or diagnostic payloads.
 | --- | --- |
 | Platform settings presentation | On each OS, check all six settings sections at default and minimum window heights, light/dark appearance, increased contrast, keyboard navigation, disabled controls, and long device names. Confirm the matching platform theme and no clipped controls. |
 | Fresh-install settings save | With no saved configuration and Start at login off, choose a speaker and output and change a volume option. Confirm saving and reconnecting work, then relaunch and verify persistence without toggling Start at login. |
+| Speaker control freshness | Change Speech Enhancement in another controller, then focus Settings or switch sections and verify the new state. Enable and disable from this app and verify authoritative state after refresh. Open the tray after hovering its icon and check matching controls. |
 | Discovery and selection | Discovery lists the selected speaker by friendly name and stable UDN. Saving selection connects without exposing an address to the frontend. |
 | Cached-address reconnect | Restart the app with network unchanged. The selected UDN is resolved through its cached local description URL before SSDP is used. |
 | Sonos-originated volume change | A physical Sonos volume change updates local output after Sonos confirmation. |
@@ -55,3 +56,35 @@ or diagnostic payloads.
 All required rows must pass on Windows and macOS. Document an exception in the
 release issue with its device class, user impact, mitigation, and a follow-up
 issue before declaring a release candidate ready.
+
+### Speaker capability and push regression checks
+
+- Automated: programmable local HTTP speaker fixtures exercise successful off/zero
+  reads, explicit unsupported faults, timeout and malformed-reply recovery,
+  independent feature failures, model-specific Speech Enhancement, advertised
+  service URLs, and switching between speakers without sharing capabilities.
+- Automated: real NOTIFY callbacks followed by SOAP reads confirm an external
+  Speech Enhancement change and preserve capabilities omitted from the event.
+  Frontend mock views test the same updater used on render and push refresh.
+- Regression mutation: treating temporary read failures as unsupported makes the
+  recovery test fail; restoring the availability classifier makes it pass.
+- Manual (pending): leave Speaker settings open, toggle Speech Enhancement in an
+  external controller, and confirm the displayed value updates without navigation;
+  repeat off/on and check the tray. Disconnect/reconnect the speaker and verify
+  controls recover. Repeat on legacy and Ultra soundbars when available. Mocks do
+  not verify real firmware behavior, native menu timing, or network reachability.
+
+### Slider and live telemetry regressions
+
+- Automated shared production gesture binding with mocked input events: pointer
+  drag/pause/release, keyboard repeat/release, cancellation, accessibility changes,
+  and exactly one final commit. Readback of both echoes and external changes must
+  produce zero additional writes. Rapid writes serialize and recover after failure.
+- Automated telemetry delivery: a push updates immediately and supersedes an older
+  pending snapshot read. Partial volume/mute notifications request fresh reads.
+- Mutation checks: committing on change while held, or accepting stale snapshot
+  reads, each makes its corresponding regression test fail.
+- Manual: drag and hold Bass/Treble/maximum volume through a backup refresh, then
+  release; confirm no jump during drag and only the final value applies. Change
+  volume externally with Diagnostics open and check prompt updates. Native drag
+  timing and physical notification latency are not simulated by the mock suite.
