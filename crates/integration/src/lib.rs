@@ -454,3 +454,5 @@ mod tests {
         assert_eq!(state.lock().unwrap().0, volume(42));
     }
 }
+
+pub mod camera;
