@@ -10,6 +10,10 @@ concurrency:
   group: verify-macos-app-store-signing
   cancel-in-progress: false
 
+# Ensure Cargo uses the installed CI toolchain instead of the local development pin.
+env:
+  RUSTUP_TOOLCHAIN: stable
+
 jobs:
   verify:
     name: Sign and verify Mac App Store package
@@ -19,17 +23,19 @@ jobs:
       APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_APP_STORE_SIGNING_IDENTITY }}
       APPLE_MAC_INSTALLER_IDENTITY: ${{ vars.APPLE_MAC_INSTALLER_IDENTITY }}
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: dtolnay/rust-toolchain@1.98.1
-      - uses: Swatinem/rust-cache@v2.9.2
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11
-      - uses: actions/setup-node@v7.0.0
+          version: 12
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
@@ -136,7 +142,7 @@ jobs:
           xcrun productsign --sign "$APPLE_MAC_INSTALLER_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" "$unsigned_package_path" sonos-volume-bridge-macos-app-store.pkg
           rm -f "$unsigned_package_path"
           pkgutil --check-signature sonos-volume-bridge-macos-app-store.pkg 2>&1 | grep -F '3rd Party Mac Developer Installer:'
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-app-store-signing-verification
           path: sonos-volume-bridge-macos-app-store.pkg

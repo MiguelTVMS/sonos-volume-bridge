@@ -1,6 +1,6 @@
 # Development
 
-Install Rust 1.98.1 (including `clippy` and `rustfmt`), Node.js 22, and pnpm 11. Run the complete local verification suite with:
+Install Rust 1.98.1 (including `clippy` and `rustfmt`), Node.js 26, and pnpm 12. Run the complete local verification suite with:
 
 ```sh
 pnpm run ci:all
@@ -26,6 +26,12 @@ pnpm run ci:all
 ```
 
 ## Pre-commit validation
+
+Run the settings tests with `pnpm --dir ui test`. For rendered UI coverage, run
+`pnpm --dir ui exec playwright install chromium` once, then
+`pnpm --dir ui run test:ui`. The browser suite starts a separate preview server
+and exercises the production settings renderer with mocked device commands.
+Both suites run in the UI tests pull-request workflow, followed by a frontend build.
 
 Enable local hooks once per clone:
 
@@ -141,9 +147,18 @@ and frontend formatting, lint, tests, and build without requiring signing secret
 
 ## Stable dependency baseline
 
-The workspace and CI use Rust 1.98.1. Update `rust-toolchain.toml`, the workspace
-`rust-version`, and workflow toolchain pins together, then run all validation.
+Local development uses the Rust version in `rust-toolchain.toml`. CI installs the
+latest stable Rust through `dtolnay/rust-toolchain@v1` and sets
+`RUSTUP_TOOLCHAIN=stable` so the local pin does not override that selection.
 Lockfile and workflow changes also trigger Rust checks.
+
+CI actions use their latest stable major tags. Node.js and pnpm are selected by
+major version (26 and 12), allowing stable minor and patch updates. The browser
+test job has a ten-minute timeout to bound failures during setup or teardown.
+Playwright launches Vite directly through Node. A nested `pnpm run dev` leaves
+Vite in a separate process group with pnpm 11.27.1 and 12.6.0 on Linux, causing
+shutdown to hang after every browser test passes. The browser suite must both
+pass its assertions and exit successfully to validate server cleanup.
 
 The frontend uses TypeScript 7 for builds. Its `typescript` dependency aliases
 `@typescript/typescript6` to supply the compiler API required by typescript-eslint;
@@ -192,5 +207,6 @@ Use `?platform=macos`, `?platform=windows`, or `?platform=linux` to review each
 presentation. Add `&appearance=dark` or `&appearance=light` to force a color scheme.
 The preview uses sample data and mocks all Tauri commands; it does
 not control speakers or write app configuration. It is not included in the
-production frontend build. Test at a 740-pixel width on macOS (600 on other platforms) and both default
+production frontend build. Test at a 740-pixel width on macOS, 960 on Windows
+(also its 760-pixel minimum), and 600 on Linux, and both default
 and minimum window heights, including dark mode, keyboard focus, and increased contrast.

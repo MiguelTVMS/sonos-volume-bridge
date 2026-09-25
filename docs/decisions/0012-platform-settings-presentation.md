@@ -11,6 +11,18 @@ selection, and compact controls inspired by System Settings. Windows uses Segoe,
 outlined cards, and a selection indicator. Linux uses the system font and an
 Ubuntu accent. Unknown hosts retain the base presentation.
 
+The Windows presentation follows Windows 11 Settings: a soft background, colored
+sidebar icons, a short blue selection marker, larger page headings, individual
+outlined setting cards, trailing controls, and 40-by-20 switches. Windows-only
+cards include decorative outline icons and secondary descriptions. Caption text
+is escaped, and the shared controls retain their labels and keyboard operation.
+Windows-only rules live in `ui/src/windows.css`; the form and command handlers remain shared.
+The native Windows window starts at 960 by 760 logical pixels and can resize down
+to 760 by 460. Below 800 pixels, selectors and sliders move below their labels.
+Native title-bar controls remain in place. Light, dark, increased-contrast,
+forced-colors, and reduced-motion preferences are handled in the presentation.
+The background approximates the reference material with CSS; it is not native Mica.
+
 Platform styling stays in the frontend; domain and synchronization behavior is
 unchanged. Color-scheme, increased-contrast, reduced-motion, and keyboard-focus
 preferences apply across themes. Icons are decorative; buttons retain text labels.

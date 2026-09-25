@@ -138,6 +138,10 @@ The settings form shares behavior across platforms while selecting separate
 macOS, Windows, and Linux presentation styles in the frontend. See
 [ADR 0012](decisions/0012-platform-settings-presentation.md).
 
+Windows uses a dedicated, scoped stylesheet and platform window configuration
+for its resizable Windows 11 Settings presentation. OS-specific presentation
+does not change the shared settings controls or synchronization lifecycle.
+
 The shell preloads optional tray speaker controls asynchronously at startup and
 refreshes them when connection state changes or the tray is clicked. Network
 reads never block the menu event handler; menu updates run on the main thread.

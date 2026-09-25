@@ -33,6 +33,10 @@ concurrency:
   group: final-release-develop
   cancel-in-progress: false
 
+# Ensure Cargo uses the installed CI toolchain instead of the local development pin.
+env:
+  RUSTUP_TOOLCHAIN: stable
+
 jobs:
   prepare-version:
     name: Validate and version develop
@@ -50,14 +54,14 @@ jobs:
             echo "Release workflow must be dispatched from develop; received $GITHUB_REF." >&2
             exit 1
           fi
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: develop
           fetch-depth: 0
           persist-credentials: true
 
       - name: Cache Linux desktop package archives
-        uses: actions/cache@v6.1.0
+        uses: actions/cache@v6
         with:
           path: /var/cache/apt/archives
           key: ${{ runner.os }}-apt-linux-desktop-v1
@@ -65,18 +69,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
-      - uses: dtolnay/rust-toolchain@1.98.1
+      - uses: dtolnay/rust-toolchain@v1
         with:
+          toolchain: stable
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2.9.2
+      - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11
-      - uses: actions/setup-node@v7.0.0
+          version: 12
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
@@ -145,23 +150,25 @@ jobs:
     needs: prepare-version
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: develop
       - name: Verify the checked-out release commit
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
         run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-      - uses: dtolnay/rust-toolchain@1.98.1
-      - uses: Swatinem/rust-cache@v2.9.2
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11
-      - uses: actions/setup-node@v7.0.0
+          version: 12
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
@@ -181,7 +188,7 @@ jobs:
           tar -czf \
             "sonos-volume-bridge-${RELEASE_TAG}-macos-unsigned.tar.gz" \
             target/release/sonos-volume-bridge ui/dist
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-unsigned-${{ needs.prepare-version.outputs.tag }}
           path: sonos-volume-bridge-*-macos-unsigned.tar.gz
@@ -193,7 +200,7 @@ jobs:
     needs: prepare-version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: develop
       - name: Verify the checked-out release commit
@@ -201,7 +208,7 @@ jobs:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
         run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - name: Cache Linux desktop package archives
-        uses: actions/cache@v6.1.0
+        uses: actions/cache@v6
         with:
           path: /var/cache/apt/archives
           key: ${{ runner.os }}-apt-linux-desktop-v1
@@ -209,16 +216,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
-      - uses: dtolnay/rust-toolchain@1.98.1
-      - uses: Swatinem/rust-cache@v2.9.2
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11
-      - uses: actions/setup-node@v7.0.0
+          version: 12
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
@@ -237,7 +246,7 @@ jobs:
           installer="$(find target/release/bundle/deb -maxdepth 1 -type f -name '*.deb' -print -quit)"
           test -n "$installer"
           cp "$installer" "sonos-volume-bridge-${RELEASE_TAG}-linux-amd64.deb"
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-release
           path: sonos-volume-bridge-*-linux-amd64.deb
@@ -253,19 +262,21 @@ jobs:
       APPLE_API_ISSUER: ${{ vars.APPLE_API_ISSUER }}
       APPLE_API_KEY: ${{ vars.APPLE_API_KEY }}
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: develop
       - name: Verify the checked-out release commit
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
         run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-      - uses: dtolnay/rust-toolchain@1.98.1
-      - uses: Swatinem/rust-cache@v2.9.2
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
       - run: cargo install tauri-cli --version '^2' --locked
-      - uses: actions/download-artifact@v8.0.1
+      - uses: actions/download-artifact@v8
         with:
           name: macos-unsigned-${{ needs.prepare-version.outputs.tag }}
           path: macos-unsigned
@@ -346,7 +357,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             'target/release/bundle/macos/Sonos Volume Bridge.app' \
             "sonos-volume-bridge-${RELEASE_TAG}-macos.zip"
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-release
           path: sonos-volume-bridge-*-macos.zip
@@ -370,19 +381,21 @@ jobs:
       APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_APP_STORE_SIGNING_IDENTITY }}
       APPLE_MAC_INSTALLER_IDENTITY: ${{ vars.APPLE_MAC_INSTALLER_IDENTITY }}
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: develop
       - name: Verify the checked-out release commit
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
         run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-      - uses: dtolnay/rust-toolchain@1.98.1
-      - uses: Swatinem/rust-cache@v2.9.2
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
       - run: cargo install tauri-cli --version '^2' --locked
-      - uses: actions/download-artifact@v8.0.1
+      - uses: actions/download-artifact@v8
         with:
           name: macos-unsigned-${{ needs.prepare-version.outputs.tag }}
           path: macos-unsigned
@@ -497,7 +510,7 @@ jobs:
           xcrun productsign --sign "$APPLE_MAC_INSTALLER_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" "$unsigned_package_path" "$package_path"
           rm -f "$unsigned_package_path"
           pkgutil --check-signature "$package_path" 2>&1 | grep -F '3rd Party Mac Developer Installer:'
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-app-store-${{ needs.prepare-version.outputs.tag }}
           path: sonos-volume-bridge-*-macos-app-store.pkg
@@ -515,7 +528,7 @@ jobs:
     needs: prepare-version
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: develop
       - name: Verify the checked-out release commit
@@ -526,16 +539,18 @@ jobs:
           if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
             throw 'The checked-out revision does not match the release commit.'
           }
-      - uses: dtolnay/rust-toolchain@1.98.1
-      - uses: Swatinem/rust-cache@v2.9.2
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11
-      - uses: actions/setup-node@v7.0.0
+          version: 12
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
@@ -550,7 +565,7 @@ jobs:
           if (-not (Test-Path -LiteralPath 'ui/dist' -PathType Container)) {
             throw 'The frontend distribution was not generated.'
           }
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-build-${{ needs.prepare-version.outputs.tag }}
           path: |
@@ -564,7 +579,7 @@ jobs:
     needs: [prepare-version, windows-app]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: develop
       - name: Verify the checked-out release commit
@@ -575,12 +590,14 @@ jobs:
           if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
             throw 'The checked-out revision does not match the release commit.'
           }
-      - uses: dtolnay/rust-toolchain@1.98.1
-      - uses: Swatinem/rust-cache@v2.9.2
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
         with:
           shared-key: workspace
       - run: cargo install tauri-cli --version '^2' --locked
-      - uses: actions/download-artifact@v8.0.1
+      - uses: actions/download-artifact@v8
         with:
           name: windows-build-${{ needs.prepare-version.outputs.tag }}
           path: .
@@ -594,7 +611,7 @@ jobs:
           $installer = Get-ChildItem target/release/bundle -Recurse -Filter '*.exe' | Select-Object -First 1
           if ($null -eq $installer) { throw 'No NSIS installer was generated.' }
           Copy-Item $installer.FullName "sonos-volume-bridge-$env:RELEASE_TAG-windows-unsigned.exe"
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-release
           path: sonos-volume-bridge-*-windows-unsigned.exe
@@ -605,7 +622,7 @@ jobs:
     needs: [prepare-version, windows-app]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: develop
       - name: Verify the checked-out release commit
@@ -616,15 +633,17 @@ jobs:
           if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
             throw 'The checked-out revision does not match the release commit.'
           }
-      - uses: dtolnay/rust-toolchain@1.98.1
-      - uses: actions/download-artifact@v8.0.1
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/download-artifact@v8
         with:
           name: windows-build-${{ needs.prepare-version.outputs.tag }}
           path: .
       - name: Build and validate the MSIX from the compiled executable
         shell: pwsh
         run: ./scripts/build-msix.ps1
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7
         with:
           name: microsoft-store-msix-${{ needs.prepare-version.outputs.tag }}
           path: target/release/bundle/msix/*.msix
@@ -637,12 +656,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: develop
           fetch-depth: 0
           persist-credentials: true
-      - uses: actions/download-artifact@v8.0.1
+      - uses: actions/download-artifact@v8
         with:
           pattern: "*-release"
           path: release-assets
@@ -712,7 +731,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare-version.outputs.commit }}
           fetch-depth: 0
@@ -739,12 +758,12 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:MICROSOFT_STORE_PRODUCT_ID)) {
             throw 'MICROSOFT_STORE_PRODUCT_ID is not configured in the microsoft-store environment.'
           }
-      - uses: actions/download-artifact@v8.0.1
+      - uses: actions/download-artifact@v8
         with:
           name: microsoft-store-msix-${{ needs.prepare-version.outputs.tag }}
           path: microsoft-store-msix
       - name: Configure Microsoft Store Developer CLI
-        uses: microsoft/microsoft-store-apppublisher@v1.4
+        uses: microsoft/microsoft-store-apppublisher@v1
       - name: Authenticate with Partner Center
         shell: pwsh
         env:
