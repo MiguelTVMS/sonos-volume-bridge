@@ -19,3 +19,9 @@ attributes where supported.
 - unsupported settings are reported clearly with generic user-facing errors,
 - controls are optional from a synchronization perspective, so no policy coupling
   exists with the main volume state machine.
+
+Tray controls are loaded at startup, before any menu interaction, and refreshed
+on connection transitions and tray clicks. Reads run asynchronously so a slow
+speaker does not block the UI. The menu shows supported controls after the read
+completes; results from superseded requests or a different selected speaker are
+discarded before updating the native menu on the main thread.
