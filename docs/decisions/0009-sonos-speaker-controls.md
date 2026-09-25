@@ -83,3 +83,14 @@ variants, speaker changes, and partial GENA notifications followed by fresh read
 Frontend tests exercise the shared first-render/push control updater with mock
 views, including unavailable-to-supported recovery and preserving an edited tone
 control. Native event delivery still requires the manual matrix checks.
+
+## Gesture ownership and event delivery
+
+Separate user commits from device observations. Hold slider drafts through pointer
+or keyboard gestures and serialize released speaker writes. Block refresh/render
+while editing or writing, and invalidate older reads on each gesture. Programmatic
+readback changes properties only: it must never feed the user-write queue. This
+prevents loops without guessing which controller produced an anonymous GENA event.
+Runtime telemetry is pushed immediately; stale fallback reads cannot overwrite a
+newer pushed snapshot. Fixed deadlines provide backup reads even when other events
+keep arriving. Optional settings without events remain refreshed periodically.

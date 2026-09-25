@@ -282,3 +282,17 @@ async fn callback_accepts_eq_only_push_without_volume_or_mute() {
         .unwrap();
     assert_eq!(rejected.status(), reqwest::StatusCode::PRECONDITION_FAILED);
 }
+
+#[test]
+fn partial_volume_notifications_request_authoritative_read_without_inventing_mute() {
+    use sonos_volume_bridge_sonos::parse_rendering_control_notification;
+    for tag in ["Volume", "Mute"] {
+        let xml = format!(
+            "<LastChange>&lt;Event&gt;&lt;{tag} channel=\"Master\" val=\"1\"/&gt;&lt;/Event&gt;</LastChange>"
+        );
+        let event = parse_rendering_control_notification(xml.as_bytes(), Some(2)).unwrap();
+        assert!(event.volume_changed);
+        assert!(event.volume_state.is_none());
+        assert!(!event.settings_changed);
+    }
+}

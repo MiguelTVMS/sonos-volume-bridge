@@ -151,3 +151,19 @@ model-specific EQ selection and advertised services. The shell forwards this
 alongside current values. Unsupported and temporarily unavailable remain distinct;
 event omissions never remove capabilities. No networking enters the domain or
 synchronization crates.
+
+Runtime volume/mute/status changes are pushed to Settings immediately; the one-second
+cached snapshot poll remains a UI-delivery backup. Volume-only and mute-only GENA
+notifications trigger authoritative reads rather than being rejected. With fallback
+polling enabled, fixed-deadline speaker health reads run every five seconds when
+subscribed and every second when unsubscribed, updating both synchronization and
+visible diagnostics. Optional settings also receive periodic backup refreshes,
+including controls that do not publish RenderingControl events.
+
+Slider gestures preview locally and commit on release (keyboard: key release).
+Active gestures block background form replacement and control refresh. Settings
+writes from explicit user actions are serialized; device reads only update display
+properties, never dispatch input/change events or enqueue writes. Existing audio
+origin/expected-write suppression remains in the synchronization adapters. Sonos
+notifications do not identify the originating controller, so an echoed value is
+not treated as proof of authorship and genuine external changes remain observable.

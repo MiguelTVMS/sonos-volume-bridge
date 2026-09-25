@@ -73,3 +73,18 @@ issue before declaring a release candidate ready.
   repeat off/on and check the tray. Disconnect/reconnect the speaker and verify
   controls recover. Repeat on legacy and Ultra soundbars when available. Mocks do
   not verify real firmware behavior, native menu timing, or network reachability.
+
+### Slider and live telemetry regressions
+
+- Automated shared production gesture binding with mocked input events: pointer
+  drag/pause/release, keyboard repeat/release, cancellation, accessibility changes,
+  and exactly one final commit. Readback of both echoes and external changes must
+  produce zero additional writes. Rapid writes serialize and recover after failure.
+- Automated telemetry delivery: a push updates immediately and supersedes an older
+  pending snapshot read. Partial volume/mute notifications request fresh reads.
+- Mutation checks: committing on change while held, or accepting stale snapshot
+  reads, each makes its corresponding regression test fail.
+- Manual: drag and hold Bass/Treble/maximum volume through a backup refresh, then
+  release; confirm no jump during drag and only the final value applies. Change
+  volume externally with Diagnostics open and check prompt updates. Native drag
+  timing and physical notification latency are not simulated by the mock suite.

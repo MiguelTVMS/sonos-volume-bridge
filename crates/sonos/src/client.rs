@@ -110,6 +110,25 @@ impl SonosClient {
     pub async fn retrieve_device(&self, location: Url) -> Result<DiscoveredDevice, SonosError> {
         retrieve_device(&self.http, location, self.max_response_bytes).await
     }
+    /// Resolve partial event payloads through authoritative reads. Never guess
+    /// a missing mute/volume or write values back while observing a notification.
+    pub async fn notification_state(
+        &self,
+        device: &SonosDevice,
+        notification: &crate::RenderingControlNotification,
+    ) -> Result<Option<crate::GenaEvent>, SonosError> {
+        if let Some(state) = &notification.volume_state {
+            return Ok(Some(state.clone()));
+        }
+        if !notification.volume_changed {
+            return Ok(None);
+        }
+        let (volume, muted) = tokio::try_join!(self.get_volume(device), self.get_mute(device))?;
+        Ok(Some(crate::GenaEvent {
+            sequence: notification.sequence,
+            state: crate::GenaState { volume, muted },
+        }))
+    }
     pub async fn get_volume(&self, device: &SonosDevice) -> Result<SonosVolume, SonosError> {
         let response = self
             .soap(

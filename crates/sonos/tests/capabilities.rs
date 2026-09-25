@@ -226,3 +226,28 @@ async fn invalid_or_denied_responses_are_neither_unsupported_nor_off() {
     assert_eq!(settings.capabilities.bass, Availability::Unavailable);
     assert_eq!(settings.bass, None);
 }
+
+#[tokio::test]
+async fn partial_volume_event_reads_missing_mute_without_a_feedback_write() {
+    use sonos_volume_bridge_sonos::parse_rendering_control_notification;
+    let server = MockSoapServer::start().await.unwrap();
+    server
+        .reply("GetVolume", SoapReply::value("CurrentVolume", "37"))
+        .await;
+    server
+        .reply("GetMute", SoapReply::value("CurrentMute", "1"))
+        .await;
+    let client = SonosClient::builder().build().unwrap();
+    let device = device(&server, "Sonos Ray", false);
+    let notification = parse_rendering_control_notification(b"<LastChange>&lt;Event&gt;&lt;Volume channel=\"Master\" val=\"37\"/&gt;&lt;/Event&gt;</LastChange>", Some(3)).unwrap();
+    let observed = client
+        .notification_state(&device, &notification)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(observed.state.volume.get(), 37);
+    assert!(observed.state.muted.0);
+    let requests = server.requests().await;
+    assert_eq!(requests.len(), 2);
+    assert!(requests.iter().all(|r| !r.contains("#Set")));
+}

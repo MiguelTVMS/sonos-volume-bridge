@@ -10,6 +10,9 @@ import { sizeSelectedControls } from './select-sizing';
 import { canApplyRefresh } from './refresh-state';
 import { adjacentPage, type SettingsPage } from './settings-navigation';
 import { applySpeakerControls, type SpeakerSettings } from './speaker-controls';
+import { SliderInteraction } from './slider-interaction';
+import { LiveStatus } from './live-status';
+import { UserWrites } from './user-writes';
 import './style.css';
 import './platform.css';
 
@@ -114,6 +117,9 @@ let lastFallbackRefresh = 0;
 let refreshRequest = 0;
 let editRevision = 0;
 let pendingWrites = 0;
+const sliders = new SliderInteraction();
+const userWrites = new UserWrites();
+const liveStatus = new LiveStatus<Snapshot>(refreshRuntimeStatus);
 let refreshRunning = false;
 let refreshAgain = false;
 let appVersion = 'Loading…';
@@ -255,6 +261,7 @@ function panel(page: SettingsPage, content: string): string {
 }
 
 function render(nextSnapshot: Snapshot): void {
+  if (sliders.active) return;
   snapshot = nextSnapshot;
   const c = nextSnapshot.configuration;
   const speakerName = nextSnapshot.sonosName ?? 'No speaker selected';
@@ -344,7 +351,9 @@ function render(nextSnapshot: Snapshot): void {
   const scheduleConfigurationSave = (event: Event): void => {
     if (
       !(event.target instanceof HTMLElement) ||
-      (!event.target.dataset.speakerSetting && !event.target.dataset.speakerLevel)
+      (!event.target.dataset.speakerSetting &&
+        !event.target.dataset.speakerLevel &&
+        !(event.target instanceof HTMLInputElement && event.target.type === 'range'))
     )
       scheduleSave();
   };
@@ -353,13 +362,22 @@ function render(nextSnapshot: Snapshot): void {
   document.querySelectorAll<HTMLInputElement>('[data-speaker-setting]').forEach((input) => {
     input.addEventListener('change', () => void updateSpeakerSetting(input));
   });
-  document.querySelectorAll<HTMLInputElement>('[data-speaker-level]').forEach((input) => {
-    input.addEventListener('input', () => {
-      editRevision++;
-      const label = input.closest('label')?.querySelector<HTMLOutputElement>('output');
-      if (label) label.value = input.value;
-    });
-    input.addEventListener('change', () => void updateSpeakerLevel(input));
+  document.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach((input) => {
+    sliders.bind(
+      input,
+      () => {
+        editRevision++;
+        saveRevision++;
+      },
+      () => {
+        const label = input.closest('label')?.querySelector<HTMLOutputElement>('output');
+        if (label) label.value = input.id === 'maximum-volume' ? `${input.value}%` : input.value;
+      },
+      () => {
+        if (input.dataset.speakerLevel) void updateSpeakerLevel(input);
+        else scheduleSave();
+      },
+    );
   });
 
   document.querySelectorAll<HTMLButtonElement>('[data-page]').forEach((button) => {
@@ -426,13 +444,12 @@ function refreshRuntimeStatus(nextSnapshot: Snapshot): void {
 function startStatusPolling(): void {
   if (statusPoll !== undefined) return;
   statusPoll = window.setInterval(() => {
-    void invoke<Snapshot>('get_snapshot')
-      .then((next) => {
-        refreshRuntimeStatus(next);
-        if (
-          ['subscriptionDegraded', 'pollingFallback'].includes(next.status) &&
-          Date.now() - lastFallbackRefresh > 5000
-        ) {
+    void liveStatus
+      .read(() => invoke<Snapshot>('get_snapshot'))
+      .then(() => {
+        const next = snapshot;
+        if (!next) return;
+        if (document.visibilityState === 'visible' && Date.now() - lastFallbackRefresh > 5000) {
           lastFallbackRefresh = Date.now();
           schedulePushRefresh();
         }
@@ -486,7 +503,7 @@ async function discoverSonos(): Promise<void> {
 }
 
 async function refreshSpeakerSettings(): Promise<void> {
-  if (!snapshot || pendingWrites > 0 || saveTimeout !== undefined) return;
+  if (!snapshot || sliders.active || pendingWrites > 0 || saveTimeout !== undefined) return;
   const request = ++speakerReadRequest;
   const revision = editRevision;
   const speaker = await invoke<SpeakerSettings>('get_speaker_settings').catch(() => ({
@@ -503,7 +520,7 @@ async function refreshSpeakerSettings(): Promise<void> {
       speakerReadRequest,
       revision,
       editRevision,
-      pendingWrites > 0 || saveTimeout !== undefined,
+      sliders.active || pendingWrites > 0 || saveTimeout !== undefined,
     )
   )
     return;
@@ -533,13 +550,11 @@ async function updateSpeakerSetting(input: HTMLInputElement): Promise<void> {
   editRevision++;
   pendingWrites++;
   try {
-    await invoke('set_speaker_setting', {
-      setting: input.dataset.speakerSetting,
-      enabled: input.checked,
-    });
+    const setting = input.dataset.speakerSetting;
+    const enabled = input.checked;
+    await userWrites.run(() => invoke('set_speaker_setting', { setting, enabled }));
     notice('Saved.');
   } catch (error) {
-    input.checked = !input.checked;
     notice(String(error));
   } finally {
     pendingWrites--;
@@ -553,7 +568,7 @@ async function updateSpeakerLevel(input: HTMLInputElement): Promise<void> {
   try {
     const setting = input.dataset.speakerLevel as 'treble' | 'bass';
     const value = Number(input.value);
-    await invoke('set_speaker_level', { setting, value });
+    await userWrites.run(() => invoke('set_speaker_level', { setting, value }));
     speakerSettings[setting] = value;
     notice('Saved.');
   } catch (error) {
@@ -609,6 +624,10 @@ function scheduleSave(): void {
   const revision = ++saveRevision;
   saveTimeout = window.setTimeout(() => {
     saveTimeout = undefined;
+    if (sliders.active) {
+      scheduleSave();
+      return;
+    }
     const form = document.querySelector<HTMLFormElement>('#settings');
     if (form) void saveConfiguration(formConfiguration(form), revision);
   }, 350);
@@ -688,7 +707,7 @@ async function refreshAllSettings(): Promise<void> {
     refreshAgain = true;
     return;
   }
-  if (saveTimeout !== undefined || pendingWrites > 0) return;
+  if (sliders.active || saveTimeout !== undefined || pendingWrites > 0) return;
   refreshRunning = true;
   const request = ++refreshRequest;
   const revision = editRevision;
@@ -706,7 +725,7 @@ async function refreshAllSettings(): Promise<void> {
         refreshRequest,
         revision,
         editRevision,
-        pendingWrites > 0 || saveTimeout !== undefined,
+        sliders.active || pendingWrites > 0 || saveTimeout !== undefined,
       )
     )
       return;
@@ -716,7 +735,14 @@ async function refreshAllSettings(): Promise<void> {
       discoveredSonos = discovered;
       discoveryStatus = `Found ${discovered.length} speaker${discovered.length === 1 ? '' : 's'}`;
     }
-    render(next);
+    render({
+      ...next,
+      status: snapshot.status,
+      sonosName: snapshot.sonosName,
+      sonosVolume: snapshot.sonosVolume,
+      localVolume: snapshot.localVolume,
+      muted: snapshot.muted,
+    });
     const audioInput = document.querySelector('#diagnostic-audio-input');
     if (audioInput) audioInput.textContent = diagnostics?.audioInputFormat ?? 'Unavailable';
     const payload = document.querySelector('#diagnostic-payload');
@@ -734,6 +760,9 @@ async function refreshAllSettings(): Promise<void> {
 }
 
 if (isTauri()) {
+  void listen<Snapshot>('runtime-status-changed', ({ payload }) => liveStatus.push(payload)).catch(
+    () => undefined,
+  );
   void getCurrentWindow()
     .onFocusChanged(({ payload: focused }) => {
       if (focused) void refreshAllSettings();

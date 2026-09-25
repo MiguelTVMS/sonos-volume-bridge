@@ -135,6 +135,7 @@ pub struct RenderingControlNotification {
     pub sequence: Option<u32>,
     pub volume_state: Option<GenaEvent>,
     pub settings_changed: bool,
+    pub volume_changed: bool,
 }
 
 pub fn parse_rendering_control_notification(
@@ -145,9 +146,17 @@ pub fn parse_rendering_control_notification(
         first_text(body, "LastChange")?.ok_or(SonosError::MissingSoapValue("LastChange"))?;
     let mut reader = Reader::from_str(&outer);
     let mut changed = false;
+    let mut volume_changed = false;
     loop {
         match reader.read_event() {
             Ok(Event::Empty(tag) | Event::Start(tag)) => {
+                if matches!(tag.local_name().as_ref(), "Volume" | "Mute")
+                    && attribute(&tag, "channel")?
+                        .as_deref()
+                        .is_none_or(|channel| channel == "Master")
+                {
+                    volume_changed = true;
+                }
                 if matches!(
                     tag.local_name().as_ref(),
                     "EQ" | "DialogLevel"
@@ -166,13 +175,14 @@ pub fn parse_rendering_control_notification(
         }
     }
     let volume_state = parse_last_change(body, sequence).ok();
-    if volume_state.is_none() && !changed {
+    if volume_state.is_none() && !changed && !volume_changed {
         return Err(SonosError::MissingSoapValue("RenderingControl state"));
     }
     Ok(RenderingControlNotification {
         sequence,
         volume_state,
         settings_changed: changed,
+        volume_changed,
     })
 }
 
