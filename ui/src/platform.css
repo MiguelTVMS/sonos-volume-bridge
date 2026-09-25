@@ -387,3 +387,7 @@
 [data-platform='macos'][data-window-active='false'] .toggle input[type='checkbox']:checked {
   background: color-mix(in srgb, var(--text) 22%, transparent);
 }
+
+[data-platform='macos'][data-window-active='false'] button.icon-button {
+  color: var(--secondary-text);
+}
