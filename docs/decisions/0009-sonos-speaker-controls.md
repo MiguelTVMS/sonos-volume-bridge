@@ -25,3 +25,7 @@ on connection transitions and tray clicks. Reads run asynchronously so a slow
 speaker does not block the UI. The menu shows supported controls after the read
 completes; results from superseded requests or a different selected speaker are
 discarded before updating the native menu on the main thread.
+
+Startup registration and refresh orchestration is shared with a regression test
+that delivers no mouse events and verifies all supported control states. Native
+menu presentation remains covered by the clean-start hardware verification row.

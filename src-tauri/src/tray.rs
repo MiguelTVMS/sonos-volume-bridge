@@ -30,6 +30,26 @@ struct TrayMenuItems<R: Runtime> {
 }
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
+    initialize_tray(
+        || register_tray(app),
+        || refresh(app),
+        || refresh_speaker_controls(app),
+    )
+}
+
+// Keep startup refreshes independent of native mouse-event delivery.
+fn initialize_tray<E>(
+    register: impl FnOnce() -> Result<(), E>,
+    refresh_status: impl FnOnce(),
+    refresh_controls: impl FnOnce(),
+) -> Result<(), E> {
+    register()?;
+    refresh_status();
+    refresh_controls();
+    Ok(())
+}
+
+fn register_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let connection = app_connection(app);
     let icon = icon_for(theme(app), connection);
     let title = MenuItem::with_id(app, "title", "Sonos Volume Bridge", false, None::<&str>)?;
@@ -112,8 +132,6 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         connection: Mutex::new(connection),
         controls_request: AtomicU64::new(0),
     });
-    refresh(app);
-    refresh_speaker_controls(app);
     Ok(())
 }
 
@@ -367,6 +385,57 @@ fn opens_settings_on_double_click(button: MouseButton) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn startup_requests_speaker_controls_without_any_mouse_event() {
+        use std::cell::{Cell, RefCell};
+
+        let registered = Cell::new(false);
+        let status_refreshed = Cell::new(false);
+        let controls = RefCell::new(Vec::new());
+        initialize_tray(
+            || {
+                registered.set(true);
+                Ok::<_, ()>(())
+            },
+            || status_refreshed.set(true),
+            || {
+                assert!(registered.get(), "menu must exist before controls load");
+                *controls.borrow_mut() = available_speaker_controls(&SpeakerSettings {
+                    night_sound: Some(false),
+                    loudness: Some(true),
+                    status_light: Some(true),
+                    speech_enhancement: Some(false),
+                    ..SpeakerSettings::default()
+                });
+            },
+        )
+        .unwrap();
+        // No click callback is dispatched, including the first left-click that
+        // macOS can consume while displaying the native menu.
+        assert!(status_refreshed.get());
+        assert_eq!(
+            *controls.borrow(),
+            vec![
+                ("speaker-night-sound", "Night sound", false),
+                ("speaker-loudness", "Loudness", true),
+                ("speaker-status-light", "Status light", true),
+                ("speaker-speech-enhancement", "Speech enhancement", false),
+            ]
+        );
+    }
+
+    #[test]
+    fn failed_tray_registration_does_not_start_refreshes() {
+        assert_eq!(
+            initialize_tray(
+                || Err("unavailable"),
+                || panic!("status refreshed without menu"),
+                || panic!("controls requested without menu")
+            ),
+            Err("unavailable")
+        );
+    }
 
     #[test]
     fn controls_results_must_match_latest_request_and_selected_speaker() {
