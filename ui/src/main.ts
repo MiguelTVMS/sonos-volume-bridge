@@ -184,12 +184,12 @@ function sonosOptions(configuration: Configuration): string {
   if (selected && !devices.some((device) => device.id === selected)) {
     devices.unshift({
       id: selected,
-      friendlyName: 'Previously chosen speaker (not nearby)',
+      friendlyName: 'Speaker unavailable',
       location: configuration.lastKnownSonosAddress ?? '',
     });
   }
   return [
-    option('', 'Select a Sonos speaker', !selected),
+    option('', 'Select speaker', !selected),
     ...devices.map((device) => option(device.id, device.friendlyName, device.id === selected)),
   ].join('');
 }
@@ -209,7 +209,7 @@ function outputOptions(configuration: Configuration): string {
   if (selected !== 'default' && !writableOutputs.some((output) => output.id === selected)) {
     writableOutputs.unshift({
       id: selected,
-      name: 'Previously chosen output (not available)',
+      name: 'Output unavailable',
       writableVolume: true,
     });
   }
