@@ -10,6 +10,17 @@
   - `cargo clippy --workspace --all-targets -- -D warnings`
   - `cargo test --workspace`
 
+## Bug regression coverage
+
+- Every bug fix must include an automated regression test reproducing the reported
+  preconditions and interaction sequence, including startup timing when relevant.
+- Verify that the test fails with the faulty behavior and passes with the fix.
+  Test the behavior through its production entry point or shared orchestration;
+  helper-only assertions are insufficient when the defect is lifecycle wiring.
+- Run regression tests in the normal CI suite. For native UI or hardware behavior
+  that cannot run in CI, test the underlying orchestration and document the exact
+  manual reproduction in `docs/verification-matrix.md`, including coverage limits.
+
 ## Development from a personal fork
 
 Contributions are expected to be done from a fork and synchronized through pull requests.
