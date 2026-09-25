@@ -37,6 +37,7 @@ or diagnostic payloads.
 
 | Check | Expected result |
 | --- | --- |
+| First left-click after startup | Fully quit and relaunch with a selected speaker. After the initial speaker read completes, left-click the tray before any right-click. All supported Night sound, Loudness, Status light, and Speech enhancement controls appear with correct values. The automated startup test covers the refresh trigger and control mapping; this check covers native menu presentation and real device responses. |
 | Bundle signature | `codesign --verify --deep --strict --verbose=4` succeeds for the downloaded app bundle and reports the expected Developer ID identity. |
 | Notarization ticket | `xcrun stapler validate` succeeds for the downloaded app bundle. |
 | Gatekeeper assessment | `spctl --assess --type execute --verbose=4` accepts the downloaded app bundle. |

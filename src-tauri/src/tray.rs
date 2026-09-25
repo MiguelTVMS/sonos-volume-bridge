@@ -2,7 +2,10 @@ use crate::{
     runtime::{self, SpeakerSetting, SpeakerSettings},
     state::{AppState, UiStatus},
 };
-use std::sync::Mutex;
+use std::sync::{
+    Mutex,
+    atomic::{AtomicU64, Ordering},
+};
 use tauri::{
     AppHandle, Manager, Runtime, Theme,
     image::Image,
@@ -23,9 +26,30 @@ struct TrayMenuItems<R: Runtime> {
     speaker_separator: PredefinedMenuItem<R>,
     speaker_controls: Mutex<Vec<CheckMenuItem<R>>>,
     connection: Mutex<ConnectionState>,
+    controls_request: AtomicU64,
 }
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
+    initialize_tray(
+        || register_tray(app),
+        || refresh(app),
+        || refresh_speaker_controls(app),
+    )
+}
+
+// Keep startup refreshes independent of native mouse-event delivery.
+fn initialize_tray<E>(
+    register: impl FnOnce() -> Result<(), E>,
+    refresh_status: impl FnOnce(),
+    refresh_controls: impl FnOnce(),
+) -> Result<(), E> {
+    register()?;
+    refresh_status();
+    refresh_controls();
+    Ok(())
+}
+
+fn register_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let connection = app_connection(app);
     let icon = icon_for(theme(app), connection);
     let title = MenuItem::with_id(app, "title", "Sonos Volume Bridge", false, None::<&str>)?;
@@ -106,8 +130,8 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         speaker_separator,
         speaker_controls: Mutex::new(Vec::new()),
         connection: Mutex::new(connection),
+        controls_request: AtomicU64::new(0),
     });
-    refresh(app);
     Ok(())
 }
 
@@ -115,10 +139,50 @@ fn refresh_speaker_controls<R: Runtime>(app: &AppHandle<R>) {
     let configuration = app
         .try_state::<AppState>()
         .and_then(|state| state.configuration.lock().ok().map(|value| value.clone()));
-    let settings = configuration.map_or_else(SpeakerSettings::default, |configuration| {
-        tauri::async_runtime::block_on(runtime::speaker_settings(configuration))
+    let Some(items) = app.try_state::<TrayMenuItems<R>>() else {
+        return;
+    };
+    let request = items.controls_request.fetch_add(1, Ordering::SeqCst) + 1;
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let selected = configuration
+            .as_ref()
+            .and_then(|value| value.selected_sonos_id.clone());
+        let settings = match configuration {
+            Some(configuration) => runtime::speaker_settings(configuration).await,
+            None => SpeakerSettings::default(),
+        };
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            let Some(items) = handle.try_state::<TrayMenuItems<R>>() else {
+                return;
+            };
+            let current = handle.try_state::<AppState>().and_then(|state| {
+                state
+                    .configuration
+                    .lock()
+                    .ok()
+                    .and_then(|value| value.selected_sonos_id.clone())
+            });
+            if accepts_controls_result(
+                request,
+                items.controls_request.load(Ordering::SeqCst),
+                selected.as_deref(),
+                current.as_deref(),
+            ) {
+                update_speaker_controls(&handle, &settings);
+            }
+        });
     });
-    update_speaker_controls(app, &settings);
+}
+
+fn accepts_controls_result(
+    request: u64,
+    latest: u64,
+    selected: Option<&str>,
+    current: Option<&str>,
+) -> bool {
+    request == latest && selected == current
 }
 
 fn update_speaker_controls<R: Runtime>(app: &AppHandle<R>, settings: &SpeakerSettings) {
@@ -250,6 +314,9 @@ pub fn refresh<R: Runtime>(app: &AppHandle<R>) {
             update_icon = true;
         }
     }
+    if update_icon {
+        refresh_speaker_controls(app);
+    }
     if let Some(tray) = app.tray_by_id("main-tray") {
         let _ = tray.set_tooltip(Some(tooltip));
         if update_icon {
@@ -318,6 +385,82 @@ fn opens_settings_on_double_click(button: MouseButton) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn startup_requests_speaker_controls_without_any_mouse_event() {
+        use std::cell::{Cell, RefCell};
+
+        let registered = Cell::new(false);
+        let status_refreshed = Cell::new(false);
+        let controls = RefCell::new(Vec::new());
+        initialize_tray(
+            || {
+                registered.set(true);
+                Ok::<_, ()>(())
+            },
+            || status_refreshed.set(true),
+            || {
+                assert!(registered.get(), "menu must exist before controls load");
+                *controls.borrow_mut() = available_speaker_controls(&SpeakerSettings {
+                    night_sound: Some(false),
+                    loudness: Some(true),
+                    status_light: Some(true),
+                    speech_enhancement: Some(false),
+                    ..SpeakerSettings::default()
+                });
+            },
+        )
+        .unwrap();
+        // No click callback is dispatched, including the first left-click that
+        // macOS can consume while displaying the native menu.
+        assert!(status_refreshed.get());
+        assert_eq!(
+            *controls.borrow(),
+            vec![
+                ("speaker-night-sound", "Night sound", false),
+                ("speaker-loudness", "Loudness", true),
+                ("speaker-status-light", "Status light", true),
+                ("speaker-speech-enhancement", "Speech enhancement", false),
+            ]
+        );
+    }
+
+    #[test]
+    fn failed_tray_registration_does_not_start_refreshes() {
+        assert_eq!(
+            initialize_tray(
+                || Err("unavailable"),
+                || panic!("status refreshed without menu"),
+                || panic!("controls requested without menu")
+            ),
+            Err("unavailable")
+        );
+    }
+
+    #[test]
+    fn controls_results_must_match_latest_request_and_selected_speaker() {
+        assert!(accepts_controls_result(1, 1, Some("a"), Some("a")));
+        assert!(!accepts_controls_result(1, 2, Some("a"), Some("a")));
+        assert!(!accepts_controls_result(1, 1, Some("a"), Some("b")));
+        assert!(!accepts_controls_result(1, 1, Some("a"), None));
+    }
+
+    #[test]
+    fn supported_controls_preserve_checked_state_and_omit_unsupported_settings() {
+        let settings = SpeakerSettings {
+            loudness: Some(true),
+            status_light: Some(false),
+            ..SpeakerSettings::default()
+        };
+        assert_eq!(
+            available_speaker_controls(&settings),
+            vec![
+                ("speaker-loudness", "Loudness", true),
+                ("speaker-status-light", "Status light", false),
+            ]
+        );
+        assert!(available_speaker_controls(&SpeakerSettings::default()).is_empty());
+    }
 
     #[test]
     fn only_left_double_click_opens_settings() {
