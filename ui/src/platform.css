@@ -413,3 +413,64 @@
 [data-platform='macos'] .content {
   padding-top: 64px;
 }
+
+[data-platform='macos'] .macos-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: 254px;
+  height: 54px;
+}
+[data-platform='macos'] .section-navigation {
+  display: flex;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid var(--separator);
+  border-radius: 22px;
+  background: linear-gradient(rgb(255 255 255 / 8%), transparent), var(--control);
+}
+[data-platform='macos'] .section-navigation button {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  min-height: 26px;
+  padding: 4px;
+  border-radius: 16px;
+  color: var(--text);
+  background: transparent;
+}
+[data-platform='macos'] .section-navigation button + button {
+  border-left: 1px solid var(--separator);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+[data-platform='macos'] .section-navigation button:hover:not(:disabled) {
+  background: var(--separator);
+}
+[data-platform='macos'] .section-navigation button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+[data-platform='macos'] .section-navigation svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+[data-platform='macos'] #toolbar-section-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-platform='macos'][data-window-active='false'] .macos-titlebar {
+  color: var(--secondary-text);
+}
+[data-platform='macos'] .panel-heading h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}

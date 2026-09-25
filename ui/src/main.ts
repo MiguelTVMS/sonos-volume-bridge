@@ -6,6 +6,7 @@ import { connectionLabel } from './connection';
 import { diagnosticsDisclosureState } from './diagnostics';
 import { desktopPlatform } from './platform';
 import { sizeSelectedControls } from './select-sizing';
+import { adjacentPage, type SettingsPage } from './settings-navigation';
 import './style.css';
 import './platform.css';
 
@@ -36,7 +37,6 @@ if (document.documentElement.dataset.platform === 'macos') {
 }
 
 type MappingPoint = { local: number; sonos: number };
-type SettingsPage = 'devices' | 'speaker' | 'volume' | 'general' | 'diagnostics' | 'about';
 type SpeakerSettings = {
   loudness: boolean | null;
   nightSound: boolean | null;
@@ -258,7 +258,13 @@ function render(nextSnapshot: Snapshot): void {
   const status = connectionLabel(nextSnapshot.status);
   app.innerHTML = `
     <div class="settings-shell">
-      <div class="macos-titlebar" data-tauri-drag-region aria-hidden="true"></div>
+      <div class="macos-titlebar" data-tauri-drag-region>
+        <div class="section-navigation" role="group" aria-label="Navigate settings sections">
+          <button type="button" id="previous-section" aria-label="Previous settings section" title="Previous settings section"${adjacentPage(activePage, -1) ? '' : ' disabled'}><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m10 2-6 6 6 6"/></svg></button>
+          <button type="button" id="next-section" aria-label="Next settings section" title="Next settings section"${adjacentPage(activePage, 1) ? '' : ' disabled'}><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m6 2 6 6-6 6"/></svg></button>
+        </div>
+        <span id="toolbar-section-title" data-tauri-drag-region>${activePage[0].toUpperCase() + activePage.slice(1)}</span>
+      </div>
       <aside class="sidebar">
         <div class="app-heading"><h1><span class="sonos-name">SONOS</span><span>Volume Bridge</span></h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
         <nav aria-label="Settings sections">
@@ -322,6 +328,14 @@ function render(nextSnapshot: Snapshot): void {
       </form>
     </div>`;
   if (document.documentElement.dataset.platform === 'macos') sizeSelectedControls(app);
+  document.querySelector('#previous-section')?.addEventListener('click', () => {
+    const page = adjacentPage(activePage, -1);
+    if (page) activatePage(page);
+  });
+  document.querySelector('#next-section')?.addEventListener('click', () => {
+    const page = adjacentPage(activePage, 1);
+    if (page) activatePage(page);
+  });
   const form = document.querySelector<HTMLFormElement>('#settings');
   const scheduleConfigurationSave = (event: Event): void => {
     if (
@@ -366,6 +380,13 @@ function render(nextSnapshot: Snapshot): void {
 
 function activatePage(page: SettingsPage): void {
   activePage = page;
+  const title = document.querySelector('#toolbar-section-title');
+  if (title) title.textContent = page[0].toUpperCase() + page.slice(1);
+  const previous = document.querySelector<HTMLButtonElement>('#previous-section');
+  const next = document.querySelector<HTMLButtonElement>('#next-section');
+  if (previous) previous.disabled = !adjacentPage(page, -1);
+  if (next) next.disabled = !adjacentPage(page, 1);
+  document.querySelector('.content')?.scrollTo(0, 0);
   if (page === 'diagnostics') void refreshAudioInputFormat();
   document.querySelectorAll<HTMLElement>('[data-panel]').forEach((element) => {
     element.hidden = element.dataset.panel !== page;

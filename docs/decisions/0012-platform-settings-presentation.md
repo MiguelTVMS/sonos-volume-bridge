@@ -48,3 +48,7 @@ initial focus state and ignore a late snapshot after a newer focus event.
 The macOS title bar overlays the frontend, retaining native traffic-light window
 controls without a separate title strip. A reserved top drag region and content
 insets keep the controls unobstructed. Windows and Linux retain standard chrome.
+
+The macOS toolbar includes previous/next section buttons and the current section
+title. Navigation follows sidebar order, does not wrap at the ends, and uses the
+same page activation path as the sidebar, including diagnostic refreshes.
