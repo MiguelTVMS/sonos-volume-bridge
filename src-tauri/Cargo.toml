@@ -19,9 +19,9 @@ sonos-volume-bridge-integration = { path = "../crates/integration" }
 sonos-volume-bridge-platform-audio = { path = "../crates/platform-audio" }
 sonos-volume-bridge-sonos = { path = "../crates/sonos" }
 sonos-volume-bridge-synchronization = { path = "../crates/synchronization" }
-tauri = { version = "2", features = ["image-png", "tray-icon"] }
+tauri = { version = "2.11.6", features = ["image-png", "tray-icon"] }
 tauri-plugin-autostart = "2"
-tauri-plugin-single-instance = "2"
+tauri-plugin-single-instance = "2.4.5"
 thiserror.workspace = true
 tracing.workspace = true
 tracing-appender.workspace = true
