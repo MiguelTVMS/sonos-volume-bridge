@@ -1,6 +1,6 @@
 # Development
 
-Install Rust 1.98.1 (including `clippy` and `rustfmt`), Node.js 22, and pnpm 11. Run the complete local verification suite with:
+Install Rust 1.98.1 (including `clippy` and `rustfmt`), Node.js 26, and pnpm 12. Run the complete local verification suite with:
 
 ```sh
 pnpm run ci:all
@@ -147,9 +147,18 @@ and frontend formatting, lint, tests, and build without requiring signing secret
 
 ## Stable dependency baseline
 
-The workspace and CI use Rust 1.98.1. Update `rust-toolchain.toml`, the workspace
-`rust-version`, and workflow toolchain pins together, then run all validation.
+Local development uses the Rust version in `rust-toolchain.toml`. CI installs the
+latest stable Rust through `dtolnay/rust-toolchain@v1` and sets
+`RUSTUP_TOOLCHAIN=stable` so the local pin does not override that selection.
 Lockfile and workflow changes also trigger Rust checks.
+
+CI actions use their latest stable major tags. Node.js and pnpm are selected by
+major version (26 and 12), allowing stable minor and patch updates. The browser
+test job has a ten-minute timeout to bound failures during setup or teardown.
+Playwright launches Vite directly through Node. A nested `pnpm run dev` leaves
+Vite in a separate process group with pnpm 11.27.1 and 12.6.0 on Linux, causing
+shutdown to hang after every browser test passes. The browser suite must both
+pass its assertions and exit successfully to validate server cleanup.
 
 The frontend uses TypeScript 7 for builds. Its `typescript` dependency aliases
 `@typescript/typescript6` to supply the compiler API required by typescript-eslint;

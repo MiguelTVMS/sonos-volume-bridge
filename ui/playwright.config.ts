@@ -12,7 +12,8 @@ export default defineConfig({
     viewport: { width: 960, height: 760 },
   },
   webServer: {
-    command: 'pnpm run dev --host 127.0.0.1 --port 5174 --strictPort',
+    // Launch Vite directly so pnpm cannot detach it from Playwright's process group.
+    command: 'node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5174 --strictPort',
     url: 'http://127.0.0.1:5174/preview.html',
     reuseExistingServer: false,
   },
