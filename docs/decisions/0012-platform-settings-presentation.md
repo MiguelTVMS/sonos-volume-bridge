@@ -25,3 +25,13 @@ It is a separate HTML entry point, excluded from the production build.
 Check every section at the default and minimum window heights. Verify native
 WebView rendering on each OS before release; browser previews do not establish
 native platform compatibility.
+
+The macOS window uses a 740-point width and 234-point sidebar, matching the
+System Settings reference. Settings use trailing pop-up selectors and compact
+white switch and slider thumbs. HTML controls retain native keyboard semantics;
+these are WebView controls, not AppKit or SwiftUI controls, so exact system
+materials and animations are not guaranteed.
+
+Apple references: [Pop-up buttons](https://developer.apple.com/design/human-interface-guidelines/pop-up-buttons),
+[Toggles](https://developer.apple.com/design/human-interface-guidelines/toggles), and
+[Sliders](https://developer.apple.com/design/human-interface-guidelines/sliders).

@@ -263,8 +263,8 @@ function render(nextSnapshot: Snapshot): void {
           `<div class="panel-heading"><h2>Volume</h2><p>Control how your computer volume changes the speaker.</p></div>
           <div class="settings-group">
             <label class="toggle"><span>Two-way synchronization</span><input type="checkbox" role="switch" name="twoWaySynchronization" ${c.twoWaySynchronization ? 'checked' : ''}/></label><label class="toggle"><span>Mute speaker at zero volume</span><input type="checkbox" role="switch" name="muteSpeakerAtZeroVolume" ${c.muteSpeakerAtZeroVolume ? 'checked' : ''}/></label>
-            <label>Highest speaker volume <output class="range-value" id="maximum-value">${c.maximumSonosVolume}%</output><input name="maximumSonosVolume" id="maximum-volume" type="range" min="0" max="100" step="1" value="${c.maximumSonosVolume}" /></label>
-            <label>Volume feel<select name="mapping">${mappingOptions(c)}</select></label>
+            <label class="volume-limit"><span>Highest speaker volume <output class="range-value" id="maximum-value">${c.maximumSonosVolume}%</output></span><input name="maximumSonosVolume" id="maximum-volume" type="range" min="0" max="100" step="1" value="${c.maximumSonosVolume}" /></label>
+            <label class="select-setting"><span>Volume feel</span><select name="mapping">${mappingOptions(c)}</select></label>
             <details class="help"><summary>What do these options mean?</summary><dl><div><dt>Balanced</dt><dd>Gives you more control at lower volumes and rises more gently.</dd></div><div><dt>Direct</dt><dd>Keeps the speaker volume closely matched to your computer volume.</dd></div><div><dt>Scaled</dt><dd>Scales the full system volume range to the highest speaker volume you chose.</dd></div></dl></details>
             <button class="secondary test-button" type="button" id="test">Test speaker volume</button>
           </div>`,
