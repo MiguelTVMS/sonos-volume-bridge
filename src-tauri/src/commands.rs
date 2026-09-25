@@ -1,6 +1,6 @@
 use crate::{
     autostart,
-    config::AppConfiguration,
+    config::{AppConfiguration, ConfigStore},
     runtime::{self, AvailableAudioOutput, DiscoveredSonos, SpeakerSetting, SpeakerSettings},
     state::{AppState, UiSnapshot},
 };
@@ -24,14 +24,38 @@ pub fn save_configuration(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<UiSnapshot, String> {
-    state
-        .store
-        .save(&configuration)
-        .map_err(|error| error.to_string())?;
-    autostart::update(&app, configuration.start_at_login)?;
+    let previous_start_at_login = state
+        .configuration
+        .lock()
+        .map_err(|_| "application configuration is unavailable".to_owned())?
+        .start_at_login;
+    let configuration = persist_settings(
+        &state.store,
+        previous_start_at_login,
+        configuration,
+        |enabled| autostart::update(&app, enabled),
+    )?;
     state.replace_configuration(configuration);
     state.start_runtime(app);
     get_snapshot(state)
+}
+
+fn persist_settings(
+    store: &ConfigStore,
+    previous_start_at_login: bool,
+    configuration: AppConfiguration,
+    update_autostart: impl FnOnce(bool) -> Result<(), String>,
+) -> Result<AppConfiguration, String> {
+    configuration
+        .validate()
+        .map_err(|error| error.to_string())?;
+    if configuration.start_at_login != previous_start_at_login {
+        update_autostart(configuration.start_at_login)?;
+    }
+    store
+        .save(&configuration)
+        .map_err(|error| error.to_string())?;
+    Ok(configuration)
 }
 
 #[tauri::command]
@@ -233,4 +257,102 @@ pub async fn set_speaker_setting(
         .map_err(|_| "application state is unavailable".to_owned())?
         .clone();
     runtime::set_speaker_setting(configuration, setting, enabled).await
+}
+
+#[cfg(test)]
+mod persistence_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    struct TestStore(ConfigStore);
+    impl TestStore {
+        fn new() -> Self {
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let directory = std::env::temp_dir().join(format!(
+                "sonos-save-test-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            Self(ConfigStore::new(directory.join("config.json")))
+        }
+    }
+    impl Drop for TestStore {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(self.0.path().parent().unwrap());
+        }
+    }
+
+    #[test]
+    fn first_settings_save_does_not_require_login_item_registration() {
+        let store = TestStore::new();
+        assert!(!store.0.path().exists());
+        let current = store.0.load_or_default().unwrap();
+        let selected = AppConfiguration {
+            selected_sonos_id: Some("test-speaker".to_owned()),
+            synchronize_mute: false,
+            ..current.clone()
+        };
+        let applied = persist_settings(&store.0, current.start_at_login, selected, |_| {
+            Err("login service unavailable on fresh install".to_owned())
+        })
+        .unwrap();
+        assert_eq!(applied.selected_sonos_id.as_deref(), Some("test-speaker"));
+        assert!(!applied.start_at_login);
+        let reloaded = store.0.load_or_default().unwrap();
+        assert_eq!(reloaded.selected_sonos_id, applied.selected_sonos_id);
+        assert!(!reloaded.synchronize_mute);
+        assert!(!reloaded.start_at_login);
+    }
+
+    #[test]
+    fn unchanged_enabled_login_setting_does_not_block_other_saves() {
+        let store = TestStore::new();
+        let configuration = AppConfiguration {
+            start_at_login: true,
+            ..AppConfiguration::default()
+        };
+        assert!(
+            persist_settings(&store.0, true, configuration, |_| Err(
+                "login service unavailable".to_owned()
+            ))
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn failed_explicit_login_change_preserves_saved_configuration() {
+        let store = TestStore::new();
+        let previous = AppConfiguration::default();
+        store.0.save(&previous).unwrap();
+        let next = AppConfiguration {
+            start_at_login: true,
+            ..previous
+        };
+        let result = persist_settings(&store.0, false, next, |enabled| {
+            assert!(enabled);
+            Err("registration denied".to_owned())
+        });
+        assert_eq!(result.unwrap_err(), "registration denied");
+        assert!(!store.0.load_or_default().unwrap().start_at_login);
+    }
+
+    #[test]
+    fn explicit_login_changes_are_applied_and_persisted() {
+        let store = TestStore::new();
+        for (previous, enabled) in [(false, true), (true, false)] {
+            let configuration = AppConfiguration {
+                start_at_login: enabled,
+                ..AppConfiguration::default()
+            };
+            let called = std::cell::Cell::new(false);
+            persist_settings(&store.0, previous, configuration, |requested| {
+                assert_eq!(requested, enabled);
+                called.set(true);
+                Ok(())
+            })
+            .unwrap();
+            assert!(called.get());
+            assert_eq!(store.0.load_or_default().unwrap().start_at_login, enabled);
+        }
+    }
 }

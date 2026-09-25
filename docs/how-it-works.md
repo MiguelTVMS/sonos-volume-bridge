@@ -85,3 +85,7 @@ do not create write loops.
 - `followDefaultAudioDevice` vs `fixedAudioDeviceId`: output selection strategy.
 - `fallbackPolling`: enables fallback polling when callback-driven state is not
   healthy.
+
+Settings can be saved on first launch with Start at login disabled. The login
+service is contacted only when that option changes, so login-service errors do
+not block unrelated settings updates.
