@@ -51,3 +51,35 @@ the tray; the frontend coalesces bursts for 150 ms, re-reads authoritative setti
 and patches only speaker controls to preserve form edits. Polling fallback checks
 speaker settings every five seconds while subscriptions are degraded. Status
 lights and devices that omit these events still refresh on focus/navigation.
+
+## Capability evidence and recovery
+
+Each read returns per-control availability independently of the value: supported,
+unsupported, or temporarily unavailable. A valid false/zero is still supported.
+The adapter probes only reads, concurrently, for the six exposed sound/light/tone
+controls. It uses the advertised DeviceProperties control URL instead of assuming
+a path. An absent service or explicit UPnP Invalid Action / Optional Action Not
+Implemented fault establishes unsupported; invalid arguments, authorization errors,
+timeouts, malformed values and generic failures remain unavailable and retryable.
+SOAP fault codes are retained even when sent with HTTP 500.
+
+Model metadata selects the authoritative Speech Enhancement variant. Service
+advertisements alone do not imply support for every EQ type. Events invalidate
+reads; they do not declare support or mark omitted controls unsupported. All
+results belong to the currently resolved speaker, with no persistent negative
+capability cache. Focus, navigation and push refreshes can restore controls after
+recovery. Settings labels distinguish unsupported from temporarily unavailable.
+
+This is conservative detection for the controls exposed by this app, not an
+exhaustive product feature catalog. Firmware may acknowledge an unused EQ type;
+known Speech Enhancement variants are handled explicitly, and unfamiliar models
+still require physical validation. A read proves a value can be queried, not that
+every future write will succeed. Balance and automatic TV-input capability
+detection are outside this change.
+
+Programmable HTTP mocks cover service discovery, explicit SOAP faults, false/zero
+values, timeouts and recovery, malformed values, independent controls, model
+variants, speaker changes, and partial GENA notifications followed by fresh reads.
+Frontend tests exercise the shared first-render/push control updater with mock
+views, including unavailable-to-supported recovery and preserving an edited tone
+control. Native event delivery still requires the manual matrix checks.

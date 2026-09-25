@@ -9,6 +9,7 @@ import { desktopPlatform } from './platform';
 import { sizeSelectedControls } from './select-sizing';
 import { canApplyRefresh } from './refresh-state';
 import { adjacentPage, type SettingsPage } from './settings-navigation';
+import { applySpeakerControls, type SpeakerSettings } from './speaker-controls';
 import './style.css';
 import './platform.css';
 
@@ -39,14 +40,6 @@ if (document.documentElement.dataset.platform === 'macos') {
 }
 
 type MappingPoint = { local: number; sonos: number };
-type SpeakerSettings = {
-  loudness: boolean | null;
-  nightSound: boolean | null;
-  speechEnhancement: boolean | null;
-  statusLight: boolean | null;
-  treble: number | null;
-  bass: number | null;
-};
 type Configuration = {
   schemaVersion: number;
   selectedSonosId: string | null;
@@ -300,7 +293,7 @@ function render(nextSnapshot: Snapshot): void {
         )}
         ${panel(
           'speaker',
-          `<div class="panel-heading"><h2>Speaker</h2><p>Adjust sound settings available on the selected Sonos speaker.</p></div><div class="settings-group"><label class="toggle"><span>Night sound</span><input type="checkbox" role="switch" data-speaker-setting="nightSound"${speakerSettings.nightSound ? ' checked' : ''}${speakerSettings.nightSound === null ? ' disabled' : ''}/></label><label class="toggle"><span>Loudness</span><input type="checkbox" role="switch" data-speaker-setting="loudness"${speakerSettings.loudness ? ' checked' : ''}${speakerSettings.loudness === null ? ' disabled' : ''}/></label><label class="toggle"><span>Status light</span><input type="checkbox" role="switch" data-speaker-setting="statusLight"${speakerSettings.statusLight ? ' checked' : ''}${speakerSettings.statusLight === null ? ' disabled' : ''}/></label><label class="toggle"><span>Speech enhancement</span><input type="checkbox" role="switch" data-speaker-setting="speechEnhancement"${speakerSettings.speechEnhancement ? ' checked' : ''}${speakerSettings.speechEnhancement === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>Treble <output>${speakerSettings.treble ?? 'Unavailable'}</output></span><input type="range" min="-10" max="10" value="${speakerSettings.treble ?? 0}" data-speaker-level="treble"${speakerSettings.treble === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>Bass <output>${speakerSettings.bass ?? 'Unavailable'}</output></span><input type="range" min="-10" max="10" value="${speakerSettings.bass ?? 0}" data-speaker-level="bass"${speakerSettings.bass === null ? ' disabled' : ''}/></label><div class="speaker-settings-footer"><p class="setting-note">Unavailable settings are shown in gray.</p><div class="speaker-settings-actions"><button class="secondary" type="button" id="use-tv-audio">Use TV audio</button><button class="secondary icon-button" type="button" id="refresh-speaker-settings" title="Refresh speaker settings" aria-label="Refresh speaker settings">↻</button></div></div></div>`,
+          `<div class="panel-heading"><h2>Speaker</h2><p>Adjust sound settings available on the selected Sonos speaker.</p></div><div class="settings-group"><label class="toggle"><span>Night sound<small class="feature-status" data-feature-status="nightSound"></small></span><input type="checkbox" role="switch" data-speaker-setting="nightSound"${speakerSettings.nightSound ? ' checked' : ''}${speakerSettings.nightSound === null ? ' disabled' : ''}/></label><label class="toggle"><span>Loudness<small class="feature-status" data-feature-status="loudness"></small></span><input type="checkbox" role="switch" data-speaker-setting="loudness"${speakerSettings.loudness ? ' checked' : ''}${speakerSettings.loudness === null ? ' disabled' : ''}/></label><label class="toggle"><span>Status light<small class="feature-status" data-feature-status="statusLight"></small></span><input type="checkbox" role="switch" data-speaker-setting="statusLight"${speakerSettings.statusLight ? ' checked' : ''}${speakerSettings.statusLight === null ? ' disabled' : ''}/></label><label class="toggle"><span>Speech enhancement<small class="feature-status" data-feature-status="speechEnhancement"></small></span><input type="checkbox" role="switch" data-speaker-setting="speechEnhancement"${speakerSettings.speechEnhancement ? ' checked' : ''}${speakerSettings.speechEnhancement === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>Treble <output>${speakerSettings.treble ?? 'Unavailable'}</output><small class="feature-status" data-feature-status="treble"></small></span><input type="range" min="-10" max="10" value="${speakerSettings.treble ?? 0}" data-speaker-level="treble"${speakerSettings.treble === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>Bass <output>${speakerSettings.bass ?? 'Unavailable'}</output><small class="feature-status" data-feature-status="bass"></small></span><input type="range" min="-10" max="10" value="${speakerSettings.bass ?? 0}" data-speaker-level="bass"${speakerSettings.bass === null ? ' disabled' : ''}/></label><div class="speaker-settings-footer"><p class="setting-note">Unavailable settings are checked again on refresh.</p><div class="speaker-settings-actions"><button class="secondary" type="button" id="use-tv-audio">Use TV audio</button><button class="secondary icon-button" type="button" id="refresh-speaker-settings" title="Refresh speaker settings" aria-label="Refresh speaker settings">↻</button></div></div></div>`,
         )}
         ${panel(
           'volume',
@@ -337,6 +330,7 @@ function render(nextSnapshot: Snapshot): void {
         <output id="notice" aria-live="polite"></output>
       </form>
     </div>`;
+  applySpeakerControls(app, speakerSettings, document.activeElement);
   if (document.documentElement.dataset.platform === 'macos') sizeSelectedControls(app);
   document.querySelector('#previous-section')?.addEventListener('click', () => {
     const page = adjacentPage(activePage, -1);
@@ -514,20 +508,7 @@ async function refreshSpeakerSettings(): Promise<void> {
   )
     return;
   speakerSettings = speaker;
-  // Update only speaker controls, preserving configuration drafts and focus.
-  document.querySelectorAll<HTMLInputElement>('[data-speaker-setting]').forEach((input) => {
-    const value = speaker[input.dataset.speakerSetting as keyof SpeakerSettings];
-    input.checked = value === true;
-    input.disabled = value === null;
-  });
-  document.querySelectorAll<HTMLInputElement>('[data-speaker-level]').forEach((input) => {
-    if (document.activeElement === input) return;
-    const value = speaker[input.dataset.speakerLevel as 'treble' | 'bass'];
-    input.disabled = value === null;
-    input.value = String(value ?? 0);
-    const output = input.closest('label')?.querySelector('output');
-    if (output) output.value = String(value ?? 'Unavailable');
-  });
+  applySpeakerControls(app, speakerSettings, document.activeElement);
 }
 
 function schedulePushRefresh(): void {

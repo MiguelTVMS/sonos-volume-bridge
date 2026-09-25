@@ -8,7 +8,9 @@ mod gena;
 mod model;
 mod xml;
 
-pub use client::{SonosClient, SonosClientBuilder, SpeakerSettings};
+pub use client::{
+    FeatureAvailability, SonosClient, SonosClientBuilder, SpeakerCapabilities, SpeakerSettings,
+};
 pub use discovery::{discover, parse_ssdp_response};
 pub use error::SonosError;
 pub use event::{

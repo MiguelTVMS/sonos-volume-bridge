@@ -26,6 +26,7 @@ pub fn parse_device_description(xml: &[u8], location: &Url) -> Result<SonosDevic
     let mut rendering_control = None;
     let mut group_rendering_control = None;
     let mut av_transport = None;
+    let mut device_properties = None;
     loop {
         match reader.read_event_into(&mut buffer) {
             Ok(Event::Start(event)) => {
@@ -53,6 +54,9 @@ pub fn parse_device_description(xml: &[u8], location: &Url) -> Result<SonosDevic
                             if av_transport.is_none() =>
                         {
                             av_transport = Some(candidate);
+                        }
+                        Some("urn:schemas-upnp-org:service:DeviceProperties:1") => {
+                            device_properties = Some(candidate);
                         }
                         _ => {}
                     }
@@ -122,6 +126,16 @@ pub fn parse_device_description(xml: &[u8], location: &Url) -> Result<SonosDevic
             Ok::<AvTransportService, SonosError>(AvTransportService { control_url })
         })
         .transpose()?;
+    let device_properties = device_properties
+        .and_then(|service| service.control_url)
+        .map(|path| {
+            let url = location
+                .join(&path)
+                .map_err(|error| SonosError::Xml(error.to_string()))?;
+            validate_local_url(&url)?;
+            Ok::<Url, SonosError>(url)
+        })
+        .transpose()?;
     Ok(SonosDevice {
         id,
         friendly_name: name,
@@ -132,6 +146,7 @@ pub fn parse_device_description(xml: &[u8], location: &Url) -> Result<SonosDevic
             event_url,
         },
         av_transport,
+        device_properties,
     })
 }
 

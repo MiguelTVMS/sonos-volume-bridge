@@ -157,17 +157,7 @@ pub async fn test_selected_device(configuration: AppConfiguration) -> Result<(),
         .map_err(|_| "The selected Sonos device rejected the volume test.".to_owned())
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SpeakerSettings {
-    pub loudness: Option<bool>,
-    pub status_light: Option<bool>,
-    pub night_sound: Option<bool>,
-    pub speech_enhancement: Option<bool>,
-    pub balance: Option<i8>,
-    pub treble: Option<i8>,
-    pub bass: Option<i8>,
-}
+pub use sonos_volume_bridge_sonos::SpeakerSettings;
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -188,17 +178,7 @@ pub async fn speaker_settings(configuration: AppConfiguration) -> SpeakerSetting
     let Ok(device) = resolve_device(&client, &configuration).await else {
         return SpeakerSettings::default();
     };
-    let settings = client.get_speaker_settings(&device).await;
-    SpeakerSettings {
-        loudness: settings.loudness,
-        status_light: client.get_status_light(&device).await.ok(),
-        night_sound: settings.night_sound,
-        speech_enhancement: settings.speech_enhancement,
-        balance: None,
-
-        treble: client.get_tone(&device, "Treble").await.ok(),
-        bass: client.get_tone(&device, "Bass").await.ok(),
-    }
+    client.get_speaker_settings(&device).await
 }
 
 pub async fn set_speaker_setting(
@@ -912,6 +892,7 @@ mod tests {
                 event_url: Url::parse("http://192.168.1.10:1400/event").unwrap(),
             },
             av_transport: None,
+            device_properties: None,
         };
         assert!(is_sonos_speaker(&sonos_device));
     }
@@ -928,6 +909,7 @@ mod tests {
                 event_url: Url::parse("http://192.168.1.11:1400/event").unwrap(),
             },
             av_transport: None,
+            device_properties: None,
         };
         assert!(!is_sonos_speaker(&media_renderer_device));
     }

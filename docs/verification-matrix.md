@@ -56,3 +56,20 @@ or diagnostic payloads.
 All required rows must pass on Windows and macOS. Document an exception in the
 release issue with its device class, user impact, mitigation, and a follow-up
 issue before declaring a release candidate ready.
+
+### Speaker capability and push regression checks
+
+- Automated: programmable local HTTP speaker fixtures exercise successful off/zero
+  reads, explicit unsupported faults, timeout and malformed-reply recovery,
+  independent feature failures, model-specific Speech Enhancement, advertised
+  service URLs, and switching between speakers without sharing capabilities.
+- Automated: real NOTIFY callbacks followed by SOAP reads confirm an external
+  Speech Enhancement change and preserve capabilities omitted from the event.
+  Frontend mock views test the same updater used on render and push refresh.
+- Regression mutation: treating temporary read failures as unsupported makes the
+  recovery test fail; restoring the availability classifier makes it pass.
+- Manual (pending): leave Speaker settings open, toggle Speech Enhancement in an
+  external controller, and confirm the displayed value updates without navigation;
+  repeat off/on and check the tray. Disconnect/reconnect the speaker and verify
+  controls recover. Repeat on legacy and Ultra soundbars when available. Mocks do
+  not verify real firmware behavior, native menu timing, or network reachability.

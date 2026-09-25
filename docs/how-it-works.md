@@ -95,3 +95,9 @@ Settings-only events no longer require accompanying volume/mute fields. The app
 reads the speaker after a notification and updates Settings and the tray. Focus
 and page changes also refresh device data. Devices/settings without event support
 remain dependent on these refreshes; subscription failures use a polling fallback.
+
+Speaker controls show “Not supported by this speaker” only for an absent required
+service or an explicit unsupported-action response. Failed or ambiguous reads show
+“Temporarily unavailable” and are retried on refresh; they are not treated as off.
+An off switch or zero tone value can still be fully supported. Detection performs
+no setting writes.

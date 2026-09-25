@@ -141,6 +141,7 @@ async fn mock_server_supports_rendering_control_round_trip() {
             control_url: base.join("control").unwrap(),
             event_url: base.join("event").unwrap(),
         },
+        device_properties: Some(base.join("DeviceProperties/Control").unwrap()),
         av_transport: Some(AvTransportService {
             control_url: base.join("avtransport").unwrap(),
         }),
@@ -224,6 +225,7 @@ async fn ray_speech_state_uses_dialog_level_for_read_write_and_confirmation() {
             event_url: base.join("event").unwrap(),
         },
         av_transport: None,
+        device_properties: None,
     };
     let client = SonosClient::builder().build().unwrap();
     assert!(client.get_speech_enhancement(&device).await.unwrap());

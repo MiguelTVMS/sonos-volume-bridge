@@ -2,6 +2,10 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum SonosError {
+    #[error("service is not advertised by this speaker")]
+    UnsupportedService,
+    #[error("SOAP fault {0}")]
+    SoapFault(u16),
     #[error("discovered URL must use HTTP")]
     NonHttpUrl,
     #[error("discovered URL has no host")]

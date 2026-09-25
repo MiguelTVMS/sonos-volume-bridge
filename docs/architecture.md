@@ -145,3 +145,9 @@ reads never block the menu event handler; menu updates run on the main thread.
 Settings refreshes are asynchronous and guarded against edits and pending writes.
 Speech Enhancement chooses the same model-appropriate EQ for reads and writes;
 see [ADR 0009](decisions/0009-sonos-speaker-controls.md).
+
+The Sonos adapter derives per-control availability from validated read responses,
+model-specific EQ selection and advertised services. The shell forwards this
+alongside current values. Unsupported and temporarily unavailable remain distinct;
+event omissions never remove capabilities. No networking enters the domain or
+synchronization crates.
