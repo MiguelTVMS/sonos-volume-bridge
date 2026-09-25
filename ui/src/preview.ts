@@ -21,6 +21,7 @@ const snapshot = {
     twoWaySynchronization: true,
     startAtLogin: false,
     fallbackPolling: true,
+    cameraSpeechEnhancementEnabled: false,
     maximumSonosVolume: 70,
     mapping: { type: 'linear' },
   },
@@ -42,6 +43,15 @@ mockIPC((command, payload) => {
   switch (command) {
     case 'plugin:app|version':
       return 'Preview';
+    case 'get_camera_status':
+      return {
+        available: platform !== 'linux',
+        message:
+          platform === 'linux'
+            ? 'Camera automation is unavailable in this platform build'
+            : 'Camera automation is waiting',
+        warning: null,
+      };
     case 'get_snapshot':
       return snapshot;
     case 'save_configuration':

@@ -171,3 +171,10 @@ properties, never dispatch input/change events or enqueue writes. Existing audio
 origin/expected-write suppression remains in the synchronization adapters. Sonos
 notifications do not identify the originating controller, so an echoed value is
 not treated as proof of authorship and genuine external changes remain observable.
+
+Camera-triggered Speech Enhancement uses a separate application-lifetime
+coordinator and `platform-camera` adapters. Domain policy contains only normalized
+activity, timing, and ownership; integration defines camera/speech ports. The shell
+serializes Speech Enhancement user and automation writes independently of volume
+runtime restarts. Native macOS/Windows candidates remain behind default-off build
+features; Linux is deferred. See [ADR 0013](decisions/0013-camera-speech-automation.md).

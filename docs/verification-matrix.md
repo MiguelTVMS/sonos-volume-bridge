@@ -112,3 +112,31 @@ issue before declaring a release candidate ready.
   release; confirm no jump during drag and only the final value applies. Change
   volume externally with Diagnostics open and check prompt updates. Native drag
   timing and physical notification latency are not simulated by the mock suite.
+
+## Camera-triggered Speech Enhancement (#89)
+
+**Release status: not hardware validated. Both build features remain off.** Linux is
+out of scope and tracked separately in #125. Run the following independently for
+macOS direct, macOS App Store, Windows NSIS, and Windows MSIX distributions before
+enabling that distribution's corresponding Cargo feature. Never reuse a binary
+between distribution gates that differ.
+
+| Scenario | Exact interaction and expected result |
+| --- | --- |
+| Privacy and disabled default | Start a fresh feature-off build: option is visibly unavailable. In a native candidate build leave opt-in off, then enable it with cameras idle. No camera LED, permission prompt, capture session, or media access should be caused by observation. No identifiers or activity history appear in logs/exports. |
+| Camera classes | Repeat with built-in, USB, and exposed virtual cameras. Start capture in a separate app: after one second speech turns on and Settings/tray identify automation. Stop capture: after three seconds speech returns off. Virtual source initialization without consumers must not falsely count as a call. |
+| Already enabled | Enable speech manually before starting the camera. Start/stop capture: speech remains on and is not labelled as an automation-owned change. |
+| Startup timing | Start capture first, then launch the bridge with opt-in saved. The initial snapshot detects ongoing capture; normal debounce and guarded activation apply without needing a new camera event. |
+| Overlap and gaps | Start two cameras, stop one, and confirm speech stays on. Stop the last camera: restoration waits three seconds. Restart capture during that gap: no off/on churn. Capture bursts shorter than one second do not write. |
+| Manual override | During owned speech, toggle speech from Settings and separately from tray; repeat using another controller and allow authoritative refresh. The manual value remains, automation pauses until the next complete camera period, and no stale restoration overwrites it. |
+| Settings and switching | During owned speech save an unrelated volume setting: ownership persists. Select another compatible speaker: old speaker restores before new activation. Repeat with old speaker unreachable: warning remains visible, and no delayed restoration targets the replacement. |
+| Failure and recovery | Interrupt observation, disconnect the speaker, restart camera services, and reconnect devices. Unknown never becomes inactive; ownership is abandoned after a gap and later recovery cannot disable a pre-existing on value. Volume sync remains operational when only camera observation fails. |
+| Suspend and hot-plug | Suspend during owned speech; resume with camera stopped and running. Repeat unplug/replug, including replacement during the inactive grace period. No stale ownership restores. Confirm OS callbacks/resume delivery and re-enumeration under each package type. |
+| Disable/reset/quit/crash | While owned, disable, reset, or normally quit: guarded cleanup completes or times out within its deadline. Force-terminate instead and restart: no restoration journal exists, so a remaining on value is preserved. |
+
+CI covers shared production orchestration, ownership, debounce, configuration
+compatibility, partial inventory aggregation, UI explanations, and native feature
+compilation. It does not validate camera-driver completeness, native event-source
+silence, packaging permissions, actual capture, physical Sonos firmware, or timing
+of OS suspend notifications. Record sanitized pass/fail outcomes privately; do not
+attach camera/app identifiers or activity traces to issues or PR descriptions.

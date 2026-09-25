@@ -1,4 +1,5 @@
 mod autostart;
+mod camera;
 mod commands;
 mod config;
 mod logging;
@@ -64,6 +65,7 @@ pub fn run() {
             tray::install(app.handle())?;
             let state = app.state::<AppState>();
             state.start_runtime(app.handle().clone());
+            state.camera.start(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -82,6 +84,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_snapshot,
+            commands::get_camera_status,
             commands::save_configuration,
             commands::reset_configuration,
             commands::diagnostics,
@@ -94,6 +97,25 @@ pub fn run() {
             commands::set_speaker_level,
             commands::use_tv_audio
         ])
-        .run(tauri::generate_context!())
-        .expect("Tauri runtime failed");
+        .build(tauri::generate_context!())
+        .expect("Tauri runtime failed")
+        .run(handle_runtime_event);
+}
+
+fn handle_runtime_event(app: &tauri::AppHandle, event: tauri::RunEvent) {
+    let state = app.state::<AppState>();
+    match event {
+        tauri::RunEvent::Resumed => state.camera.resume(),
+        tauri::RunEvent::ExitRequested { api, code, .. } if !state.camera.stopping() => {
+            api.prevent_exit();
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let state = app.state::<AppState>();
+                state.camera.shutdown().await;
+                state.stop_runtime();
+                app.exit(code.unwrap_or(0));
+            });
+        }
+        _ => {}
+    }
 }

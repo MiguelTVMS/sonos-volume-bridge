@@ -26,7 +26,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::{
     net::UdpSocket,
     sync::watch,
@@ -501,6 +501,9 @@ async fn run_session(
                 if current_generation && notification.settings_changed
                     && (notification.sequence.is_none() || notification.sequence != last_settings_sequence) {
                     last_settings_sequence = notification.sequence;
+                    if let Some(state) = app.try_state::<crate::state::AppState>() {
+                        state.camera.request_refresh();
+                    }
                     let _ = app.emit("speaker-settings-changed", ());
                     tray::refresh_speaker_controls(app);
                 }
@@ -549,7 +552,10 @@ async fn run_session(
                 update_snapshot(snapshot, app, generation,
                     if subscription.is_some() { UiStatus::Synchronized } else { UiStatus::PollingFallback },
                     Some(SnapshotValues { name: &speaker_name, sonos_volume: Some(volume.get()), local_volume: Some(local.volume.get()), muted: Some(muted.0) }));
-                let _ = app.emit("speaker-settings-changed", ());
+                if let Some(state) = app.try_state::<crate::state::AppState>() {
+                        state.camera.request_refresh();
+                    }
+                    let _ = app.emit("speaker-settings-changed", ());
                 tray::refresh_speaker_controls(app);
                 health_at = Instant::now() + if subscription.is_some() { Duration::from_secs(5) } else { Duration::from_secs(1) };
             }
@@ -604,7 +610,7 @@ async fn selected_local_bind(peer: SocketAddr) -> Result<SocketAddr, RuntimeErro
     ))
 }
 
-async fn resolve_device(
+pub(crate) async fn resolve_device(
     client: &SonosClient,
     configuration: &AppConfiguration,
 ) -> Result<SonosDevice, RuntimeError> {
@@ -731,7 +737,7 @@ impl LocalAudioPort for DeviceAudioPort {
 }
 
 #[derive(Debug)]
-enum RuntimeError {
+pub(crate) enum RuntimeError {
     SonosUnavailable,
     Local(PlatformAudioError),
     Integration(String),

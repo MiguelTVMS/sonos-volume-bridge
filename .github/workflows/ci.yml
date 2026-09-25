@@ -89,6 +89,16 @@ jobs:
         with:
           shared-key: workspace-${{ runner.os }}
       - run: cargo check --workspace
+      - name: Test native camera backend (release gate remains off)
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            feature=camera-automation-macos
+          else
+            feature=camera-automation-windows
+          fi
+          cargo clippy --workspace --all-targets --features "$feature" -- -D warnings
+          cargo test --workspace --features "$feature"
 
   rust-quality:
     name: Rust quality
