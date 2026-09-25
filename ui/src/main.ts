@@ -1,11 +1,42 @@
 import { getVersion } from '@tauri-apps/api/app';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { bindWindowFocus } from './window-appearance';
 import { connectionLabel } from './connection';
 import { diagnosticsDisclosureState } from './diagnostics';
+import { desktopPlatform } from './platform';
+import { sizeSelectedControls } from './select-sizing';
+import { adjacentPage, type SettingsPage } from './settings-navigation';
 import './style.css';
+import './platform.css';
+
+document.documentElement.dataset.platform = desktopPlatform(navigator.userAgent);
+
+if (document.documentElement.dataset.platform === 'macos') {
+  const applyFocus = (focused: boolean): void => {
+    document.documentElement.dataset.windowActive = String(focused);
+  };
+  applyFocus(document.hasFocus());
+  if (isTauri()) {
+    const nativeWindow = getCurrentWindow();
+    void bindWindowFocus(
+      {
+        listen: (update) => nativeWindow.onFocusChanged(({ payload }) => update(payload)),
+        current: () => nativeWindow.isFocused(),
+      },
+      applyFocus,
+    ).catch(() => {
+      window.addEventListener('focus', () => applyFocus(true));
+      window.addEventListener('blur', () => applyFocus(false));
+      applyFocus(document.hasFocus());
+    });
+  } else {
+    window.addEventListener('focus', () => applyFocus(true));
+    window.addEventListener('blur', () => applyFocus(false));
+  }
+}
 
 type MappingPoint = { local: number; sonos: number };
-type SettingsPage = 'devices' | 'speaker' | 'volume' | 'general' | 'diagnostics' | 'about';
 type SpeakerSettings = {
   loudness: boolean | null;
   nightSound: boolean | null;
@@ -200,8 +231,20 @@ function knownSonosAddress(configuration: Configuration): string {
   return selected?.location ?? configuration.lastKnownSonosAddress ?? '';
 }
 
+const pageIcons: Record<SettingsPage, string> = {
+  devices:
+    '<rect x="3" y="4" width="12" height="10" rx="2"/><path d="M6 18h6m-3-4v4"/><rect x="17" y="8" width="4" height="12" rx="1"/>',
+  speaker:
+    '<rect x="6" y="2" width="12" height="20" rx="3"/><circle cx="12" cy="14" r="4"/><circle cx="12" cy="6" r="1"/>',
+  volume: '<path d="M11 4 6 8H3v8h3l5 4V4Zm4 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
+  general:
+    '<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/>',
+  diagnostics: '<path d="M3 12h4l3-7 4 14 3-7h4"/>',
+  about: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-11v1"/>',
+};
+
 function pageButton(page: SettingsPage, label: string): string {
-  return `<button class="page-button${activePage === page ? ' active' : ''}" type="button" data-page="${page}"${activePage === page ? ' aria-current="page"' : ''}>${label}</button>`;
+  return `<button class="page-button${activePage === page ? ' active' : ''}" type="button" data-page="${page}"${activePage === page ? ' aria-current="page"' : ''}><span class="nav-icon nav-icon-${page}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${pageIcons[page]}</svg></span><span>${label}</span></button>`;
 }
 
 function panel(page: SettingsPage, content: string): string {
@@ -215,6 +258,13 @@ function render(nextSnapshot: Snapshot): void {
   const status = connectionLabel(nextSnapshot.status);
   app.innerHTML = `
     <div class="settings-shell">
+      <div class="macos-titlebar" data-tauri-drag-region>
+        <div class="section-navigation" role="group" aria-label="Navigate settings sections">
+          <button type="button" id="previous-section" aria-label="Previous settings section" title="Previous settings section"${adjacentPage(activePage, -1) ? '' : ' disabled'}><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m10 2-6 6 6 6"/></svg></button>
+          <button type="button" id="next-section" aria-label="Next settings section" title="Next settings section"${adjacentPage(activePage, 1) ? '' : ' disabled'}><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m6 2 6 6-6 6"/></svg></button>
+        </div>
+        <span id="toolbar-section-title" data-tauri-drag-region>${activePage[0].toUpperCase() + activePage.slice(1)}</span>
+      </div>
       <aside class="sidebar">
         <div class="app-heading"><h1><span class="sonos-name">SONOS</span><span>Volume Bridge</span></h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
         <nav aria-label="Settings sections">
@@ -247,8 +297,8 @@ function render(nextSnapshot: Snapshot): void {
           `<div class="panel-heading"><h2>Volume</h2><p>Control how your computer volume changes the speaker.</p></div>
           <div class="settings-group">
             <label class="toggle"><span>Two-way synchronization</span><input type="checkbox" role="switch" name="twoWaySynchronization" ${c.twoWaySynchronization ? 'checked' : ''}/></label><label class="toggle"><span>Mute speaker at zero volume</span><input type="checkbox" role="switch" name="muteSpeakerAtZeroVolume" ${c.muteSpeakerAtZeroVolume ? 'checked' : ''}/></label>
-            <label>Highest speaker volume <output class="range-value" id="maximum-value">${c.maximumSonosVolume}%</output><input name="maximumSonosVolume" id="maximum-volume" type="range" min="0" max="100" step="1" value="${c.maximumSonosVolume}" /></label>
-            <label>Volume feel<select name="mapping">${mappingOptions(c)}</select></label>
+            <label class="volume-limit"><span>Highest speaker volume <output class="range-value" id="maximum-value">${c.maximumSonosVolume}%</output></span><input name="maximumSonosVolume" id="maximum-volume" type="range" min="0" max="100" step="1" value="${c.maximumSonosVolume}" /></label>
+            <label class="select-setting"><span>Volume feel</span><select name="mapping">${mappingOptions(c)}</select></label>
             <details class="help"><summary>What do these options mean?</summary><dl><div><dt>Balanced</dt><dd>Gives you more control at lower volumes and rises more gently.</dd></div><div><dt>Direct</dt><dd>Keeps the speaker volume closely matched to your computer volume.</dd></div><div><dt>Scaled</dt><dd>Scales the full system volume range to the highest speaker volume you chose.</dd></div></dl></details>
             <button class="secondary test-button" type="button" id="test">Test speaker volume</button>
           </div>`,
@@ -277,6 +327,15 @@ function render(nextSnapshot: Snapshot): void {
         <output id="notice" aria-live="polite"></output>
       </form>
     </div>`;
+  if (document.documentElement.dataset.platform === 'macos') sizeSelectedControls(app);
+  document.querySelector('#previous-section')?.addEventListener('click', () => {
+    const page = adjacentPage(activePage, -1);
+    if (page) activatePage(page);
+  });
+  document.querySelector('#next-section')?.addEventListener('click', () => {
+    const page = adjacentPage(activePage, 1);
+    if (page) activatePage(page);
+  });
   const form = document.querySelector<HTMLFormElement>('#settings');
   const scheduleConfigurationSave = (event: Event): void => {
     if (
@@ -321,6 +380,13 @@ function render(nextSnapshot: Snapshot): void {
 
 function activatePage(page: SettingsPage): void {
   activePage = page;
+  const title = document.querySelector('#toolbar-section-title');
+  if (title) title.textContent = page[0].toUpperCase() + page.slice(1);
+  const previous = document.querySelector<HTMLButtonElement>('#previous-section');
+  const next = document.querySelector<HTMLButtonElement>('#next-section');
+  if (previous) previous.disabled = !adjacentPage(page, -1);
+  if (next) next.disabled = !adjacentPage(page, 1);
+  document.querySelector('.content')?.scrollTo(0, 0);
   if (page === 'diagnostics') void refreshAudioInputFormat();
   document.querySelectorAll<HTMLElement>('[data-panel]').forEach((element) => {
     element.hidden = element.dataset.panel !== page;
@@ -328,7 +394,8 @@ function activatePage(page: SettingsPage): void {
   document.querySelectorAll<HTMLButtonElement>('[data-page]').forEach((button) => {
     const active = button.dataset.page === page;
     button.classList.toggle('active', active);
-    button.toggleAttribute('aria-current', active);
+    if (active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
   });
 }
 

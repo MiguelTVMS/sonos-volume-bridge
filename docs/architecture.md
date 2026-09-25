@@ -134,6 +134,10 @@ The protocol adapter uses Reqwest 0.13 and quick-xml 0.42. XML decoding is
 performed by the streaming reader; protocol parsing retains explicit reference
 unescaping and typed errors. See [ADR 0002](decisions/0002-local-sonos-client.md).
 
+The settings form shares behavior across platforms while selecting separate
+macOS, Windows, and Linux presentation styles in the frontend. See
+[ADR 0012](decisions/0012-platform-settings-presentation.md).
+
 The shell preloads optional tray speaker controls asynchronously at startup and
 refreshes them when connection state changes or the tray is clicked. Network
 reads never block the menu event handler; menu updates run on the main thread.
