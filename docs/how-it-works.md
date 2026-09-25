@@ -89,3 +89,9 @@ do not create write loops.
 Settings can be saved on first launch with Start at login disabled. The login
 service is contacted only when that option changes, so login-service errors do
 not block unrelated settings updates.
+
+Speaker sound controls update from local Sonos RenderingControl push notifications.
+Settings-only events no longer require accompanying volume/mute fields. The app
+reads the speaker after a notification and updates Settings and the tray. Focus
+and page changes also refresh device data. Devices/settings without event support
+remain dependent on these refreshes; subscription failures use a polling fallback.

@@ -141,3 +141,7 @@ macOS, Windows, and Linux presentation styles in the frontend. See
 The shell preloads optional tray speaker controls asynchronously at startup and
 refreshes them when connection state changes or the tray is clicked. Network
 reads never block the menu event handler; menu updates run on the main thread.
+
+Settings refreshes are asynchronous and guarded against edits and pending writes.
+Speech Enhancement chooses the same model-appropriate EQ for reads and writes;
+see [ADR 0009](decisions/0009-sonos-speaker-controls.md).

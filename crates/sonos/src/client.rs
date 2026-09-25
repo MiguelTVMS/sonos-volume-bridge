@@ -229,15 +229,35 @@ impl SonosClient {
         .await?;
         Ok(())
     }
+    pub async fn get_speech_enhancement(&self, device: &SonosDevice) -> Result<bool, SonosError> {
+        self.get_eq(device, speech_eq_type(device.model_name.as_deref()))
+            .await
+    }
+
+    pub async fn set_speech_enhancement(
+        &self,
+        device: &SonosDevice,
+        enabled: bool,
+    ) -> Result<(), SonosError> {
+        self.set_eq(
+            device,
+            speech_eq_type(device.model_name.as_deref()),
+            enabled,
+        )
+        .await?;
+        if self.get_speech_enhancement(device).await? != enabled {
+            return Err(SonosError::Protocol(
+                "Speaker did not confirm Speech Enhancement change".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
     pub async fn get_speaker_settings(&self, device: &SonosDevice) -> SpeakerSettings {
         SpeakerSettings {
             loudness: self.get_loudness(device).await.ok(),
             night_sound: self.get_eq(device, "NightMode").await.ok(),
-            speech_enhancement: self
-                .get_eq(device, "SpeechEnhanceEnabled")
-                .await
-                .ok()
-                .or(self.get_eq(device, "DialogLevel").await.ok()),
+            speech_enhancement: self.get_speech_enhancement(device).await.ok(),
         }
     }
     pub async fn get_audio_input_format(
@@ -378,5 +398,43 @@ fn parse_boolean(response: &[u8], field: &'static str) -> Result<bool, SonosErro
             value: value.to_owned(),
         }),
         None => Err(SonosError::MissingSoapValue(field)),
+    }
+}
+
+// Ultra soundbars expose a separate on/off switch. Legacy soundbars (including
+// Ray) can return a successful but non-authoritative zero for that EQ type.
+fn speech_eq_type(model_name: Option<&str>) -> &'static str {
+    let model = model_name.unwrap_or_default().to_ascii_lowercase();
+    if model.ends_with("arc ultra") || model.ends_with("beam ultra") {
+        "SpeechEnhanceEnabled"
+    } else {
+        "DialogLevel"
+    }
+}
+
+#[cfg(test)]
+mod speech_tests {
+    use super::*;
+    #[test]
+    fn legacy_and_ultra_models_use_consistent_eq_variants() {
+        for model in [
+            Some("Sonos Ray"),
+            Some("Sonos Beam"),
+            Some("Sonos Arc"),
+            None,
+        ] {
+            assert_eq!(speech_eq_type(model), "DialogLevel");
+        }
+        for model in ["Sonos Arc Ultra", "Sonos Beam Ultra"] {
+            assert_eq!(speech_eq_type(Some(model)), "SpeechEnhanceEnabled");
+        }
+    }
+    #[test]
+    fn speech_read_errors_are_not_confirmed_off() {
+        assert!(parse_boolean(b"<CurrentValue>1</CurrentValue>", "CurrentValue").unwrap());
+        assert!(!parse_boolean(b"<CurrentValue>0</CurrentValue>", "CurrentValue").unwrap());
+        assert!(parse_boolean(b"<CurrentValue>unknown</CurrentValue>", "CurrentValue").is_err());
+        assert!(parse_boolean(b"<CurrentValue>3</CurrentValue>", "CurrentValue").is_err());
+        assert!(parse_boolean(b"<Response/>", "CurrentValue").is_err());
     }
 }

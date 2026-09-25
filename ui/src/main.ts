@@ -1,11 +1,13 @@
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { listen } from '@tauri-apps/api/event';
 import { bindWindowFocus } from './window-appearance';
 import { connectionLabel } from './connection';
 import { diagnosticsDisclosureState } from './diagnostics';
 import { desktopPlatform } from './platform';
 import { sizeSelectedControls } from './select-sizing';
+import { canApplyRefresh } from './refresh-state';
 import { adjacentPage, type SettingsPage } from './settings-navigation';
 import './style.css';
 import './platform.css';
@@ -113,6 +115,14 @@ let saveTimeout: number | undefined;
 let saveRevision = 0;
 let statusPoll: number | undefined;
 let diagnosticDetailsVisible = false;
+let speakerReadRequest = 0;
+let pushRefreshTimeout: number | undefined;
+let lastFallbackRefresh = 0;
+let refreshRequest = 0;
+let editRevision = 0;
+let pendingWrites = 0;
+let refreshRunning = false;
+let refreshAgain = false;
 let appVersion = 'Loading…';
 
 const repositoryUrl = 'https://github.com/MiguelTVMS/sonos-volume-bridge';
@@ -351,6 +361,7 @@ function render(nextSnapshot: Snapshot): void {
   });
   document.querySelectorAll<HTMLInputElement>('[data-speaker-level]').forEach((input) => {
     input.addEventListener('input', () => {
+      editRevision++;
       const label = input.closest('label')?.querySelector<HTMLOutputElement>('output');
       if (label) label.value = input.value;
     });
@@ -387,7 +398,7 @@ function activatePage(page: SettingsPage): void {
   if (previous) previous.disabled = !adjacentPage(page, -1);
   if (next) next.disabled = !adjacentPage(page, 1);
   document.querySelector('.content')?.scrollTo(0, 0);
-  if (page === 'diagnostics') void refreshAudioInputFormat();
+  void refreshAllSettings();
   document.querySelectorAll<HTMLElement>('[data-panel]').forEach((element) => {
     element.hidden = element.dataset.panel !== page;
   });
@@ -422,7 +433,16 @@ function startStatusPolling(): void {
   if (statusPoll !== undefined) return;
   statusPoll = window.setInterval(() => {
     void invoke<Snapshot>('get_snapshot')
-      .then(refreshRuntimeStatus)
+      .then((next) => {
+        refreshRuntimeStatus(next);
+        if (
+          ['subscriptionDegraded', 'pollingFallback'].includes(next.status) &&
+          Date.now() - lastFallbackRefresh > 5000
+        ) {
+          lastFallbackRefresh = Date.now();
+          schedulePushRefresh();
+        }
+      })
       .catch(() => undefined);
   }, 1_000);
 }
@@ -472,7 +492,10 @@ async function discoverSonos(): Promise<void> {
 }
 
 async function refreshSpeakerSettings(): Promise<void> {
-  speakerSettings = await invoke<SpeakerSettings>('get_speaker_settings').catch(() => ({
+  if (!snapshot || pendingWrites > 0 || saveTimeout !== undefined) return;
+  const request = ++speakerReadRequest;
+  const revision = editRevision;
+  const speaker = await invoke<SpeakerSettings>('get_speaker_settings').catch(() => ({
     loudness: null,
     nightSound: null,
     speechEnhancement: null,
@@ -480,7 +503,40 @@ async function refreshSpeakerSettings(): Promise<void> {
     treble: null,
     bass: null,
   }));
-  if (snapshot) render(snapshot);
+  if (
+    !canApplyRefresh(
+      request,
+      speakerReadRequest,
+      revision,
+      editRevision,
+      pendingWrites > 0 || saveTimeout !== undefined,
+    )
+  )
+    return;
+  speakerSettings = speaker;
+  // Update only speaker controls, preserving configuration drafts and focus.
+  document.querySelectorAll<HTMLInputElement>('[data-speaker-setting]').forEach((input) => {
+    const value = speaker[input.dataset.speakerSetting as keyof SpeakerSettings];
+    input.checked = value === true;
+    input.disabled = value === null;
+  });
+  document.querySelectorAll<HTMLInputElement>('[data-speaker-level]').forEach((input) => {
+    if (document.activeElement === input) return;
+    const value = speaker[input.dataset.speakerLevel as 'treble' | 'bass'];
+    input.disabled = value === null;
+    input.value = String(value ?? 0);
+    const output = input.closest('label')?.querySelector('output');
+    if (output) output.value = String(value ?? 'Unavailable');
+  });
+}
+
+function schedulePushRefresh(): void {
+  editRevision++;
+  if (pushRefreshTimeout !== undefined) window.clearTimeout(pushRefreshTimeout);
+  pushRefreshTimeout = window.setTimeout(() => {
+    pushRefreshTimeout = undefined;
+    void refreshSpeakerSettings();
+  }, 150);
 }
 
 async function useTvAudio(): Promise<void> {
@@ -493,23 +549,26 @@ async function useTvAudio(): Promise<void> {
   }
 }
 async function updateSpeakerSetting(input: HTMLInputElement): Promise<void> {
+  editRevision++;
+  pendingWrites++;
   try {
     await invoke('set_speaker_setting', {
       setting: input.dataset.speakerSetting,
       enabled: input.checked,
     });
-    speakerSettings[
-      input.dataset.speakerSetting as
-        'loudness' | 'nightSound' | 'speechEnhancement' | 'statusLight'
-    ] = input.checked;
     notice('Saved.');
   } catch (error) {
     input.checked = !input.checked;
     notice(String(error));
+  } finally {
+    pendingWrites--;
+    void refreshAllSettings();
   }
 }
 
 async function updateSpeakerLevel(input: HTMLInputElement): Promise<void> {
+  editRevision++;
+  pendingWrites++;
   try {
     const setting = input.dataset.speakerLevel as 'treble' | 'bass';
     const value = Number(input.value);
@@ -518,6 +577,9 @@ async function updateSpeakerLevel(input: HTMLInputElement): Promise<void> {
     notice('Saved.');
   } catch (error) {
     notice(String(error));
+  } finally {
+    pendingWrites--;
+    void refreshAllSettings();
   }
 }
 function notice(value: string): void {
@@ -561,22 +623,30 @@ function formConfiguration(form: HTMLFormElement): Configuration {
 }
 
 function scheduleSave(): void {
+  editRevision++;
   if (saveTimeout !== undefined) window.clearTimeout(saveTimeout);
   const revision = ++saveRevision;
   saveTimeout = window.setTimeout(() => {
+    saveTimeout = undefined;
     const form = document.querySelector<HTMLFormElement>('#settings');
     if (form) void saveConfiguration(formConfiguration(form), revision);
   }, 350);
 }
 
 async function saveConfiguration(configuration: Configuration, revision: number): Promise<void> {
+  pendingWrites++;
+  let saved = false;
   try {
     const nextSnapshot = await invoke<Snapshot>('save_configuration', { configuration });
     if (revision !== saveRevision) return;
     render(nextSnapshot);
     notice('Saved.');
+    saved = true;
   } catch (error) {
     if (revision === saveRevision) notice(`Could not save: ${String(error)}`);
+  } finally {
+    pendingWrites--;
+    if (saved) void refreshAllSettings();
   }
 }
 
@@ -625,11 +695,77 @@ invoke<Snapshot>('get_snapshot')
   .then((nextSnapshot) => {
     render(nextSnapshot);
     startStatusPolling();
-    void refreshAudioOutputs();
-    void refreshSpeakerSettings();
-    discoveryStatus = 'Searching…';
-    void discoverSonos();
+    void refreshAllSettings();
   })
   .catch((error: unknown) => {
     app.textContent = `Unable to load settings: ${String(error)}`;
   });
+
+async function refreshAllSettings(): Promise<void> {
+  if (!snapshot) return;
+  if (refreshRunning) {
+    refreshAgain = true;
+    return;
+  }
+  if (saveTimeout !== undefined || pendingWrites > 0) return;
+  refreshRunning = true;
+  const request = ++refreshRequest;
+  const revision = editRevision;
+  try {
+    const [next, speaker, outputs, discovered, diagnostics] = await Promise.all([
+      invoke<Snapshot>('get_snapshot'),
+      invoke<SpeakerSettings>('get_speaker_settings'),
+      invoke<AudioOutput[]>('list_audio_outputs').catch(() => null),
+      invoke<DiscoveredSonos[]>('discover_sonos').catch(() => null),
+      invoke<Diagnostics>('diagnostics').catch(() => null),
+    ]);
+    if (
+      !canApplyRefresh(
+        request,
+        refreshRequest,
+        revision,
+        editRevision,
+        pendingWrites > 0 || saveTimeout !== undefined,
+      )
+    )
+      return;
+    speakerSettings = speaker;
+    if (outputs) audioOutputs = outputs;
+    if (discovered) {
+      discoveredSonos = discovered;
+      discoveryStatus = `Found ${discovered.length} speaker${discovered.length === 1 ? '' : 's'}`;
+    }
+    render(next);
+    const audioInput = document.querySelector('#diagnostic-audio-input');
+    if (audioInput) audioInput.textContent = diagnostics?.audioInputFormat ?? 'Unavailable';
+    const payload = document.querySelector('#diagnostic-payload');
+    if (payload && diagnosticDetailsVisible && diagnostics)
+      payload.textContent = JSON.stringify(diagnostics, null, 2);
+  } catch {
+    notice('Could not refresh settings. Check the speaker connection and try again.');
+  } finally {
+    refreshRunning = false;
+    if (refreshAgain) {
+      refreshAgain = false;
+      void refreshAllSettings();
+    }
+  }
+}
+
+if (isTauri()) {
+  void getCurrentWindow()
+    .onFocusChanged(({ payload: focused }) => {
+      if (focused) void refreshAllSettings();
+    })
+    .catch(() => {
+      window.addEventListener('focus', () => void refreshAllSettings());
+    });
+} else {
+  window.addEventListener('focus', () => void refreshAllSettings());
+}
+
+if (isTauri()) {
+  void listen('speaker-settings-changed', schedulePushRefresh).catch(() => {
+    notice('Live speaker updates are unavailable. Reopen settings to refresh.');
+  });
+}

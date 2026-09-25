@@ -11,7 +11,10 @@ mod xml;
 pub use client::{SonosClient, SonosClientBuilder, SpeakerSettings};
 pub use discovery::{discover, parse_ssdp_response};
 pub use error::SonosError;
-pub use event::{EventDeduplicator, GenaEvent, GenaState, parse_last_change};
+pub use event::{
+    EventDeduplicator, GenaEvent, GenaState, RenderingControlNotification, parse_last_change,
+    parse_rendering_control_notification,
+};
 pub use gena::{CallbackListener, GenaClient, Subscription};
 pub use model::{
     AvTransportService, DiscoveredDevice, RenderingControlService, SonosDevice, SonosId,

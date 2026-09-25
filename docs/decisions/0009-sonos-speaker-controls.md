@@ -29,3 +29,25 @@ discarded before updating the native menu on the main thread.
 Startup registration and refresh orchestration is shared with a regression test
 that delivers no mouse events and verifies all supported control states. Native
 menu presentation remains covered by the clean-start hardware verification row.
+
+Settings refreshes all device data when opened/focused and when navigating to a
+section. Refresh requests coalesce; responses started before an edit or while a
+write is pending cannot replace the form. Speaker changes trigger an authoritative
+read after writing. Tray hover and click events refresh its controls, and tray
+writes trigger a read afterward. macOS can consume native left-click events, so
+hover prefetch complements the startup refresh; it does not guarantee the first
+menu frame contains a network response that has not arrived yet.
+
+Legacy soundbars, including Ray, use DialogLevel for both Speech Enhancement
+reads and writes. Ultra soundbars use SpeechEnhanceEnabled, with DialogLevel
+reserved for intensity. A successful zero from the wrong EQ type is not a reliable
+capability signal. Writes read back the same variant and report failure if the
+speaker does not confirm the requested state. Malformed reads remain unavailable.
+
+RenderingControl GENA callbacks also accept settings-only LastChange payloads.
+They invalidate speaker-control state independently of the volume/mute
+synchronizer. The current runtime generation emits a Tauri event and refreshes
+the tray; the frontend coalesces bursts for 150 ms, re-reads authoritative settings,
+and patches only speaker controls to preserve form edits. Polling fallback checks
+speaker settings every five seconds while subscriptions are degraded. Status
+lights and devices that omit these events still refresh on focus/navigation.
