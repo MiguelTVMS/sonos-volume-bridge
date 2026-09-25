@@ -1,0 +1,252 @@
+/* Shared semantics and behavior, with independent desktop presentations. */
+.nav-icon {
+  display: none;
+}
+
+:root[data-platform='macos'] {
+  --sidebar: #f0f0f0;
+  --surface: #f7f7f7;
+  --separator: rgb(60 60 67 / 9%);
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+[data-platform='macos'] .settings-shell {
+  grid-template-columns: 184px minmax(0, 1fr);
+}
+[data-platform='macos'] .sidebar {
+  gap: 24px;
+  padding: 22px 10px 16px;
+  background: linear-gradient(145deg, rgb(255 255 255 / 18%), transparent), var(--sidebar);
+}
+[data-platform='macos'] .app-heading {
+  padding: 0 9px;
+}
+[data-platform='macos'] h1 {
+  font-size: 15px;
+  line-height: 1.2;
+}
+[data-platform='macos'] h1 .sonos-name {
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  color: var(--secondary-text);
+  margin-bottom: 3px;
+}
+[data-platform='macos'] nav {
+  gap: 3px;
+}
+[data-platform='macos'] button.page-button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  font-weight: 400;
+}
+[data-platform='macos'] button.page-button.active {
+  background: rgb(0 0 0 / 6%);
+  color: var(--text);
+  font-weight: 600;
+}
+[data-platform='macos'] .nav-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 23px;
+  height: 23px;
+  border-radius: 6px;
+  color: white;
+  box-shadow:
+    inset 0 0 0 0.5px rgb(0 0 0 / 12%),
+    0 1px 1px rgb(0 0 0 / 8%);
+  background: #007aff;
+}
+.nav-icon svg {
+  width: 17px;
+  height: 17px;
+}
+[data-platform='macos'] .nav-icon-speaker {
+  background: #af52de;
+}
+[data-platform='macos'] .nav-icon-volume {
+  background: #f04459;
+}
+[data-platform='macos'] .nav-icon-general {
+  background: #85858b;
+}
+[data-platform='macos'] .nav-icon-diagnostics {
+  background: #30a66b;
+}
+[data-platform='macos'] .nav-icon-about {
+  background: #3478f6;
+}
+[data-platform='macos'] .content {
+  padding: 24px 20px 16px;
+}
+[data-platform='macos'] .panel {
+  gap: 20px;
+}
+[data-platform='macos'] .panel-heading {
+  gap: 7px;
+  padding: 0 2px;
+}
+[data-platform='macos'] h2 {
+  font-size: 20px;
+  letter-spacing: -0.4px;
+}
+[data-platform='macos'] .panel-heading p {
+  line-height: 1.5;
+}
+[data-platform='macos'] .settings-group {
+  gap: 0;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+}
+[data-platform='macos'] .settings-group > :where(:not([type='hidden'])) {
+  padding: 13px 0;
+  margin: 0;
+}
+[data-platform='macos'] .settings-group > :where(:not([type='hidden'])) ~ :not([type='hidden']) {
+  border-top: 1px solid var(--separator);
+}
+[data-platform='macos'] .settings-group > .control-field {
+  gap: 8px;
+}
+[data-platform='macos'] .control-field > label,
+[data-platform='macos'] label {
+  font-weight: 400;
+  font-size: 13px;
+}
+[data-platform='macos'] select {
+  min-height: 27px;
+  padding: 3px 24px 3px 8px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+}
+[data-platform='macos'] button.secondary,
+[data-platform='macos'] button.danger {
+  color: var(--text);
+  font-weight: 400;
+  background: var(--control);
+}
+[data-platform='macos'] button.danger {
+  color: var(--danger);
+}
+[data-platform='macos'] button.icon-button {
+  color: var(--accent);
+  background: transparent;
+}
+[data-platform='macos'] button.secondary:hover {
+  background: var(--separator);
+}
+[data-platform='macos'] .settings-group > button {
+  margin: 12px 0;
+  padding: 5px 11px;
+}
+[data-platform='macos'] .speaker-level > span {
+  display: flex;
+  justify-content: space-between;
+}
+[data-platform='macos'] .speaker-level output {
+  color: var(--secondary-text);
+}
+[data-platform='macos'] .speaker-settings-footer {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+[data-platform='macos'] .status-list {
+  border: 0;
+  border-radius: 12px;
+}
+[data-platform='macos'] .status-list div {
+  padding: 13px 12px;
+}
+[data-platform='macos'] .status-list dd {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+[data-platform='macos'] .about-disclaimer {
+  padding: 12px;
+  gap: 8px;
+}
+[data-platform='macos'] .about-disclaimer > * {
+  padding: 0;
+  border: 0 !important;
+}
+
+/* Windows uses Segoe, a blue selection indicator, and outlined cards. */
+:root[data-platform='windows'] {
+  font-family: 'Segoe UI', sans-serif;
+  --accent: #0067c0;
+  --sidebar: #f3f3f3;
+  --surface: #fafafa;
+}
+[data-platform='windows'] button.page-button {
+  border-radius: 4px;
+}
+[data-platform='windows'] button.page-button.active {
+  background: var(--control);
+  color: var(--text);
+  box-shadow: inset 3px 0 var(--accent);
+}
+[data-platform='windows'] .settings-group {
+  border-radius: 6px;
+}
+[data-platform='windows'] h2 {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+/* Linux keeps a compact, neutral desktop layout with Ubuntu's accent. */
+:root[data-platform='linux'] {
+  font-family: Ubuntu, Cantarell, system-ui, sans-serif;
+  --accent: #c64600;
+  --accent-hover: #a83c00;
+}
+[data-platform='linux'] .settings-group,
+[data-platform='linux'] button,
+[data-platform='linux'] select {
+  border-radius: 6px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-platform='macos'] {
+    --sidebar: #252527;
+    --surface: #2c2c2e;
+    --separator: rgb(255 255 255 / 9%);
+  }
+  [data-platform='macos'] button.page-button.active {
+    background: rgb(255 255 255 / 10%);
+  }
+  :root[data-platform='windows'] {
+    --sidebar: #202020;
+    --surface: #2b2b2b;
+    --accent: #60cdff;
+    --accent-text: #101010;
+  }
+  :root[data-platform='linux'] {
+    --accent: #e97439;
+    --accent-text: #171717;
+  }
+}
+@media (prefers-contrast: more) {
+  :root[data-platform] {
+    --separator: color-mix(in srgb, var(--text) 40%, transparent);
+  }
+  [data-platform='macos'] .settings-group,
+  [data-platform='macos'] .status-list {
+    outline: 1px solid var(--separator);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toggle input[type='checkbox'],
+  .toggle input[type='checkbox']::after {
+    transition: none;
+  }
+}
+
+[data-platform='macos'] .status-list dt {
+  flex-shrink: 0;
+}
+
+[data-platform='macos'] .toggle input[type='checkbox']::after {
+  background: #fff;
+}

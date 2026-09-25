@@ -2,7 +2,11 @@ import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { connectionLabel } from './connection';
 import { diagnosticsDisclosureState } from './diagnostics';
+import { desktopPlatform } from './platform';
 import './style.css';
+import './platform.css';
+
+document.documentElement.dataset.platform = desktopPlatform(navigator.userAgent);
 
 type MappingPoint = { local: number; sonos: number };
 type SettingsPage = 'devices' | 'speaker' | 'volume' | 'general' | 'diagnostics' | 'about';
@@ -200,8 +204,20 @@ function knownSonosAddress(configuration: Configuration): string {
   return selected?.location ?? configuration.lastKnownSonosAddress ?? '';
 }
 
+const pageIcons: Record<SettingsPage, string> = {
+  devices:
+    '<rect x="3" y="4" width="12" height="10" rx="2"/><path d="M6 18h6m-3-4v4"/><rect x="17" y="8" width="4" height="12" rx="1"/>',
+  speaker:
+    '<rect x="6" y="2" width="12" height="20" rx="3"/><circle cx="12" cy="14" r="4"/><circle cx="12" cy="6" r="1"/>',
+  volume: '<path d="M11 4 6 8H3v8h3l5 4V4Zm4 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
+  general:
+    '<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/>',
+  diagnostics: '<path d="M3 12h4l3-7 4 14 3-7h4"/>',
+  about: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-11v1"/>',
+};
+
 function pageButton(page: SettingsPage, label: string): string {
-  return `<button class="page-button${activePage === page ? ' active' : ''}" type="button" data-page="${page}"${activePage === page ? ' aria-current="page"' : ''}>${label}</button>`;
+  return `<button class="page-button${activePage === page ? ' active' : ''}" type="button" data-page="${page}"${activePage === page ? ' aria-current="page"' : ''}><span class="nav-icon nav-icon-${page}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${pageIcons[page]}</svg></span><span>${label}</span></button>`;
 }
 
 function panel(page: SettingsPage, content: string): string {
@@ -328,7 +344,8 @@ function activatePage(page: SettingsPage): void {
   document.querySelectorAll<HTMLButtonElement>('[data-page]').forEach((button) => {
     const active = button.dataset.page === page;
     button.classList.toggle('active', active);
-    button.toggleAttribute('aria-current', active);
+    if (active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
   });
 }
 
