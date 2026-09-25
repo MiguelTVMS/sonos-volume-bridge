@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { connectionLabel } from './connection';
 import { diagnosticsDisclosureState } from './diagnostics';
 import { desktopPlatform } from './platform';
+import { sizeSelectedControls } from './select-sizing';
 import './style.css';
 import './platform.css';
 
@@ -293,6 +294,7 @@ function render(nextSnapshot: Snapshot): void {
         <output id="notice" aria-live="polite"></output>
       </form>
     </div>`;
+  if (document.documentElement.dataset.platform === 'macos') sizeSelectedControls(app);
   const form = document.querySelector<HTMLFormElement>('#settings');
   const scheduleConfigurationSave = (event: Event): void => {
     if (

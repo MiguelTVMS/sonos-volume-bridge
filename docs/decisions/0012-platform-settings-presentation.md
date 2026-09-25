@@ -35,3 +35,7 @@ materials and animations are not guaranteed.
 Apple references: [Pop-up buttons](https://developer.apple.com/design/human-interface-guidelines/pop-up-buttons),
 [Toggles](https://developer.apple.com/design/human-interface-guidelines/toggles), and
 [Sliders](https://developer.apple.com/design/human-interface-guidelines/sliders).
+
+macOS pop-up controls size to the selected label rather than the longest option
+or the trailing column. A hidden, accessibility-excluded label provides intrinsic
+width and updates on selection changes; long values remain capped to the row.

@@ -350,3 +350,29 @@
 [data-platform='macos'] input[type='range']:disabled {
   opacity: 0.45;
 }
+
+/* Intrinsic selected-text width, capped by the available trailing column.
+   An ordinary auto-width select would size to its longest option instead. */
+[data-platform='macos'] .selected-control {
+  position: relative;
+  display: inline-block;
+  justify-self: end;
+  min-width: 0;
+  max-width: 100%;
+}
+[data-platform='macos'] .selected-control-label {
+  display: block;
+  visibility: hidden;
+  overflow: hidden;
+  height: 24px;
+  padding: 2px 25px 2px 8px;
+  white-space: nowrap;
+  font: inherit;
+}
+[data-platform='macos'] .selected-control select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 24px;
+  padding-left: 8px;
+}
