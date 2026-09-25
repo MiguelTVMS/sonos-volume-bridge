@@ -258,6 +258,7 @@ function render(nextSnapshot: Snapshot): void {
   const status = connectionLabel(nextSnapshot.status);
   app.innerHTML = `
     <div class="settings-shell">
+      <div class="macos-titlebar" data-tauri-drag-region aria-hidden="true"></div>
       <aside class="sidebar">
         <div class="app-heading"><h1><span class="sonos-name">SONOS</span><span>Volume Bridge</span></h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
         <nav aria-label="Settings sections">

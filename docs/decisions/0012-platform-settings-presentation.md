@@ -44,3 +44,7 @@ Native window focus controls the macOS accent appearance: the selected sidebar
 row and checked switches use the accent while active and neutral gray while
 inactive. Focus changes never modify switch values. Subscribe before reading the
 initial focus state and ignore a late snapshot after a newer focus event.
+
+The macOS title bar overlays the frontend, retaining native traffic-light window
+controls without a separate title strip. A reserved top drag region and content
+insets keep the controls unobstructed. Windows and Linux retain standard chrome.
