@@ -27,6 +27,12 @@ pnpm run ci:all
 
 ## Pre-commit validation
 
+Run the settings tests with `pnpm --dir ui test`. For rendered UI coverage, run
+`pnpm --dir ui exec playwright install chromium` once, then
+`pnpm --dir ui run test:ui`. The browser suite starts a separate preview server
+and exercises the production settings renderer with mocked device commands.
+Both suites run in the UI tests pull-request workflow, followed by a frontend build.
+
 Enable local hooks once per clone:
 
 ```sh
@@ -192,5 +198,6 @@ Use `?platform=macos`, `?platform=windows`, or `?platform=linux` to review each
 presentation. Add `&appearance=dark` or `&appearance=light` to force a color scheme.
 The preview uses sample data and mocks all Tauri commands; it does
 not control speakers or write app configuration. It is not included in the
-production frontend build. Test at a 740-pixel width on macOS (600 on other platforms) and both default
+production frontend build. Test at a 740-pixel width on macOS, 960 on Windows
+(also its 760-pixel minimum), and 600 on Linux, and both default
 and minimum window heights, including dark mode, keyboard focus, and increased contrast.

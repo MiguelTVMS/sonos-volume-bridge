@@ -1,5 +1,29 @@
 # Hardware verification matrix
 
+## Windows 11 settings presentation
+
+- Automated: the normal frontend suite validates platform selection, native
+  window identity, resize bounds, tray-first startup, and retained Windows chrome.
+- Automated browser tests run the production renderer through the isolated preview:
+  all six pages at default/minimum size in light/dark mode, visible sidebar footer,
+  card nesting, keyboard switch/select/slider changes across rerenders, forced colors,
+  reduced motion, visible focus, and macOS/Linux presentation isolation.
+- Regression mutation verified: removing the compact-height rules makes the
+  minimum-size browser test fail because the speaker footer extends below the
+  window. Restoring the rules makes the same test pass.
+- Visual checks: launch `cargo tauri dev`, open Settings from the tray, and visit
+  Devices, Speaker, Volume, General, Diagnostics, and About. Check the 960-by-760
+  default and 760-by-460 minimum content sizes. Confirm all sidebar entries and
+  the selected speaker remain reachable, cards scroll vertically, and long
+  output names and diagnostics values do not create horizontal overflow.
+- Repeat with light/dark appearance, increased contrast, reduced motion, and
+  keyboard navigation. Switches must toggle with Space; selectors and sliders
+  retain keyboard operation and visible focus. Use the isolated preview for
+  interaction tests that should not change physical speaker settings.
+- Development verification: Windows native light-mode window and isolated browser
+  previews are checked locally. CI covers configuration and shared interaction
+  logic, not native rendering, system contrast themes, or physical Sonos hardware.
+
 Run this matrix for every release candidate on a private local network with one
 supported Sonos speaker and one physical output device per operating system.
 Complete this matrix before treating a release as ready for general use. The
