@@ -15,7 +15,7 @@
 [data-platform='macos'] .sidebar {
   gap: 24px;
   padding: 22px 10px 16px;
-  background: linear-gradient(145deg, rgb(255 255 255 / 18%), transparent), var(--sidebar);
+  background: linear-gradient(145deg, rgb(255 255 255 / 1%), transparent), var(--sidebar);
 }
 [data-platform='macos'] .app-heading {
   padding: 0 9px;
@@ -393,5 +393,5 @@
 }
 
 [data-platform='macos'][data-window-active='true'] .sidebar {
-  background: linear-gradient(145deg, rgb(255 255 255 / 4%), transparent), var(--sidebar);
+  background: linear-gradient(145deg, rgb(255 255 255 / 8%), transparent 65%), var(--sidebar);
 }
