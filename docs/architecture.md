@@ -197,10 +197,12 @@ the shared hover interaction remains in the frontend (ADR 0013).
 
 ## Hardware-free UI demo
 
-The default-off `ui-demo` debug feature selects a separate shell before runtime
-services start. Its frontend uses the shared preview simulator; native device
-handlers are not registered. Presentation overrides never change domain or
-synchronization behavior. See [ADR 0014](decisions/0014-ui-demo-build.md).
+The default-off `ui-demo` debug feature runs the normal shell and native commands
+against a loopback Sonos simulator. Discovery and resolution select only this
+simulated device; SOAP and GENA use the production client. The scheduler, tray,
+local audio and synchronization services remain active. Demo configuration and
+logs use a separate app identity. Browser previews alone use the frontend mock.
+See [ADR 0014](decisions/0014-ui-demo-build.md).
 
 Night schedule notifications share the shell's speaker display-name normalization
 with device selection; notification bodies never need the renderer suffix to

@@ -1,4 +1,4 @@
-// Shared in-memory device simulator for browser previews and opt-in desktop UI demos.
+// Lightweight in-memory simulator for development-only browser layout previews.
 // No native commands, device discovery, files, or audio APIs are used here.
 export function createDemoBackend(options: { hour12?: boolean | null; now?: () => Date } = {}) {
   const snapshot = {

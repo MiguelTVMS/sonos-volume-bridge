@@ -217,25 +217,47 @@ the packaged macOS app before release.
 ## UI demo builds
 
 Build without flags and confirm there is no demo label. Build with `--debug
---features ui-demo`, start without a speaker, and verify Settings opens immediately
-with simulated devices. Edit sound controls, configuration, schedule, and
-notification modes; navigate away/back and check state. Reset and confirm defaults;
-restart and confirm session edits disappear. Normal saved settings, OS audio,
-login registration, and real devices must remain untouched.
+--features ui-demo`, start without a speaker, and verify Settings opens with
+Living Room (simulated). Check normal tray controls, speaker settings, local
+output selection, volume/mute synchronization, diagnostics/export and reset.
+Demo saved settings/logs are separate; no real Sonos devices are discovered or
+contacted. Local audio and OS services operate normally.
 
-Repeat with `ui-windows`, `ui-macos`, and `ui-ubuntu` on the same host. Check the
-forced styling while retaining native window behavior (macOS width stays fixed).
-Try Settings/Quit from the demo tray and running demo alongside a normal instance.
+Regression sequence for Windows Night Sound: start a fresh demo, open Night
+schedule, select the current day's current half-hour cell and Save schedule.
+With recurrence disabled, turn Night sound off on Speaker. Enable schedule and
+return to Speaker: Night sound becomes on, its switch is disabled and the message
+explains that scheduling must be disabled first. Try the tray Night sound action
+as well. Disable the schedule: Night sound stays on but manual off works. Save
+an empty schedule and enable: manual on/off is available outside active periods.
+Repeat after restarting with an enabled active schedule, including opening Speaker
+immediately before the first scheduler tick. Cross a half-hour start/end boundary
+and verify on enforcement, one-time off at exit, and the selected notification mode.
 
-Automated coverage checks command routing, simulator edits/reset, all forced
-presentations, and native IPC rejection of production commands. Browser coverage
-does not prove native WebView, tray, audio, notification, or hardware behavior;
-forced styling does not replace target-OS VM testing.
+Restart: demo app settings persist and the real runtime reconciles fresh simulated
+speaker state. Repeat with `ui-windows`, `ui-macos`, and `ui-ubuntu`; native window
+constraints and chrome remain host-specific. Check keyboard navigation and resizing
+at default/minimum sizes and across display scaling settings.
 
-Local validation: a packaged macOS debug app with `ui-windows` opened successfully
-and displayed the Windows Night schedule layout with the demo label and simulated
-speaker. Browser control-edit/reset checks passed for all three presentations.
-Native Windows/Linux execution and hardware integration remain target-OS checks.
+Automated routing tests cover the delayed startup handshake and native commands
+in both normal and demo builds (the old desktop mock routing fails these tests).
+Native tests use actual SOAP/GENA clients and production scheduler/command entry
+points to cover enabling, startup timing, enforcement, manual-off rejection,
+disabling and outside-period control. They run in the ordinary CI test suite and
+feature-enabled checks. Browser tests cover presentation only. Native WebView,
+tray interaction, notification delivery, wake/time changes and physical hardware
+still require target-OS checks; simulated firmware cannot establish hardware behavior.
+
+Windows native tests require the Common Controls v6 manifest. The shell build
+script supplies it to library test executables; application binaries retain the
+full Tauri manifest. Without this, the test process fails before running tests.
+Local Windows verification of the revised native demo: startup showed Connected
+with the simulated speaker. Saving the current Saturday half-hour and enabling
+scheduling made Night sound checked and disabled, with the schedule-lock message
+and next transition visible. Left the active demo period enabled for UI testing.
+Rust workspace/demo suites, formatting and Clippy passed; frontend unit tests,
+lint/format/build and all 21 browser tests passed. Native notification delivery,
+clock boundaries and restart persistence were not manually exercised in this pass.
 
 ## Schedule notification speaker names
 

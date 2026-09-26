@@ -243,12 +243,13 @@ Use `--no-bundle` for an executable in `target/debug`; packaged output lives und
 on macOS still produces a macOS executable. The **Branch desktop check** workflow
 has an optional `ui_demo` checkbox for Windows/Linux debug artifacts, off by default.
 
-The app opens Settings with simulated devices. Sound controls, configuration,
-schedule editing and Save, notification preferences, diagnostics display, volume
-tests, and reset work without a speaker or audio endpoint. Values last until reload
-or restart. Login registration, audio playback, notifications, and diagnostic file
-export have no actual OS effects. The demo tray provides Settings/Quit; recurring
-schedule enforcement and tray speaker controls require normal native testing.
+The app opens Settings with a simulated Sonos speaker. The ordinary native app
+runs, including recurring schedule enforcement, manual-off locking, tray speaker
+controls, notifications, diagnostics/export, login registration and real local
+audio synchronization. Demo settings and logs use a separate app identity and
+settings persist across restarts. Speaker state resets at restart; the normal
+runtime reconciles it. Local volume and mute can change. No real Sonos device is
+discovered or contacted. The browser preview remains a layout-only simulator.
 
 Only styling is forced. Native chrome, WebView behavior, audio, notifications,
 and device integration need verification on the target OS. Host window constraints

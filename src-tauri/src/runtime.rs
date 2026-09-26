@@ -17,8 +17,12 @@ use sonos_volume_bridge_integration::{
 use sonos_volume_bridge_platform_audio::{
     AudioDeviceSelection, PlatformAudioError, SystemAudioController, SystemAudioEvent,
 };
+#[cfg(any(test, not(feature = "ui-demo")))]
+use sonos_volume_bridge_sonos::SonosId;
+#[cfg(not(feature = "ui-demo"))]
+use sonos_volume_bridge_sonos::discover;
 use sonos_volume_bridge_sonos::{
-    CallbackListener, EventDeduplicator, GenaClient, SonosClient, SonosDevice, SonosId, discover,
+    CallbackListener, EventDeduplicator, GenaClient, SonosClient, SonosDevice,
 };
 use sonos_volume_bridge_synchronization::Synchronizer;
 use std::{
@@ -33,13 +37,16 @@ use tokio::{
     time::{Instant, sleep, sleep_until},
 };
 use tracing::warn;
+#[cfg(not(feature = "ui-demo"))]
 use url::Url;
 
 const SONOS_TIMEOUT: Duration = Duration::from_secs(3);
+#[cfg(not(feature = "ui-demo"))]
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(2);
 const REQUESTED_SUBSCRIPTION: Duration = Duration::from_secs(300);
 const INITIAL_RECONNECT_DELAY: Duration = Duration::from_secs(1);
 const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(30);
+#[cfg(any(test, not(feature = "ui-demo")))]
 const SONOS_UDN_PREFIX: &str = "uuid:RINCON_";
 
 #[derive(Clone, Debug, Serialize)]
@@ -113,6 +120,21 @@ pub(crate) fn display_speaker_name(name: &str) -> String {
 
 /// Performs bounded local-network discovery for the settings application service.
 pub async fn discover_available() -> Result<Vec<DiscoveredSonos>, String> {
+    #[cfg(feature = "ui-demo")]
+    {
+        let speaker = crate::demo::speaker().await.map_err(|e| e.to_string())?;
+        Ok(vec![DiscoveredSonos {
+            id: crate::demo::SPEAKER_ID.into(),
+            friendly_name: "Living Room (simulated)".into(),
+            location: speaker.location.to_string(),
+        }])
+    }
+    #[cfg(not(feature = "ui-demo"))]
+    discover_network().await
+}
+
+#[cfg(not(feature = "ui-demo"))]
+async fn discover_network() -> Result<Vec<DiscoveredSonos>, String> {
     let client = SonosClient::builder()
         .timeout(SONOS_TIMEOUT)
         .build()
@@ -612,6 +634,29 @@ pub(crate) async fn resolve_device(
     client: &SonosClient,
     configuration: &AppConfiguration,
 ) -> Result<SonosDevice, RuntimeError> {
+    #[cfg(feature = "ui-demo")]
+    {
+        if configuration.selected_sonos_id.as_deref() != Some(crate::demo::SPEAKER_ID) {
+            return Err(RuntimeError::SonosUnavailable);
+        }
+        let speaker = crate::demo::speaker()
+            .await
+            .map_err(|_| RuntimeError::SonosUnavailable)?;
+        return client
+            .retrieve_device(speaker.location.clone())
+            .await
+            .map(|found| found.device)
+            .map_err(|_| RuntimeError::SonosUnavailable);
+    }
+    #[cfg(not(feature = "ui-demo"))]
+    resolve_network_device(client, configuration).await
+}
+
+#[cfg(not(feature = "ui-demo"))]
+async fn resolve_network_device(
+    client: &SonosClient,
+    configuration: &AppConfiguration,
+) -> Result<SonosDevice, RuntimeError> {
     let selected = SonosId::new(
         configuration
             .selected_sonos_id
@@ -641,6 +686,7 @@ pub(crate) async fn resolve_device(
     Err(RuntimeError::SonosUnavailable)
 }
 
+#[cfg(any(test, not(feature = "ui-demo")))]
 fn is_sonos_speaker(device: &SonosDevice) -> bool {
     device.id.as_str().starts_with(SONOS_UDN_PREFIX)
 }

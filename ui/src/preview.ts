@@ -1,6 +1,7 @@
 // Development-only entry point. Vite's production build includes index.html only.
 // All commands are mocked: this preview cannot discover or modify real devices.
 import { mockIPC } from '@tauri-apps/api/mocks';
+import { createDemoBackend } from './demo-backend';
 
 const platform = new URLSearchParams(location.search).get('platform') ?? 'macos';
 const agents: Record<string, string> = {
@@ -9,11 +10,14 @@ const agents: Record<string, string> = {
   linux: 'X11; Linux x86_64',
 };
 Object.defineProperty(navigator, 'userAgent', { value: agents[platform] ?? 'Preview' });
-mockIPC((command) => {
+const backend = createDemoBackend({
+  hour12: new URLSearchParams(location.search).get('hour12') === 'false' ? false : null,
+});
+mockIPC((command, args) => {
   if (command === 'ui_demo_enabled') return true;
   if (command === 'ui_demo_platform') return new URLSearchParams(location.search).get('ui');
   if (command === 'plugin:app|version') return 'Preview';
-  throw new Error(`Unexpected native preview command: ${command}`);
+  return backend(command, args as Record<string, unknown>);
 });
 const { settingsReady } = await import('./bootstrap');
 await settingsReady;

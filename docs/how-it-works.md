@@ -167,7 +167,10 @@ errors, capability guidance, and active-period restrictions remain visible.
 
 ## UI demo builds
 
-Explicit `ui-demo` debug builds open Settings with simulated devices and a demo
-label. Edits stay in memory until reload/restart and do not affect real devices
-or normal saved configuration. See [development](development.md#hardware-free-ui-demo)
-for build commands and platform styling overrides.
+Explicit `ui-demo` debug builds open Settings with a simulated Sonos speaker and
+a demo label. The normal scheduler, tray, settings, notifications and local audio
+operate unchanged, including manual-off locking during active scheduled periods.
+Demo app settings persist separately from normal settings; speaker state resets
+on restart and is reconciled by the runtime. No real Sonos device is contacted.
+Local output volume and mute can change through normal synchronization. See
+[development](development.md#hardware-free-ui-demo) for build commands and styling.

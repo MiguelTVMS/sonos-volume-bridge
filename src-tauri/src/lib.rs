@@ -2,6 +2,7 @@ mod autostart;
 mod clock_format;
 mod commands;
 mod config;
+#[cfg(any(test, feature = "ui-demo"))]
 mod demo;
 mod logging;
 mod night_schedule;
@@ -43,14 +44,16 @@ fn ui_demo_platform() -> Option<&'static str> {
 }
 
 pub fn run() {
-    let context = tauri::generate_context!();
-    if ui_demo_enabled() {
-        demo::run(context);
-    } else {
-        run_normal(context);
+    #[allow(unused_mut)]
+    let mut context = tauri::generate_context!();
+    #[cfg(feature = "ui-demo")]
+    {
+        context.config_mut().identifier.push_str(".ui-demo");
     }
+    run_normal(context);
 }
 
+#[allow(clippy::too_many_lines)] // One composition root for normal and demo runtime wiring.
 fn run_normal(context: tauri::Context<tauri::Wry>) {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
@@ -73,9 +76,18 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let config_path = app.path().app_config_dir()?.join("config.json");
             let store = ConfigStore::new(config_path);
-            let configuration = store
+            #[allow(unused_mut)]
+            let mut configuration = store
                 .load_or_default()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
+            #[cfg(feature = "ui-demo")]
+            {
+                let speaker = tauri::async_runtime::block_on(demo::speaker())?;
+                if !store.path().exists() {
+                    configuration.selected_sonos_id = Some(demo::SPEAKER_ID.into());
+                    configuration.last_known_sonos_address = Some(speaker.location.to_string());
+                }
+            }
             #[cfg(target_os = "macos")]
             let mut configuration = configuration;
             #[cfg(target_os = "macos")]
@@ -111,6 +123,13 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
             schedule_wake::install(app.handle());
             schedule_notifications::install();
             night_schedule::start(app.handle().clone());
+            if ui_demo_enabled()
+                && let Some(window) = app.get_webview_window("main")
+            {
+                window.set_title("Sonos Volume Bridge — UI demo")?;
+                window.show()?;
+                window.set_focus()?;
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -129,6 +148,7 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
         })
         .invoke_handler(tauri::generate_handler![
             ui_demo_enabled,
+            ui_demo_platform,
             commands::get_snapshot,
             commands::get_system_hour12,
             commands::save_night_schedule,

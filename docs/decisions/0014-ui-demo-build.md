@@ -1,41 +1,43 @@
-# ADR 0014: Opt-in desktop UI demo builds
+# ADR 0014: Native desktop demo with a simulated Sonos speaker
 
-**Status:** Accepted (2026-09-26)
+**Status:** Accepted (2026-09-26), revised after native schedule testing.
 
 ## Decision
 
-Add the default-off Cargo feature `ui-demo` for hardware-free Settings testing.
-It requires a debug build. With no flag, debug and release builds use normal
-native services. The composition root selects the shell before initializing any
-runtime services. The demo opens Settings immediately and offers Settings/Quit
-in the tray. Its native handler exposes only mode and presentation handshakes:
-no AppState, configuration store, discovery, audio, login items, scheduler,
-notification adapters, or production command handlers are started. A distinct
-runtime identifier separates demo single-instance handling from the normal app.
+The default-off `ui-demo` feature requires a debug build. It runs the ordinary
+application shell, commands, configuration store, tray, synchronization runtime,
+Night Mode scheduler, clock/wake adapters and notifications. Only the speaker is
+simulated. The frontend keeps native IPC after its demo-mode handshake; it never
+loads the browser preview backend in a desktop build.
 
-The frontend waits for the compiled-mode handshake before mounting the production
-Settings renderer. A positive result loads an in-memory simulator shared with the
-browser preview; a negative result retains native commands. A handshake error
-shows a startup error and never silently enables simulation. Native window APIs
-remain intact. A visible sidebar label identifies simulated devices. Changes
-last for the window session, resetting on reload or app restart.
+A loopback-only, stateful Sonos protocol simulator supplies device discovery,
+SOAP reads/writes and GENA callbacks. The production Sonos client and normal
+application orchestration operate on it. Demo discovery and resolution are
+restricted to this speaker, including when saved settings contain another address.
+No domain or synchronization logic depends on demo mode.
 
-The mutually exclusive features `ui-windows`, `ui-macos`, and `ui-ubuntu` imply
-`ui-demo` and force the corresponding frontend presentation on any host. With no
-override, presentation follows the host OS. Native chrome and window constraints
-remain host-specific, including fixed macOS width and vertical resizing.
+A separate `.ui-demo` app identity isolates its single-instance handling, saved
+configuration and logs. A fresh demo preselects the simulated speaker. Settings
+open at startup and show a demo label. Speaker state resets at process restart;
+saved app settings persist and the ordinary runtime reconciles them on startup.
+Local audio outputs, volume synchronization, notifications, login registration,
+diagnostics and exports behave normally. Simulated sound settings affect only the
+simulated speaker; the app can change the actual local output volume and mute.
+
+The mutually exclusive `ui-windows`, `ui-macos` and `ui-ubuntu` features imply
+`ui-demo` and override presentation. Window chrome and constraints remain native.
+The development-only browser preview retains its lightweight in-memory backend
+for layout tests; it is not the behavioral desktop demo.
 
 ## Coverage and limits
 
-Unit tests cover default routing, delayed/failed handshakes, state copies, writes,
-reset, and schedule Save. Browser tests exercise production startup and controls
-under every forced presentation. Native mock IPC tests use the demo's actual
-handler registration and verify that production device commands are rejected.
-CI checks ordinary and feature builds.
+Command-routing regressions cover startup timing and verify that demo commands
+reach native IPC. Native regression tests exercise real SOAP/GENA clients, the
+production schedule worker, enabling a saved current period, manual-off rejection
+before its first tick, enforced on, disabling, and outside-period manual control.
+They run in the ordinary Rust suite and in the feature-enabled CI suite.
 
-This is a Settings UI simulator, not an audio/protocol/scheduler implementation.
-Recurring boundaries, native notifications, audio playback, login registration,
-diagnostic file export, and tray speaker actions require normal native testing.
-Export explains that no file was written. Save, toggles, levels, volume tests,
-and reset remain usable without hardware. Domain and synchronization crates
-are unchanged.
+Native desktop verification covers Settings, tray controls, persisted startup,
+local audio, clock boundaries and notifications. The simulator is not physical
+speaker firmware and cannot validate acoustic output, network discovery failures,
+or hardware-specific protocol quirks. See the verification matrix.
