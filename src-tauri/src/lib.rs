@@ -44,13 +44,17 @@ fn ui_demo_platform() -> Option<&'static str> {
 }
 
 pub fn run() {
-    #[allow(unused_mut)]
     let mut context = tauri::generate_context!();
-    #[cfg(feature = "ui-demo")]
-    {
-        context.config_mut().identifier.push_str(".ui-demo");
-    }
+    configure_identity(&mut context, ui_demo_enabled());
     run_normal(context);
+}
+
+fn configure_identity<R: tauri::Runtime>(context: &mut tauri::Context<R>, demo: bool) {
+    if demo {
+        context.config_mut().identifier.push_str(".ui-demo");
+        // Windows/Linux autostart keys use the package name, not the identifier.
+        context.package_info_mut().name.push_str("-ui-demo");
+    }
 }
 
 #[allow(clippy::too_many_lines)] // One composition root for normal and demo runtime wiring.
@@ -88,8 +92,6 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
                     configuration.last_known_sonos_address = Some(speaker.location.to_string());
                 }
             }
-            #[cfg(target_os = "macos")]
-            let mut configuration = configuration;
             #[cfg(target_os = "macos")]
             let migrated_fixed_output = if configuration.follow_default_audio_device {
                 false
@@ -169,4 +171,23 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
         ])
         .run(context)
         .expect("Tauri runtime failed");
+}
+
+#[cfg(test)]
+mod identity_tests {
+    #[test]
+    fn demo_startup_keeps_autostart_identity_separate_from_normal_app() {
+        let build = |demo| {
+            let mut context = tauri::test::mock_context(tauri::test::noop_assets());
+            context.package_info_mut().name = "sonos-volume-bridge".into();
+            super::configure_identity(&mut context, demo);
+            tauri::test::mock_builder().build(context).unwrap()
+        };
+        let normal = build(false);
+        let demo = build(true);
+        // The autostart plugin uses package_info().name as its registration key.
+        assert_eq!(normal.package_info().name, "sonos-volume-bridge");
+        assert_eq!(demo.package_info().name, "sonos-volume-bridge-ui-demo");
+        assert_ne!(normal.config().identifier, demo.config().identifier);
+    }
 }

@@ -249,6 +249,20 @@ the packaged macOS app before release.
 
 ## UI demo builds
 
+Autostart isolation regression: the normal Rust suite builds normal and demo
+mock applications through the shared startup identity configuration and checks
+the package names consumed by the autostart plugin remain distinct. This test
+fails with identifier-only isolation and passes with the demo package suffix.
+It does not write real OS login entries. On Windows and Linux, enable Start at
+login in the normal app, then enable and disable it in the demo. Confirm the
+normal registry Run entry or autostart desktop file is unchanged and still
+launches the normal executable after signing in again.
+
+The Windows presentation browser test uses native select change events for
+portable save/rerender coverage, retaining keyboard checks for switches and
+sliders. Native dropdown popup keyboard behavior must be checked on Windows:
+focus Follow, choose an output by keyboard, and verify it survives navigation.
+
 Build without flags and confirm there is no demo label. Build with `--debug
 --features ui-demo`, start without a speaker, and verify Settings opens with
 Living Room (simulated). Check normal tray controls, speaker settings, local

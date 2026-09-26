@@ -197,6 +197,10 @@ the shared hover interaction remains in the frontend (ADR 0013).
 
 ## Hardware-free UI demo
 
+Demo startup assigns a distinct runtime package name as well as application
+identifier. Windows/Linux login registration uses the package name, preserving
+the normal application's autostart entry when demo login settings change.
+
 The default-off `ui-demo` debug feature runs the normal shell and native commands
 against a loopback Sonos simulator. Discovery and resolution select only this
 simulated device; SOAP and GENA use the production client. The scheduler, tray,

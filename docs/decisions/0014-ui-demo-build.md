@@ -17,8 +17,11 @@ restricted to this speaker, including when saved settings contain another addres
 No domain or synchronization logic depends on demo mode.
 
 A separate `.ui-demo` app identity isolates its single-instance handling, saved
-configuration and logs. A fresh demo preselects the simulated speaker. Settings
-open at startup and show a demo label. Speaker state resets at process restart;
+configuration and logs.
+Windows/Linux autostart also uses a separate `-ui-demo` package name, since the
+plugin keys login entries by package name rather than application identifier.
+A fresh demo preselects the simulated speaker. Settings open at startup and show
+a demo label. Speaker state resets at process restart;
 saved app settings persist and the ordinary runtime reconciles them on startup.
 Local audio outputs, volume synchronization, notifications, login registration,
 diagnostics and exports behave normally. Simulated sound settings affect only the

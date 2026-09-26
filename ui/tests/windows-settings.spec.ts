@@ -49,7 +49,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
   }
 }
 
-test('Windows captions preserve keyboard switches, selects, and slider commits through rerenders', async ({
+test('Windows captions preserve keyboard switches and sliders, and select changes through rerenders', async ({
   page,
 }) => {
   await page.goto('/preview.html?platform=windows');
@@ -58,10 +58,11 @@ test('Windows captions preserve keyboard switches, selects, and slider commits t
   await mute.focus();
   await page.keyboard.press('Space');
   await expect(mute).not.toBeChecked();
+  await expect(page.locator('#notice')).toHaveText('Saved.');
   const output = page.getByRole('combobox', { name: /^Follow/ });
-  await output.focus();
-  await page.keyboard.press('End');
-  await page.keyboard.press('Enter');
+  // Native popup keyboard behavior belongs to the host OS, even in Windows styling.
+  // Exercise the select's change/save path portably; verify popup keys on Windows.
+  await output.selectOption('sample-output');
   await expect(output).toHaveValue('sample-output');
   await page.getByRole('button', { name: 'Volume', exact: true }).click();
   const slider = page.getByRole('slider');
