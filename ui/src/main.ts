@@ -374,7 +374,6 @@ function render(nextSnapshot: Snapshot): void {
     </div>`;
   applySpeakerControls(app, speakerSettings, document.activeElement);
   refreshScheduleView();
-  if (document.documentElement.dataset.platform === 'macos') sizeSelectedControls(app);
   document.querySelector('#previous-section')?.addEventListener('click', () => {
     const page = adjacentPage(activePage, -1);
     if (page) activatePage(page);
@@ -401,6 +400,8 @@ function render(nextSnapshot: Snapshot): void {
       error: notice,
     },
   );
+  // Mount restores saved selections before their labels determine control width.
+  if (document.documentElement.dataset.platform === 'macos') sizeSelectedControls(app);
   refreshScheduleView();
   const form = document.querySelector<HTMLFormElement>('#settings');
   const scheduleConfigurationSave = (event: Event): void => {

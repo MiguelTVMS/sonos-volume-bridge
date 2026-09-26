@@ -146,8 +146,8 @@ changes are allowed. Leaving a scheduled period turns Night Mode off once.
 The tray has a checked **Night schedule** item directly above **Night sound**.
 The checkmark represents enabled scheduling; the editor opens through Settings.
 
-**Notify when schedule starts or ends** saves immediately and offers **Never**
-(the default), **On Start**, **On End**, and **Both**. Confirmed boundaries notify
+**Night schedule notifications** saves immediately and offers **On start**,
+**On end**, **On start and end**, and **Never** (the default). Confirmed boundaries notify
 only when their direction is selected. Save also tests the matching direction:
 on counts as Start, off as End. Adjacent selected cells do not notify. Startup,
 wake, recovery, selection changes, manual changes, and enforcement corrections
