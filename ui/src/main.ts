@@ -11,7 +11,8 @@ import {
   type ScheduleStatus,
 } from './night-schedule';
 import { getVersion } from '@tauri-apps/api/app';
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { isTauri } from '@tauri-apps/api/core';
+import { invoke, demoMode, presentationOverride } from './app-commands';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 import { bindWindowFocus } from './window-appearance';
@@ -29,9 +30,18 @@ import { UserWrites } from './user-writes';
 import './style.css';
 import './platform.css';
 import './windows.css';
+import './linux.css';
 
-const platform = desktopPlatform(navigator.userAgent);
+const platform = presentationOverride ?? desktopPlatform(navigator.userAgent);
 document.documentElement.dataset.platform = platform;
+
+function updateRangeFill(input: HTMLInputElement): void {
+  if (platform !== 'linux') return;
+  const min = Number(input.min || 0);
+  const max = Number(input.max || 100);
+  const progress = max > min ? ((Number(input.value) - min) / (max - min)) * 100 : 0;
+  input.style.setProperty('--range-progress', `${Math.max(0, Math.min(100, progress))}%`);
+}
 
 if (document.documentElement.dataset.platform === 'macos') {
   const applyFocus = (focused: boolean): void => {
@@ -306,7 +316,7 @@ function render(nextSnapshot: Snapshot): void {
         <span id="toolbar-section-title" data-tauri-drag-region>${activePage === 'schedule' ? 'Night schedule' : activePage[0].toUpperCase() + activePage.slice(1)}</span>
       </div>
       <aside class="sidebar">
-        <div class="app-heading"><h1><span class="sonos-name">SONOS</span><span>Volume Bridge</span></h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
+        <div class="app-heading">${demoMode ? '<p class="demo-indicator">UI demo · simulated devices</p>' : ''}<h1><span class="sonos-name">SONOS</span><span>Volume Bridge</span></h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
         <nav aria-label="Settings sections">
           ${pageButton('devices', 'Devices')}
           ${pageButton('speaker', 'Speaker')}
@@ -373,6 +383,7 @@ function render(nextSnapshot: Snapshot): void {
       </form>
     </div>`;
   applySpeakerControls(app, speakerSettings, document.activeElement);
+  app.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(updateRangeFill);
   refreshScheduleView();
   document.querySelector('#previous-section')?.addEventListener('click', () => {
     const page = adjacentPage(activePage, -1);
@@ -420,6 +431,7 @@ function render(nextSnapshot: Snapshot): void {
     input.addEventListener('change', () => void updateSpeakerSetting(input));
   });
   document.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach((input) => {
+    updateRangeFill(input);
     sliders.bind(
       input,
       () => {
@@ -429,6 +441,7 @@ function render(nextSnapshot: Snapshot): void {
       () => {
         const label = input.closest('label')?.querySelector<HTMLOutputElement>('output');
         if (label) label.value = input.id === 'maximum-volume' ? `${input.value}%` : input.value;
+        updateRangeFill(input);
       },
       () => {
         if (input.dataset.speakerLevel) void updateSpeakerLevel(input);
@@ -586,6 +599,7 @@ async function refreshSpeakerSettings(): Promise<void> {
     return;
   speakerSettings = speaker;
   applySpeakerControls(app, speakerSettings, document.activeElement);
+  app.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(updateRangeFill);
   refreshScheduleView();
 }
 
@@ -701,7 +715,9 @@ async function saveConfiguration(configuration: Configuration, revision: number)
   pendingWrites++;
   let saved = false;
   try {
-    const nextSnapshot = await invoke<Snapshot>('save_configuration', { configuration });
+    const nextSnapshot = await userWrites.run(() =>
+      invoke<Snapshot>('save_configuration', { configuration }),
+    );
     if (revision !== saveRevision) return;
     render(nextSnapshot);
     notice('Saved.');
@@ -751,8 +767,23 @@ async function exportDiagnostics(): Promise<void> {
   notice(await invoke<string>('export_diagnostics'));
 }
 async function reset(): Promise<void> {
-  render(await invoke<Snapshot>('reset_configuration'));
-  notice('Settings reset.');
+  if (saveTimeout !== undefined) window.clearTimeout(saveTimeout);
+  saveTimeout = undefined;
+  saveRevision++;
+  editRevision++;
+  pendingWrites++;
+  try {
+    // Reset follows any write already sent, so an older save cannot restore it.
+    const next = await userWrites.run(() => invoke<Snapshot>('reset_configuration'));
+    scheduleDraft.reset(next.configuration.nightModeSchedule!.blocks);
+    render(next);
+    notice('Settings reset.');
+  } catch (error) {
+    notice(`Could not reset: ${String(error)}`);
+  } finally {
+    pendingWrites--;
+    void refreshAllSettings();
+  }
 }
 
 Promise.all([

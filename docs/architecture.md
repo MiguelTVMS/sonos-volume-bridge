@@ -194,3 +194,38 @@ rectangular editor and scheduler are used on all three platforms.
 
 Windows schedule tooltips use an opaque platform surface in both color schemes;
 the shared hover interaction remains in the frontend (ADR 0013).
+
+## Hardware-free UI demo
+
+Demo startup assigns a distinct runtime package name as well as application
+identifier. Windows/Linux login registration uses the package name, preserving
+the normal application's autostart entry when demo login settings change.
+
+The default-off `ui-demo` debug feature runs the normal shell and native commands
+against a loopback Sonos simulator. Discovery and resolution select only this
+simulated device; SOAP and GENA use the production client. The scheduler, tray,
+local audio and synchronization services remain active. Demo configuration and
+logs use a separate app identity. Browser previews alone use the frontend mock.
+See [ADR 0014](decisions/0014-ui-demo-build.md).
+
+Night schedule notifications share the shell's speaker display-name normalization
+with device selection; notification bodies never need the renderer suffix to
+identify a speaker. This applies to both scheduled boundaries and Save confirmations.
+
+
+Linux settings use a shared Ubuntu/Yaru-inspired presentation on x86-64 and
+ARM64, with a 1080-pixel fixed-width native window, an 800-pixel default height and
+responsive grouped controls. Vertical resizing remains available.
+The platform stylesheet stays inside the frontend; the shell selects Linux
+window bounds through `tauri.linux.conf.json`. See ADR 0012.
+
+The Linux tray adapter uses a white icon for Ubuntu's dark top bar independently
+of the application color scheme, retaining the disconnected badge (ADR 0012).
+
+The macOS release packages its signed and notarized app into a separately signed
+and notarized DMG for drag-to-Applications installation. A compatibility ZIP
+remains available; see [ADR 0015](decisions/0015-macos-dmg-download.md).
+
+Settings reset cancels debounced autosaves, invalidates older save responses and
+joins the same user-write queue as configuration saves. A reset therefore runs
+after writes already in flight; stale saves cannot restore pre-reset settings.

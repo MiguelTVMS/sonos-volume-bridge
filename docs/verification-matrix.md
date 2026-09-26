@@ -1,5 +1,38 @@
 # Hardware verification matrix
 
+## Linux ARM64 build
+
+Local validation (2026-09-26): Ubuntu 26.04 ARM64, Rust 1.98.1, Node.js
+24.21.0 LTS and pnpm 12.6.0 passed the standalone debug Tauri build, ELF
+architecture and linked-library checks, Rust formatting, workspace Clippy and
+tests, UI demo Rust tests, and frontend build, tests, lint and formatting.
+Graphical and physical-device scenarios below remain manual verification.
+
+Automated coverage: the Branch desktop check workflow builds on native
+`ubuntu-24.04-arm`, runs frontend and Rust checks, verifies the executable's ELF
+machine is AArch64, and uploads an artifact with the architecture in its name.
+PR Rust quality checks run workspace and UI demo tests on the same architecture.
+Workflow configuration alone is not evidence of a successful build; confirm the
+ARM64 job passes before treating an artifact as verified.
+
+Manual verification on an ARM64 Ubuntu desktop or VM:
+
+1. Follow the native build commands in [development](development.md#linux-arm64).
+2. Confirm `file` and `readelf -h` identify the executable as AArch64.
+3. Start the normal app in a graphical session. Open Settings from the tray,
+   select a local output and Sonos speaker, save, quit, and relaunch.
+4. Verify saved selections, volume/mute synchronization, tray controls, and
+   Night schedule interactions using the existing scenarios below.
+5. Build again with `--debug --features ui-demo`, launch without a physical
+   speaker, and repeat the UI demo scenarios below, including saved startup.
+6. If testing a Debian package, confirm `dpkg-deb -f <package.deb> Architecture`
+   reports `arm64`, install it, and repeat the desktop checks.
+
+Coverage limits: CI compilation and automated tests do not verify a graphical
+session, tray integration, audio service access, physical Sonos hardware, or
+package installation. Building on Ubuntu 24.04 does not establish compatibility
+with older distributions. Windows ARM64 and macOS builds are separate targets.
+
 ## Windows 11 settings presentation
 
 - Automated: the normal frontend suite validates platform selection, native
@@ -213,3 +246,134 @@ through the production form, waits for the save rerender, and checks the sizing
 label and rendered text width. It fails before the mount-order fix. Browser
 coverage does not establish native WebView popup rendering; repeat this check in
 the packaged macOS app before release.
+
+## UI demo builds
+
+Autostart isolation regression: the normal Rust suite builds normal and demo
+mock applications through the shared startup identity configuration and checks
+the package names consumed by the autostart plugin remain distinct. This test
+fails with identifier-only isolation and passes with the demo package suffix.
+It does not write real OS login entries. On Windows and Linux, enable Start at
+login in the normal app, then enable and disable it in the demo. Confirm the
+normal registry Run entry or autostart desktop file is unchanged and still
+launches the normal executable after signing in again.
+
+The Windows presentation browser test uses native select change events for
+portable save/rerender coverage, retaining keyboard checks for switches and
+sliders. Native dropdown popup keyboard behavior must be checked on Windows:
+focus Follow, choose an output by keyboard, and verify it survives navigation.
+
+Build without flags and confirm there is no demo label. Build with `--debug
+--features ui-demo`, start without a speaker, and verify Settings opens with
+Living Room (simulated). Check normal tray controls, speaker settings, local
+output selection, volume/mute synchronization, diagnostics/export and reset.
+Demo saved settings/logs are separate; no real Sonos devices are discovered or
+contacted. Local audio and OS services operate normally.
+
+Regression sequence for Windows Night Sound: start a fresh demo, open Night
+schedule, select the current day's current half-hour cell and Save schedule.
+With recurrence disabled, turn Night sound off on Speaker. Enable schedule and
+return to Speaker: Night sound becomes on, its switch is disabled and the message
+explains that scheduling must be disabled first. Try the tray Night sound action
+as well. Disable the schedule: Night sound stays on but manual off works. Save
+an empty schedule and enable: manual on/off is available outside active periods.
+Repeat after restarting with an enabled active schedule, including opening Speaker
+immediately before the first scheduler tick. Cross a half-hour start/end boundary
+and verify on enforcement, one-time off at exit, and the selected notification mode.
+
+Restart: demo app settings persist and the real runtime reconciles fresh simulated
+speaker state. Repeat with `ui-windows`, `ui-macos`, and `ui-ubuntu`; native window
+constraints and chrome remain host-specific. Check keyboard navigation and resizing
+at default/minimum sizes and across display scaling settings.
+
+Automated routing tests cover the delayed startup handshake and native commands
+in both normal and demo builds (the old desktop mock routing fails these tests).
+Native tests use actual SOAP/GENA clients and production scheduler/command entry
+points to cover enabling, startup timing, enforcement, manual-off rejection,
+disabling and outside-period control. They run in the ordinary CI test suite and
+feature-enabled checks. Browser tests cover presentation only. Native WebView,
+tray interaction, notification delivery, wake/time changes and physical hardware
+still require target-OS checks; simulated firmware cannot establish hardware behavior.
+
+Windows native tests require the Common Controls v6 manifest. The shell build
+script supplies it to library test executables; application binaries retain the
+full Tauri manifest. Without this, the test process fails before running tests.
+Local Windows verification of the revised native demo: startup showed Connected
+with the simulated speaker. Saving the current Saturday half-hour and enabling
+scheduling made Night sound checked and disabled, with the schedule-lock message
+and next transition visible. Left the active demo period enabled for UI testing.
+Rust workspace/demo suites, formatting and Clippy passed; frontend unit tests,
+lint/format/build and all 21 browser tests passed. Native notification delivery,
+clock boundaries and restart persistence were not manually exercised in this pass.
+
+## Schedule notification speaker names
+
+With a speaker whose discovery name contains a Sonos Media Renderer suffix, enable
+start/end notifications and save a schedule once inside and once outside its
+current block. Confirm each notification uses only the human speaker name. Verify
+scheduled start and end notifications likewise. Names with ordinary hyphens must
+remain intact. Automated tests cover the shared production notification formatter
+for all four paths and fail when raw discovery names are used. Native delivery
+and banner layout still require a real notification-capable host.
+
+
+## Ubuntu settings presentation
+
+- Automated browser tests cover every page at 1080 by 800 and 1080 by 460 in
+  light and dark modes, keyboard switch and slider changes, and persisted schedule
+  selection. The rounded-cell regression was reproduced before the CSS fix.
+- On native Ubuntu, start `ui-demo` from a closed app and compare with GNOME
+  Settings: wide window, neutral sidebar, white rounded groups, row separators,
+  trailing dropdowns, orange switches and white slider thumbs. Check text renders
+  in Ubuntu/system sans-serif throughout, with no unexpected serif paragraphs.
+- Confirm horizontal resizing is blocked. At the default height, open Night
+  schedule and Save: the grid, actions and save notice must fit without scrolling.
+  Resize vertically to the minimum; scroll to every setting and action. Switch pages, change a dropdown, drag a slider, and save/reopen a schedule.
+  Schedule cells must stay rectangular before and after updates.
+- Repeat in dark mode, with increased text scaling and keyboard-only input.
+  Confirm select popups, native title bar and tray behavior in WebKitGTK.
+- Browser coverage cannot establish native title-bar appearance or desktop theme
+  integration. HTML controls follow Yaru styling but are not native GTK widgets.
+
+Ubuntu window follow-up: verify width stays at 1080 while height can change.
+At the 800-pixel default height, Night schedule must fit after Save without
+scrolling. On Volume, the Test speaker volume button must be inset from the card
+and usable with Enter. Automated browser regressions cover these cases.
+
+## Ubuntu top-bar icon contrast
+
+Start with Ubuntu in light application mode and the app closed. Launch the UI
+demo: the top-bar glyph must be white immediately, including before connection
+completes. Switch the application theme dark then light; the glyph must remain
+white. In a normal build, disconnect and reconnect the selected speaker and check
+the red disconnected badge appears and clears without changing glyph contrast.
+The CI regression exercises the production image-selection path in this sequence
+and failed before the fix. It cannot verify native AppIndicator rendering or
+custom desktop panels; manually check against Ubuntu's default dark top bar.
+
+## Linux release architectures
+
+Release CI builds native AMD64 and ARM64 Debian packages and checks their
+architecture metadata before upload. Automated release-script tests use real
+Debian package fixtures and reject mismatched, missing, empty or ambiguous
+installers. Alias tests require both Linux packages and check the website URLs.
+After the first release, download each architecture from its website button,
+check `dpkg-deb -f <package.deb> Architecture`, and install on the matching Ubuntu
+machine. The ARM64 stable link is unavailable until that asset reaches a GA release.
+
+## macOS release DMG
+
+After a GA release, download the DMG from the website. Verify its stapled ticket
+and Gatekeeper assessment, open it, drag the app to Applications, eject the image,
+and launch the installed app. Confirm Settings, tray and saved configuration work.
+Repeat on a clean supported Mac to check quarantine handling. Release CI verifies
+signing, notarization acceptance, stapling and image integrity; alias tests cannot
+establish native installation or Apple notarization behavior.
+
+## Reset during autosave
+
+Change a General setting and immediately open Diagnostics and reset. Wait past
+the autosave debounce, return to General, and confirm defaults remain restored
+and the reset notice was not replaced by an old save response. Repeat with a slow
+configuration write. Browser regressions freeze the debounce clock or hold IPC
+completion to exercise both sequences deterministically through the real UI.

@@ -164,3 +164,13 @@ Windows, and GNOME clock-format or LC_TIME on Linux. Preferences are reread when
 Settings regains focus. Other Linux desktop-specific clock overrides may require
 matching LC_TIME. The form omits repetitive disabled/outside-period status text;
 errors, capability guidance, and active-period restrictions remain visible.
+
+## UI demo builds
+
+Explicit `ui-demo` debug builds open Settings with a simulated Sonos speaker and
+a demo label. The normal scheduler, tray, settings, notifications and local audio
+operate unchanged, including manual-off locking during active scheduled periods.
+Demo app settings persist separately from normal settings; speaker state resets
+on restart and is reconciled by the runtime. No real Sonos device is contacted.
+Local output volume and mute can change through normal synchronization. See
+[development](development.md#hardware-free-ui-demo) for build commands and styling.

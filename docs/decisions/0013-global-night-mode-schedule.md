@@ -86,3 +86,9 @@ alive during OS menu tracking.
 
 Windows interval tooltips use the opaque platform surface color in both light
 and dark modes so underlying grid cells cannot show through the time label.
+
+Scheduled start/end notifications and explicit Save confirmations share one body
+formatter. Speaker names use the same display-name normalization as device
+selection, removing Sonos renderer/model/identifier suffixes while retaining the
+human room name, including hyphens within that name. Stable device identity is
+unchanged.

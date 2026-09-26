@@ -77,7 +77,7 @@ jobs:
           version: 12
       - uses: actions/setup-node@v7
         with:
-          node-version: 26
+          node-version: "lts/*"
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - uses: Swatinem/rust-cache@v2
@@ -99,6 +99,7 @@ jobs:
         with:
           name: external-pr-rust-lint-logs-${{ github.run_id }}
           path: .ci-artifacts
+      - run: cargo clippy -p sonos-volume-bridge --all-targets --features ui-demo -- -D warnings
 
   rust-tests:
     name: External PR • Rust tests
@@ -122,7 +123,7 @@ jobs:
           version: 12
       - uses: actions/setup-node@v7
         with:
-          node-version: 26
+          node-version: "lts/*"
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - uses: Swatinem/rust-cache@v2
@@ -137,6 +138,7 @@ jobs:
           test_exit=${PIPESTATUS[0]}
           echo "result=$test_exit" >> "$GITHUB_OUTPUT"
           exit $test_exit
+      - run: cargo test -p sonos-volume-bridge --features ui-demo
       - name: Generate test result summary
         if: always()
         run: |
@@ -258,7 +260,7 @@ jobs:
           version: 12
       - uses: actions/setup-node@v7
         with:
-          node-version: 26
+          node-version: "lts/*"
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
@@ -291,7 +293,7 @@ jobs:
           version: 12
       - uses: actions/setup-node@v7
         with:
-          node-version: 26
+          node-version: "lts/*"
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile

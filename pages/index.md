@@ -56,11 +56,11 @@ Latest stable release · [Check the latest release ↗](https://github.com/Migue
 
 ### macOS
 
-For Macs running macOS 13 or later. Signed with Developer ID and notarized by Apple.
+For Macs running macOS 13 or later. Signed with Developer ID and notarized by Apple. Open the DMG and drag the app into Applications.
 
 Apple Silicon (ARM64) only. Intel Macs are not supported.
 
-[Download for macOS ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-macos.zip)
+[Download for macOS (DMG) ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-macos.dmg)
 
 ### Windows
 
@@ -72,11 +72,11 @@ The direct installer is unsigned. Windows SmartScreen may show a warning.
 
 ### Ubuntu
 
-For Ubuntu on x86-64, with PulseAudio or PipeWire and `pactl`.
+For Ubuntu on x86-64 or ARM64, with PulseAudio or PipeWire and `pactl`.
 
-DEB package · AMD64.
+DEB packages · AMD64 and ARM64.
 
-[Download for Ubuntu ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-linux-amd64.deb)
+[Download for Ubuntu (AMD64) ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-linux-amd64.deb)  [Download for Ubuntu (ARM64) ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-linux-arm64.deb)
 
 Need a hand? [Read the installation guide ↗](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Installation)
 

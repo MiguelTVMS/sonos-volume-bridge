@@ -1,6 +1,6 @@
 # Development
 
-Install Rust 1.98.1 (including `clippy` and `rustfmt`), Node.js 26, and pnpm 12. Run the complete local verification suite with:
+Install Rust 1.98.1 (including `clippy` and `rustfmt`), the current Node.js LTS (24), and pnpm 12. Run the complete local verification suite with:
 
 ```sh
 pnpm run ci:all
@@ -73,6 +73,44 @@ works with either PulseAudio or PipeWire's `pipewire-pulse` service:
 ```sh
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev pulseaudio-utils
 ```
+
+### Linux ARM64
+
+Build natively on an ARM64 Ubuntu desktop or VM (`uname -m` reports `aarch64`).
+Install the Rust, Node.js and pnpm versions listed above for ARM64, plus:
+
+```sh
+sudo apt update
+sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev pulseaudio-utils binutils file
+pnpm --dir ui install --frozen-lockfile
+cargo fmt --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+pnpm dlx @tauri-apps/cli@2 build --debug --no-bundle --no-sign
+file target/debug/sonos-volume-bridge
+readelf -h target/debug/sonos-volume-bridge
+```
+
+On small VMs, set `export CARGO_BUILD_JOBS=1` before the Cargo and Tauri
+commands to limit concurrent compiler memory use. If a non-interactive shell
+cannot find tools installed in your account, load `~/.cargo/env` and
+`~/.nvm/nvm.sh` first, then run `nvm use --lts`.
+
+The executable must report `AArch64`. Launch `target/debug/sonos-volume-bridge`
+from the desktop session. For the hardware-free demo, add `--features ui-demo`
+to the build command and run `cargo test -p sonos-volume-bridge --features ui-demo`.
+For a normal release Debian package, use
+`pnpm dlx @tauri-apps/cli@2 build --bundles deb`; output is under
+`target/release/bundle/deb`. Demo features require debug builds.
+
+The **Branch desktop check** workflow includes `ubuntu-24.04-arm` and publishes
+`desktop-normal-Linux-ARM64` (or `desktop-ui-demo-Linux-ARM64` when dispatched
+with `ui_demo`). It checks the executable architecture before uploading it.
+PR Rust quality checks also run the workspace and demo suites on ARM64.
+The native runner avoids a cross-compilation sysroot for GTK and WebKitGTK.
+See [GitHub's runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+Release publishing builds and uploads both Linux AMD64 and ARM64 Debian packages. Desktop checks are listed in the
+[verification matrix](verification-matrix.md#linux-arm64-build).
 
 ## Visual Studio Code on Windows
 
@@ -152,8 +190,9 @@ latest stable Rust through `dtolnay/rust-toolchain@v1` and sets
 `RUSTUP_TOOLCHAIN=stable` so the local pin does not override that selection.
 Lockfile and workflow changes also trigger Rust checks.
 
-CI actions use their latest stable major tags. Node.js and pnpm are selected by
-major version (26 and 12), allowing stable minor and patch updates. The browser
+CI actions use their latest stable major tags. Node.js follows the current LTS through `lts/*`; pnpm is selected by major
+version (12), allowing stable minor and patch updates. Local builds use nvm
+(`nvm install --lts` and `nvm use --lts`). The browser
 test job has a ten-minute timeout to bound failures during setup or teardown.
 Playwright launches Vite directly through Node. A nested `pnpm run dev` leaves
 Vite in a separate process group with pnpm 11.27.1 and 12.6.0 on Linux, causing
@@ -208,7 +247,7 @@ presentation. Add `&appearance=dark` or `&appearance=light` to force a color sch
 The preview uses sample data and mocks all Tauri commands; it does
 not control speakers or write app configuration. It is not included in the
 production frontend build. Test at a 740-pixel width on macOS, 960 on Windows
-(also its 760-pixel minimum), and 600 on Linux, and both default
+(also its 760-pixel minimum), and 1080 on Linux (fixed width, 800-pixel default height), and both default
 and minimum window heights, including dark mode, keyboard focus, and increased contrast.
 
 ## Night schedule branch testing
@@ -220,3 +259,38 @@ without opening a PR. Production builds always follow the machine clock; there i
 no forced AM/PM layout preview. Schedule tests run with ordinary frontend and Rust
 suites. Physical speaker, sleep/wake, and packaged notification checks remain in
 the verification matrix.
+
+## Hardware-free UI demo
+
+Build an app for the current host with simulated devices using an explicit flag:
+
+```sh
+pnpm --dir ui install --frozen-lockfile
+pnpm dlx @tauri-apps/cli@2 build --debug --features ui-demo
+```
+
+Replace `ui-demo` with exactly one of `ui-windows`, `ui-macos`, or `ui-ubuntu` to
+force that platform's presentation on the current host. Each enables demo mode:
+
+```sh
+pnpm dlx @tauri-apps/cli@2 build --debug --features ui-windows
+pnpm dlx @tauri-apps/cli@2 dev --features ui-ubuntu
+```
+
+Use `--no-bundle` for an executable in `target/debug`; packaged output lives under
+`target/debug/bundle`. Build on each target OS for its VM: forcing Windows styling
+on macOS still produces a macOS executable. The **Branch desktop check** workflow
+has an optional `ui_demo` checkbox for Windows/Linux debug artifacts, off by default.
+
+The app opens Settings with a simulated Sonos speaker. The ordinary native app
+runs, including recurring schedule enforcement, manual-off locking, tray speaker
+controls, notifications, diagnostics/export, login registration and real local
+audio synchronization. Demo settings and logs use a separate app identity and
+settings persist across restarts. Speaker state resets at restart; the normal
+runtime reconciles it. Local volume and mute can change. No real Sonos device is
+discovered or contacted. The browser preview remains a layout-only simulator.
+
+Only styling is forced. Native chrome, WebView behavior, audio, notifications,
+and device integration need verification on the target OS. Host window constraints
+remain in effect (macOS stays fixed-width). Release builds reject demo features.
+With no feature flags, even debug builds run normally.

@@ -1,0 +1,17 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Sonos Volume Bridge Settings",
+        "width": 1080,
+        "minWidth": 1080,
+        "height": 800,
+        "minHeight": 460,
+        "visible": false,
+        "resizable": true,
+        "maxWidth": 1080
+      }
+    ]
+  }
+}

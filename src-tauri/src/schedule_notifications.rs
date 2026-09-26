@@ -4,6 +4,29 @@ use tauri::{AppHandle, Runtime};
 #[cfg(not(target_os = "macos"))]
 use tauri_plugin_notification::NotificationExt;
 
+#[derive(Clone, Copy)]
+pub enum ScheduleNotice<'a> {
+    Boundary { next: Option<&'a str> },
+    Saved,
+}
+
+pub fn schedule_body(speaker: &str, active: bool, notice: ScheduleNotice<'_>) -> String {
+    let speaker = crate::runtime::display_speaker_name(speaker);
+    match notice {
+        ScheduleNotice::Saved => format!(
+            "{speaker}: Night Mode is {}. Applied from Save schedule.",
+            if active { "on" } else { "off" }
+        ),
+        ScheduleNotice::Boundary { next } if active => format!(
+            "{speaker}: Night Mode is on until {}.",
+            next.unwrap_or("the schedule ends")
+        ),
+        ScheduleNotice::Boundary { .. } => {
+            format!("{speaker}: Night Mode is off. Manual control is available.")
+        }
+    }
+}
+
 #[cfg(target_os = "macos")]
 pub async fn permitted<R: Runtime>(_: &AppHandle<R>, request: bool) -> bool {
     use objc2_user_notifications::{
@@ -133,4 +156,56 @@ mod foreground {
 pub fn install() {
     #[cfg(target_os = "macos")]
     foreground::install();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ScheduleNotice, schedule_body};
+
+    #[test]
+    fn all_schedule_notifications_use_the_same_human_speaker_name_as_settings() {
+        for name in [
+            "Office Desk Speaker",
+            "Office Desk Speaker - Sonos Ray Media Renderer - RINCON_TEST",
+        ] {
+            for (active, notice, expected) in [
+                (
+                    true,
+                    ScheduleNotice::Boundary {
+                        next: Some("07:00"),
+                    },
+                    "Office Desk Speaker: Night Mode is on until 07:00.",
+                ),
+                (
+                    false,
+                    ScheduleNotice::Boundary { next: None },
+                    "Office Desk Speaker: Night Mode is off. Manual control is available.",
+                ),
+                (
+                    true,
+                    ScheduleNotice::Saved,
+                    "Office Desk Speaker: Night Mode is on. Applied from Save schedule.",
+                ),
+                (
+                    false,
+                    ScheduleNotice::Saved,
+                    "Office Desk Speaker: Night Mode is off. Applied from Save schedule.",
+                ),
+            ] {
+                assert_eq!(schedule_body(name, active, notice), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn room_name_hyphens_are_preserved_and_missing_end_time_has_a_fallback() {
+        assert_eq!(
+            schedule_body(
+                "Office - Desk Speaker - Sonos Ray Media Renderer - RINCON_TEST",
+                true,
+                ScheduleNotice::Boundary { next: None }
+            ),
+            "Office - Desk Speaker: Night Mode is on until the schedule ends."
+        );
+    }
 }

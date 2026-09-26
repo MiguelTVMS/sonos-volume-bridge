@@ -3741,6 +3741,7 @@ dependencies = [
  "objc2-foundation",
  "objc2-service-management",
  "objc2-user-notifications",
+ "reqwest",
  "serde",
  "serde_json",
  "sonos-volume-bridge-domain",
