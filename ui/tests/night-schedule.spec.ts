@@ -1,5 +1,27 @@
 import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 test.use({ locale: 'en-GB' });
+
+test('Night schedule fits the default macOS window without vertical scrolling', async ({
+  page,
+}) => {
+  const config = JSON.parse(
+    readFileSync(new URL('../../src-tauri/tauri.macos.conf.json', import.meta.url), 'utf8'),
+  );
+  const { width, height, minWidth, maxWidth } = config.app.windows[0];
+  expect(minWidth).toBe(width);
+  expect(maxWidth).toBe(width);
+  await page.setViewportSize({ width, height });
+  await page.goto('/preview.html?platform=macos');
+  await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
+  await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
+  await expect(page.locator('#notice')).toContainText('saved and applied');
+  const dimensions = await page.locator('.content').evaluate((element) => ({
+    content: element.scrollHeight,
+    viewport: element.clientHeight,
+  }));
+  expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport);
+});
 
 test('macOS notification dropdown fits the saved option after rerendering', async ({ page }) => {
   await page.setViewportSize({ width: 600, height: 650 });

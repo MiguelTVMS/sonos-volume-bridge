@@ -44,6 +44,9 @@ white switch and slider thumbs. HTML controls retain native keyboard semantics;
 these are WebView controls, not AppKit or SwiftUI controls, so exact system
 materials and animations are not guaranteed.
 
+The default macOS height is 700 points to give Night schedule more vertical room.
+Width remains fixed at 740 points; users can still resize vertically down to 460.
+
 Apple references: [Pop-up buttons](https://developer.apple.com/design/human-interface-guidelines/pop-up-buttons),
 [Toggles](https://developer.apple.com/design/human-interface-guidelines/toggles), and
 [Sliders](https://developer.apple.com/design/human-interface-guidelines/sliders).

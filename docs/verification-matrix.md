@@ -201,6 +201,10 @@ is enabled in branch builds.
 
 ### Night schedule notification dropdown sizing
 
+The macOS Settings window opens at 740 by 700 points. Check Night schedule at
+that default size for unnecessary vertical scrolling; horizontal resizing must
+remain disabled. Browser coverage also checks the page with save feedback shown.
+
 On macOS, open Settings → Night schedule and select On Start, then On End.
 After each immediate save, verify the complete selected text remains visible
 beside the dropdown arrow. Leave and reopen Settings to check the restored value;
