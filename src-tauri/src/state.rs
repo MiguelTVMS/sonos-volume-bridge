@@ -42,6 +42,7 @@ pub struct AppState {
     pub configuration: Mutex<AppConfiguration>,
     pub snapshot: Arc<Mutex<UiSnapshot>>,
     runtime: RuntimeManager,
+    pub camera: Arc<crate::camera::CameraAutomation>,
     _log_guard: WorkerGuard,
 }
 
@@ -57,6 +58,7 @@ impl AppState {
             UiStatus::ConfigurationRequired
         };
         Self {
+            camera: crate::camera::CameraAutomation::new(configuration.clone()),
             store,
             configuration: Mutex::new(configuration.clone()),
             snapshot: Arc::new(Mutex::new(UiSnapshot {

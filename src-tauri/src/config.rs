@@ -25,6 +25,8 @@ pub struct AppConfiguration {
     pub start_at_login: bool,
     pub fallback_polling: bool,
     #[serde(default)]
+    pub camera_speech_enhancement_enabled: bool,
+    #[serde(default)]
     pub log_level: LogLevel,
     pub maximum_sonos_volume: SonosVolume,
     pub mapping: VolumeMapping,
@@ -54,6 +56,7 @@ impl Default for AppConfiguration {
             two_way_synchronization: true,
             start_at_login: false,
             fallback_polling: true,
+            camera_speech_enhancement_enabled: false,
             log_level: LogLevel::default(),
             maximum_sonos_volume: SonosVolume::new(55).unwrap_or(SonosVolume::MAX),
             mapping: VolumeMapping::Piecewise {
@@ -172,5 +175,20 @@ mod tests {
             .remove("twoWaySynchronization");
         let configuration: AppConfiguration = serde_json::from_value(value).unwrap();
         assert!(configuration.two_way_synchronization);
+    }
+}
+
+#[cfg(test)]
+mod camera_compatibility_tests {
+    use super::*;
+    #[test]
+    fn existing_configuration_defaults_camera_automation_off() {
+        let mut value = serde_json::to_value(AppConfiguration::default()).unwrap();
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("cameraSpeechEnhancementEnabled");
+        let config: AppConfiguration = serde_json::from_value(value).unwrap();
+        assert!(!config.camera_speech_enhancement_enabled);
     }
 }

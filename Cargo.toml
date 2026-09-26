@@ -2,6 +2,7 @@
 members = [
     "crates/domain",
     "crates/platform-audio",
+    "crates/platform-camera",
     "crates/integration",
     "src-tauri",
     "crates/sonos",

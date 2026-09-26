@@ -3669,6 +3669,7 @@ dependencies = [
  "sonos-volume-bridge-domain",
  "sonos-volume-bridge-integration",
  "sonos-volume-bridge-platform-audio",
+ "sonos-volume-bridge-platform-camera",
  "sonos-volume-bridge-sonos",
  "sonos-volume-bridge-synchronization",
  "tauri",
@@ -3712,6 +3713,16 @@ dependencies = [
  "sonos-volume-bridge-domain",
  "thiserror 2.0.21",
  "tokio",
+ "windows 0.62.2",
+ "windows-core 0.62.2",
+]
+
+[[package]]
+name = "sonos-volume-bridge-platform-camera"
+version = "1.4.0"
+dependencies = [
+ "sonos-volume-bridge-domain",
+ "sonos-volume-bridge-integration",
  "windows 0.62.2",
  "windows-core 0.62.2",
 ]

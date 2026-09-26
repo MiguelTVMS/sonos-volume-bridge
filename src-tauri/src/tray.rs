@@ -23,6 +23,7 @@ struct TrayMenuItems<R: Runtime> {
     menu: Menu<R>,
     speaker: MenuItem<R>,
     status: MenuItem<R>,
+    camera_status: MenuItem<R>,
     speaker_separator: PredefinedMenuItem<R>,
     speaker_controls: Mutex<Vec<CheckMenuItem<R>>>,
     connection: Mutex<ConnectionState>,
@@ -69,6 +70,13 @@ fn register_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     )?;
     let settings = MenuItem::with_id(app, "settings", "Open settings", true, None::<&str>)?;
     let diagnostics = MenuItem::with_id(app, "diagnostics", "Diagnostics", true, None::<&str>)?;
+    let camera_status = MenuItem::with_id(
+        app,
+        "camera-status",
+        "Camera automation is off",
+        false,
+        None::<&str>,
+    )?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let speaker_separator = PredefinedMenuItem::separator(app)?;
     let separator = PredefinedMenuItem::separator(app)?;
@@ -78,6 +86,7 @@ fn register_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             &title,
             &speaker,
             &status,
+            &camera_status,
             &separator,
             &settings,
             &diagnostics,
@@ -103,12 +112,7 @@ fn register_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             "speaker-speech-enhancement" => {
                 toggle_speaker_setting(app, SpeakerSetting::SpeechEnhancement, event.id().as_ref());
             }
-            "quit" => {
-                if let Some(state) = app.try_state::<AppState>() {
-                    state.stop_runtime();
-                }
-                app.exit(0);
-            }
+            "quit" => app.exit(0),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| match event {
@@ -128,6 +132,7 @@ fn register_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         menu,
         speaker,
         status,
+        camera_status,
         speaker_separator,
         speaker_controls: Mutex::new(Vec::new()),
         connection: Mutex::new(connection),
@@ -251,7 +256,13 @@ fn toggle_speaker_setting<R: Runtime>(app: &AppHandle<R>, setting: SpeakerSettin
     if let (Some(enabled), Some(configuration)) = (enabled, configuration) {
         let app = app.clone();
         tauri::async_runtime::spawn(async move {
-            let _ = runtime::set_speaker_setting(configuration, setting, enabled).await;
+            if matches!(setting, SpeakerSetting::SpeechEnhancement) {
+                if let Some(state) = app.try_state::<AppState>() {
+                    let _ = state.camera.manual(configuration, enabled).await;
+                }
+            } else {
+                let _ = runtime::set_speaker_setting(configuration, setting, enabled).await;
+            }
             refresh_speaker_controls(&app);
         });
     }
@@ -383,6 +394,21 @@ fn show_settings<R: Runtime>(app: &AppHandle<R>) {
 
 fn opens_settings_on_double_click(button: MouseButton) -> bool {
     button == MouseButton::Left
+}
+
+pub(crate) fn refresh_camera_status<R: Runtime>(app: &AppHandle<R>) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let (Some(items), Some(state)) = (
+            handle.try_state::<TrayMenuItems<R>>(),
+            handle.try_state::<AppState>(),
+        ) {
+            let status = state.camera.status();
+            let _ = items
+                .camera_status
+                .set_text(status.warning.unwrap_or(status.message));
+        }
+    });
 }
 
 #[cfg(test)]

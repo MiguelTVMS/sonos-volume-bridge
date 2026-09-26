@@ -1,3 +1,4 @@
+import { cameraAutomationPresentation, type CameraAutomationStatus } from './camera-automation';
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -57,6 +58,7 @@ type Configuration = {
   twoWaySynchronization: boolean;
   startAtLogin: boolean;
   fallbackPolling: boolean;
+  cameraSpeechEnhancementEnabled?: boolean;
   maximumSonosVolume: number;
   mapping: {
     type: 'linear' | 'capped_linear' | 'piecewise';
@@ -98,6 +100,10 @@ const root = document.querySelector<HTMLDivElement>('#app');
 if (!root) throw new Error('Missing application root.');
 const app: HTMLDivElement = root;
 let snapshot: Snapshot | null = null;
+let cameraStatus: CameraAutomationStatus = {
+  available: false,
+  message: 'Camera automation is unavailable in this platform build',
+};
 let discoveredSonos: DiscoveredSonos[] = [];
 let audioOutputs: AudioOutput[] = [];
 let speakerSettings: SpeakerSettings = {
@@ -263,6 +269,15 @@ function panel(page: SettingsPage, content: string): string {
   return `<section class="panel" data-panel="${page}"${activePage === page ? '' : ' hidden'}>${content}</section>`;
 }
 
+function cameraAutomationControl(configuration: Configuration): string {
+  const presentation = cameraAutomationPresentation(
+    cameraStatus,
+    !!configuration.cameraSpeechEnhancementEnabled,
+    speakerSettings.speechEnhancement !== null,
+  );
+  return `<label class="toggle"><span>Enable Speech Enhancement while a camera is in use<small class="feature-status" id="camera-status">${escapeHtml(presentation.message)}</small><small>Camera activity is a proxy for video calls; audio-only calls are not detected. No camera media is accessed.</small></span><input type="checkbox" role="switch" name="cameraSpeechEnhancementEnabled"${configuration.cameraSpeechEnhancementEnabled ? ' checked' : ''}${presentation.disabled ? ' disabled' : ''}/></label>`;
+}
+
 function render(nextSnapshot: Snapshot): void {
   if (sliders.active) return;
   snapshot = nextSnapshot;
@@ -303,7 +318,7 @@ function render(nextSnapshot: Snapshot): void {
         )}
         ${panel(
           'speaker',
-          `<div class="panel-heading"><h2>Speaker</h2><p>Adjust sound settings available on the selected Sonos speaker.</p></div><div class="settings-group"><label class="toggle"><span>${settingCaption(platform, 'Night sound', 'Reduce loud sounds for quieter listening.', 'moon')}<small class="feature-status" data-feature-status="nightSound"></small></span><input type="checkbox" role="switch" data-speaker-setting="nightSound"${speakerSettings.nightSound ? ' checked' : ''}${speakerSettings.nightSound === null ? ' disabled' : ''}/></label><label class="toggle"><span>${settingCaption(platform, 'Loudness', 'Enhance bass and treble at lower volumes.', 'sound')}<small class="feature-status" data-feature-status="loudness"></small></span><input type="checkbox" role="switch" data-speaker-setting="loudness"${speakerSettings.loudness ? ' checked' : ''}${speakerSettings.loudness === null ? ' disabled' : ''}/></label><label class="toggle"><span>${settingCaption(platform, 'Status light', 'Show the indicator light on the speaker.', 'light')}<small class="feature-status" data-feature-status="statusLight"></small></span><input type="checkbox" role="switch" data-speaker-setting="statusLight"${speakerSettings.statusLight ? ' checked' : ''}${speakerSettings.statusLight === null ? ' disabled' : ''}/></label><label class="toggle"><span>${settingCaption(platform, 'Speech enhancement', 'Make voices easier to hear.', 'speech')}<small class="feature-status" data-feature-status="speechEnhancement"></small></span><input type="checkbox" role="switch" data-speaker-setting="speechEnhancement"${speakerSettings.speechEnhancement ? ' checked' : ''}${speakerSettings.speechEnhancement === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>${settingCaption(platform, 'Treble', 'Adjust the higher frequencies.', 'tone')} <output>${speakerSettings.treble ?? 'Unavailable'}</output><small class="feature-status" data-feature-status="treble"></small></span><input type="range" min="-10" max="10" value="${speakerSettings.treble ?? 0}" data-speaker-level="treble"${speakerSettings.treble === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>${settingCaption(platform, 'Bass', 'Adjust the lower frequencies.', 'tone')} <output>${speakerSettings.bass ?? 'Unavailable'}</output><small class="feature-status" data-feature-status="bass"></small></span><input type="range" min="-10" max="10" value="${speakerSettings.bass ?? 0}" data-speaker-level="bass"${speakerSettings.bass === null ? ' disabled' : ''}/></label><div class="speaker-settings-footer"><p class="setting-note">Unavailable settings are checked again on refresh.</p><div class="speaker-settings-actions"><button class="secondary" type="button" id="use-tv-audio">Use TV audio</button><button class="secondary icon-button" type="button" id="refresh-speaker-settings" title="Refresh speaker settings" aria-label="Refresh speaker settings">↻</button></div></div></div>`,
+          `<div class="panel-heading"><h2>Speaker</h2><p>Adjust sound settings available on the selected Sonos speaker.</p></div><div class="settings-group"><label class="toggle"><span>${settingCaption(platform, 'Night sound', 'Reduce loud sounds for quieter listening.', 'moon')}<small class="feature-status" data-feature-status="nightSound"></small></span><input type="checkbox" role="switch" data-speaker-setting="nightSound"${speakerSettings.nightSound ? ' checked' : ''}${speakerSettings.nightSound === null ? ' disabled' : ''}/></label><label class="toggle"><span>${settingCaption(platform, 'Loudness', 'Enhance bass and treble at lower volumes.', 'sound')}<small class="feature-status" data-feature-status="loudness"></small></span><input type="checkbox" role="switch" data-speaker-setting="loudness"${speakerSettings.loudness ? ' checked' : ''}${speakerSettings.loudness === null ? ' disabled' : ''}/></label><label class="toggle"><span>${settingCaption(platform, 'Status light', 'Show the indicator light on the speaker.', 'light')}<small class="feature-status" data-feature-status="statusLight"></small></span><input type="checkbox" role="switch" data-speaker-setting="statusLight"${speakerSettings.statusLight ? ' checked' : ''}${speakerSettings.statusLight === null ? ' disabled' : ''}/></label><label class="toggle"><span>${settingCaption(platform, 'Speech enhancement', 'Make voices easier to hear.', 'speech')}<small class="feature-status" data-feature-status="speechEnhancement"></small></span><input type="checkbox" role="switch" data-speaker-setting="speechEnhancement"${speakerSettings.speechEnhancement ? ' checked' : ''}${speakerSettings.speechEnhancement === null ? ' disabled' : ''}/></label>${cameraAutomationControl(c)}<label class="speaker-level"><span>${settingCaption(platform, 'Treble', 'Adjust the higher frequencies.', 'tone')} <output>${speakerSettings.treble ?? 'Unavailable'}</output><small class="feature-status" data-feature-status="treble"></small></span><input type="range" min="-10" max="10" value="${speakerSettings.treble ?? 0}" data-speaker-level="treble"${speakerSettings.treble === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>${settingCaption(platform, 'Bass', 'Adjust the lower frequencies.', 'tone')} <output>${speakerSettings.bass ?? 'Unavailable'}</output><small class="feature-status" data-feature-status="bass"></small></span><input type="range" min="-10" max="10" value="${speakerSettings.bass ?? 0}" data-speaker-level="bass"${speakerSettings.bass === null ? ' disabled' : ''}/></label><div class="speaker-settings-footer"><p class="setting-note">Unavailable settings are checked again on refresh.</p><div class="speaker-settings-actions"><button class="secondary" type="button" id="use-tv-audio">Use TV audio</button><button class="secondary icon-button" type="button" id="refresh-speaker-settings" title="Refresh speaker settings" aria-label="Refresh speaker settings">↻</button></div></div></div>`,
         )}
         ${panel(
           'volume',
@@ -601,6 +616,7 @@ function formConfiguration(form: HTMLFormElement): Configuration {
     twoWaySynchronization: values.has('twoWaySynchronization'),
     startAtLogin: values.has('startAtLogin'),
     fallbackPolling: values.has('fallbackPolling'),
+    cameraSpeechEnhancementEnabled: values.has('cameraSpeechEnhancementEnabled'),
     maximumSonosVolume: Number(values.get('maximumSonosVolume')),
     mapping:
       mapping === 'piecewise'
@@ -782,3 +798,25 @@ if (isTauri()) {
     notice('Live speaker updates are unavailable. Reopen settings to refresh.');
   });
 }
+
+async function refreshCameraStatus(): Promise<void> {
+  cameraStatus = await invoke<typeof cameraStatus>('get_camera_status').catch(() => cameraStatus);
+  const label = document.querySelector<HTMLElement>('#camera-status');
+  if (label)
+    label.textContent = cameraAutomationPresentation(
+      cameraStatus,
+      !!snapshot?.configuration.cameraSpeechEnhancementEnabled,
+      speakerSettings.speechEnhancement !== null,
+    ).message;
+  const input = document.querySelector<HTMLInputElement>(
+    'input[name="cameraSpeechEnhancementEnabled"]',
+  );
+  if (input)
+    input.disabled = cameraAutomationPresentation(
+      cameraStatus,
+      input.checked,
+      speakerSettings.speechEnhancement !== null,
+    ).disabled;
+}
+void refreshCameraStatus();
+window.setInterval(() => void refreshCameraStatus(), 1_000);

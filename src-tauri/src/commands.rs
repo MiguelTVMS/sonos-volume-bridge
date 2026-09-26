@@ -19,7 +19,7 @@ pub fn get_snapshot(state: State<'_, AppState>) -> Result<UiSnapshot, String> {
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri owns command argument extraction.
-pub fn save_configuration(
+pub async fn save_configuration(
     configuration: AppConfiguration,
     state: State<'_, AppState>,
     app: AppHandle,
@@ -35,6 +35,7 @@ pub fn save_configuration(
         configuration,
         |enabled| autostart::update(&app, enabled),
     )?;
+    state.camera.configure(configuration.clone()).await;
     state.replace_configuration(configuration);
     state.start_runtime(app);
     get_snapshot(state)
@@ -60,11 +61,12 @@ fn persist_settings(
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri owns command argument extraction.
-pub fn reset_configuration(
+pub async fn reset_configuration(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<UiSnapshot, String> {
     let configuration = state.store.reset().map_err(|error| error.to_string())?;
+    state.camera.configure(configuration.clone()).await;
     state.replace_configuration(configuration);
     state.start_runtime(app);
     get_snapshot(state)
@@ -216,6 +218,7 @@ pub async fn get_speaker_settings(state: State<'_, AppState>) -> Result<SpeakerS
         .configuration
         .lock()
         .map_or_else(|_| AppConfiguration::default(), |value| value.clone());
+    state.camera.request_refresh();
     Ok(runtime::speaker_settings(configuration).await)
 }
 
@@ -256,7 +259,11 @@ pub async fn set_speaker_setting(
         .lock()
         .map_err(|_| "application state is unavailable".to_owned())?
         .clone();
-    runtime::set_speaker_setting(configuration, setting, enabled).await
+    if matches!(setting, SpeakerSetting::SpeechEnhancement) {
+        state.camera.manual(configuration, enabled).await
+    } else {
+        runtime::set_speaker_setting(configuration, setting, enabled).await
+    }
 }
 
 #[cfg(test)]
@@ -355,4 +362,10 @@ mod persistence_tests {
             assert_eq!(store.0.load_or_default().unwrap().start_at_login, enabled);
         }
     }
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn get_camera_status(state: State<'_, AppState>) -> crate::camera::CameraStatus {
+    state.camera.status()
 }

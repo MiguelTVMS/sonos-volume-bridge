@@ -117,3 +117,21 @@ properties, never dispatch input/change events or enqueue writes. Existing audio
 origin/expected-write suppression remains in the synchronization adapters. Sonos
 notifications do not identify the originating controller, so an echoed value is
 not treated as proof of authorship and genuine external changes remain observable.
+
+## Optional camera automation
+
+Validated platform builds can offer “Enable Speech Enhancement while a camera is
+in use.” Both native backends currently remain release-disabled pending physical
+validation. Linux shows the option as unavailable. Existing configurations default
+the option off.
+
+After one second of aggregate camera use, the app reads Speech Enhancement and
+only enables it if off. It restores its own change after all cameras have remained
+inactive for three seconds. An already-on setting is never automatically disabled.
+Manual changes override automation until the next camera activity period.
+Disabling, switching speakers, resetting, and quitting attempt guarded cleanup.
+Unrelated settings saves preserve ownership. Detection failures leave volume
+synchronization running. Settings and tray distinguish authoritative speech state
+from the automation source and show cleanup warnings.
+
+Read [privacy and restoration limits](camera-automation-privacy.md) before enabling.
