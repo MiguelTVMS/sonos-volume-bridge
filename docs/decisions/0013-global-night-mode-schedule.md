@@ -81,7 +81,13 @@ inside the async runtime and verifies that the sender remains connected after
 multiple sends. It never posts test notifications to the user's desktop.
 Because Tauri's desktop permission helpers unconditionally report granted, macOS uses UserNotifications
 for real authorization, delivery, and foreground presentation; Windows checks the
-native toast setting. OS permission is requested only from the user's opt-in action.
+native toast setting. Unpackaged Windows runs register both presentation metadata
+and a COM activator before first use; display-name-only registration is incomplete.
+The activator has a quoted executable launch command and opens Settings, ignoring
+notification arguments. A dedicated MTA retains the COM factory for process lifetime.
+Startup repairs the executable path after a rebuild or installation change.
+Normal and demo activators are distinct. Native macOS and Linux delivery is unchanged.
+OS permission is requested only from the user's opt-in action.
 Linux notification services do not expose a portable permission prompt/status;
 delivery follows desktop settings. OS suppression and notification delivery failures
 never affect volume synchronization. Native permission waits run outside the speaker

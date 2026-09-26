@@ -233,6 +233,11 @@ pub fn install() {
     foreground::install();
 }
 
+#[cfg(windows)]
+pub fn install_windows<R: Runtime>(app: &AppHandle<R>) {
+    windows::install(app);
+}
+
 #[cfg(test)]
 mod tests {
     use super::{ScheduleNotice, schedule_body};

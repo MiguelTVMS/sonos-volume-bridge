@@ -1,5 +1,34 @@
 //! Keep Windows permission checks and delivery on the same notification identity.
 
+#[cfg(windows)]
+mod activation;
+
+#[cfg(windows)]
+pub(super) fn install<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    use tauri::Manager;
+    let identifier = app.config().identifier.clone();
+    let name = app
+        .config()
+        .product_name
+        .clone()
+        .unwrap_or_else(|| "Sonos Volume Bridge".into());
+    let app = app.clone();
+    activation::set_open_settings(move || {
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if let Some(window) = handle.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        });
+    });
+    // Register even before a schedule is active, so a cold toast activation can
+    // connect to the COM server and a rebuilt executable repairs its launch path.
+    if let Err(error) = notifier(&identifier, &name) {
+        tracing::warn!(%error, "Windows notification registration failed");
+    }
+}
+
 pub(super) trait Transport {
     type Error;
     fn setting(&self) -> Permission;
@@ -124,15 +153,16 @@ pub(super) fn notifier(
         return ToastNotificationManager::CreateToastNotifier()
             .map(|native| Notifier(Native(native, String::new())));
     }
-    Notifier::open(
+    activation::register(identifier)?;
+    open_unpacked(
         identifier,
-        |id| {
-            // Unpackaged/local runs have no installer to register their notification identity.
-            // Register presentation metadata only; never change the user's notification settings.
-            let (key, _) = winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER)
-                .create_subkey(format!("Software\\Classes\\AppUserModelId\\{id}"))?;
-            if key.get_value::<String, _>("DisplayName").ok().as_deref() != Some(name) {
-                key.set_value("DisplayName", &name)?;
+        name,
+        &std::env::current_exe()?.to_string_lossy(),
+        |path, field, value| {
+            let (key, _) =
+                winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER).create_subkey(path)?;
+            if key.get_value::<String, _>(field).ok().as_deref() != Some(value) {
+                key.set_value(field, &value)?;
             }
             Ok(())
         },
@@ -143,6 +173,32 @@ pub(super) fn notifier(
     )
 }
 
+#[cfg(windows)]
+fn open_unpacked<T: Transport, E>(
+    id: &str,
+    name: &str,
+    executable: &str,
+    mut write: impl FnMut(&str, &str, &str) -> Result<(), E>,
+    create: impl FnOnce(&str) -> Result<T, E>,
+) -> Result<Notifier<T>, E> {
+    Notifier::open(
+        id,
+        |id| {
+            let sender = format!("Software\\Classes\\AppUserModelId\\{id}");
+            write(&sender, "DisplayName", name)?;
+            let clsid = format!("{{{:?}}}", activation::class_id(id));
+            write(
+                &format!("Software\\Classes\\CLSID\\{clsid}\\LocalServer32"),
+                "",
+                &format!("\"{executable}\" --toast-activated"),
+            )?;
+            write(&sender, "CustomActivator", &clsid)?;
+            Ok(())
+        },
+        create,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -150,6 +206,38 @@ mod tests {
         cell::{Cell, RefCell},
         rc::Rc,
     };
+
+    #[cfg(windows)]
+    #[test]
+    fn local_startup_registers_activation_before_permission_and_delivery() {
+        for id in ["normal.app", "normal.app.ui-demo"] {
+            let entries = RefCell::new(std::collections::HashMap::new());
+            let sent = Rc::new(RefCell::new(Vec::new()));
+            let notifier = open_unpacked(id, "Test app", "C:\\Test folder\\app.exe",
+                |path, field, value| {
+                    entries.borrow_mut().insert((path.to_owned(), field.to_owned()), value.to_owned());
+                    Ok(())
+                },
+                |sender_id| {
+                    assert_eq!(sender_id, id);
+                    let entries = entries.borrow();
+                    let sender = format!("Software\\Classes\\AppUserModelId\\{id}");
+                    let clsid = format!("{{{:?}}}", activation::class_id(id));
+                    assert_eq!(entries.get(&(sender, "CustomActivator".into())), Some(&clsid),
+                        "DisplayName alone cannot persist desktop notifications in Notification Center");
+                    assert_eq!(entries.get(&(format!("Software\\Classes\\CLSID\\{clsid}\\LocalServer32"), String::new())),
+                        Some(&"\"C:\\Test folder\\app.exe\" --toast-activated".to_owned()));
+                    Ok::<_, ()>(Fake {enabled: true, initialized: Cell::new(false), sent: sent.clone()})
+                }).unwrap();
+            assert!(notifier.permitted());
+            notifier.send("Night schedule", "started").unwrap();
+            assert_eq!(*sent.borrow(), ["started"]);
+        }
+        assert_ne!(
+            activation::class_id("normal.app"),
+            activation::class_id("normal.app.ui-demo")
+        );
+    }
 
     #[cfg(windows)]
     #[test]
@@ -168,6 +256,9 @@ mod tests {
                 "Windows night schedule notification test.",
             )
             .unwrap();
+        // Show is asynchronous. Keep the test sender alive while checking the
+        // shell's visible notification list; API success alone proves no popup.
+        std::thread::sleep(std::time::Duration::from_secs(15));
     }
 
     struct Fake {

@@ -202,7 +202,11 @@ The Status label sits left of the right-aligned, wrapping text. The Windows defa
 height is 820 logical pixels to allow multiline status. Successful settings actions
 clear prior errors without adding confirmation messages on any platform.
 The Windows shell registers an unpackaged notification identity before checking
-permission and uses that same identity for native toast delivery. First-use sender
+permission and uses that same identity for native toast delivery. Unpackaged startup
+registers the sender's COM activator and quoted executable launch command as well
+as its display name. A process-lifetime MTA owns the class factory; notification
+activation opens Settings on the UI thread. Demo and normal activators are separate.
+First-use sender
 registration submits a suppressed, expiring toast and removes it before querying
 permission again. Packaged apps use their package identity (ADR 0013).
 

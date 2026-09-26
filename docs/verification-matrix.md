@@ -213,6 +213,22 @@ wake delivery. Native notification display is controlled by the OS.
     refocus Settings, and verify labels/tooltips update without losing grid edits.
     CI covers a US WebView locale with a native 24-hour override at startup.
 
+### Windows native notification delivery
+
+Windows delivery verification must distinguish an accepted `Show` request from a
+visible notification. For an unpackaged normal release, trigger a configured state
+transition and verify its entry in Windows Notification Center, then click it to
+open Settings. Close the app and click a retained entry to verify cold activation.
+Repeat after rebuilding at a different location and with the installed build.
+Do not disturb may suppress banners; it must not be used to explain missing entries
+without checking Notification Center. In Parallels, compare with another Windows
+app and record whether the VM is in Coherence or desktop mode. API success or broker
+history alone is insufficient evidence of visible delivery.
+
+Windows CI covers sender/COM launch registration before permission and delivery,
+plus native class-factory activation. Actual shell rendering, retained entries,
+and Parallels presentation require the manual checks above.
+
 ### Windows and Linux branch trial
 
 Use `feat/night-mode-schedule` before opening a PR. The Branch desktop check
