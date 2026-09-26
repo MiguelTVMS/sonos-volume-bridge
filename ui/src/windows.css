@@ -137,6 +137,18 @@
   border-radius: 4px;
   background: var(--surface);
 }
+[data-platform='windows'] .schedule-status-card {
+  display: grid;
+  gap: 8px;
+}
+[data-platform='windows'] .schedule-status-card .setting-note,
+[data-platform='windows'] .schedule-status-card #notice {
+  margin: 0;
+}
+[data-platform='windows'] .schedule-status-card .setting-note:empty,
+[data-platform='windows'] #schedule-feedback:has(#notice:empty) {
+  display: none;
+}
 [data-platform='windows'] .settings-group > .control-field,
 [data-platform='windows'] .select-setting,
 [data-platform='windows'] .volume-limit,

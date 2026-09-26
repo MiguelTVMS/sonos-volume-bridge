@@ -122,3 +122,18 @@ formatter. Speaker names use the same display-name normalization as device
 selection, removing Sonos renderer/model/identifier suffixes while retaining the
 human room name, including hyphens within that name. Stable device identity is
 unchanged.
+
+Windows notifications use a shell-owned native adapter for permission and delivery.
+Unpackaged runs register their application identity and display name in the current
+user's AppUserModelId metadata. Packaged runs use the package's notifier. This
+removes the mismatch between checking the installed identity and sending under
+Tauri's development PowerShell fallback. No notification preference is rewritten.
+
+Before a sender's first notification, Windows can return Element not found for
+the permission query. Follow the [Windows Community Toolkit preregistration
+sequence](https://github.com/CommunityToolkit/WindowsCommunityToolkit/blob/main/Microsoft.Toolkit.Uwp.Notifications/Toasts/Compat/ToastNotificationManagerCompat.cs):
+submit a suppressed, silent toast with a short expiry, wait briefly for sender
+registration, remove only that tagged toast, and recheck permission. Actual denied
+settings and unrelated errors remain denied. Delivery uses native text nodes and
+reports synchronous failures to the application log. Notifications remain
+informational; clicking them does not add an application activation workflow.

@@ -480,3 +480,37 @@ reported that everything was working. This confirms the reported active-period
 enable notification in the normal Ubuntu app. The report does not separately
 verify every preference, tray interaction, timed boundary, or first-open close
 sequence listed above.
+
+## Windows Night schedule status and notifications
+
+Open the normal Windows app, navigate to Night schedule, enable scheduling, edit
+blocks and save. The third card must contain current state, next change when
+available, notification guidance and save/error feedback. There must be no second
+status line beneath the card or notice beneath Save. Disable and re-enable the
+schedule, navigate to General, save a setting and return; notices must stay visible
+in the appropriate page. Check light/dark and minimum/default window sizes.
+
+On a fresh Windows user profile, launch with `cargo tauri dev` without demo features.
+Choose a compatible speaker, select On start and end, and save a block covering
+the current time. Confirm a Sonos Volume Bridge notification, then save an empty
+grid and confirm the off notification. Enable a schedule spanning the next
+half-hour boundary and verify a single start/end notification at matching
+boundaries. Repeat with On start, On end and Never to check filtering. Repeat
+with an installed desktop build and a packaged build. With app notifications
+disabled, confirm the status guidance and that scheduling still works; restore
+notifications and confirm recovery. Do not disturb may send notifications directly
+to Notification Center instead of showing a banner.
+
+CI browser coverage uses the production form and mocked IPC to check initial
+state, toggling, grid editing, saving, next transition, notification guidance,
+failure feedback and navigation. The layout regression fails before consolidation.
+Rust CI exercises shared Windows notification orchestration from an unregistered
+sender through the initial permission check and Save/start/end delivery, and
+preserves denied/unavailable outcomes. Removing first-use preregistration fails
+that regression. Existing integration tests cover schedule boundary/filter policy.
+
+The opt-in `cargo test -p sonos-volume-bridge native_development_notification_smoke
+-- --ignored --nocapture` sends a real Windows test notification and checks native
+API success. It passed locally after the fix. Automated success does not prove a
+visible banner, native WebView layout, hardware timing or packaged delivery;
+complete the manual sequences above before release.

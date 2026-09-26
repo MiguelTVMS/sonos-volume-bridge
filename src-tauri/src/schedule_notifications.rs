@@ -1,8 +1,11 @@
 //! Native notifications. Tauri's desktop permission methods are unconditional,
 //! so macOS uses UserNotifications for both authorization and delivery.
 use tauri::{AppHandle, Runtime};
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
 use tauri_plugin_notification::NotificationExt;
+
+#[cfg(any(windows, test))]
+mod windows;
 
 #[derive(Clone, Copy)]
 pub enum ScheduleNotice<'a> {
@@ -99,7 +102,7 @@ pub async fn send<R: Runtime>(_: &AppHandle<R>, title: &str, body: &str) {
     UNUserNotificationCenter::currentNotificationCenter()
         .addNotificationRequest_withCompletionHandler(&request, None);
 }
-#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
 #[allow(clippy::unused_async)] // Shared delivery interface; Linux awaits D-Bus.
 pub async fn send<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
     let _ = app.notification().builder().title(title).body(body).show();
@@ -161,13 +164,30 @@ pub async fn send<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
 #[cfg(windows)]
 #[allow(clippy::unused_async)] // Shared async interface; macOS awaits its native permission callback.
 pub async fn permitted<R: Runtime>(app: &AppHandle<R>, _: bool) -> bool {
-    use windows::{
-        UI::Notifications::{NotificationSetting, ToastNotificationManager},
-        core::HSTRING,
-    };
-    ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from(&app.config().identifier))
-        .and_then(|notifier| notifier.Setting())
-        .is_ok_and(|setting| setting == NotificationSetting::Enabled)
+    windows::notifier(
+        &app.config().identifier,
+        app.config()
+            .product_name
+            .as_deref()
+            .unwrap_or("Sonos Volume Bridge"),
+    )
+    .is_ok_and(|notifier| notifier.permitted())
+}
+
+#[cfg(windows)]
+#[allow(clippy::unused_async)]
+pub async fn send<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
+    if let Err(error) = windows::notifier(
+        &app.config().identifier,
+        app.config()
+            .product_name
+            .as_deref()
+            .unwrap_or("Sonos Volume Bridge"),
+    )
+    .and_then(|notifier| notifier.send(title, body))
+    {
+        tracing::warn!(%error, "Could not deliver Windows schedule notification");
+    }
 }
 
 #[cfg(target_os = "macos")]

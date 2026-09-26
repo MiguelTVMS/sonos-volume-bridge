@@ -195,6 +195,14 @@ rectangular editor and scheduler are used on all three platforms.
 Windows schedule tooltips use an opaque platform surface in both color schemes;
 the shared hover interaction remains in the frontend (ADR 0013).
 
+Windows Night schedule presents current state, next change, notification guidance,
+and action feedback together in the third settings card. The shared notice output
+moves into this card while the schedule page is active (ADR 0012).
+The Windows shell registers an unpackaged notification identity before checking
+permission and uses that same identity for native toast delivery. First-use sender
+registration submits a suppressed, expiring toast and removes it before querying
+permission again. Packaged apps use their package identity (ADR 0013).
+
 ## Hardware-free UI demo
 
 Demo startup assigns a distinct runtime package name as well as application

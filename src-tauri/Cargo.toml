@@ -44,7 +44,8 @@ tokio.workspace = true
 url.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-windows = { workspace = true, features = ["ApplicationModel", "UI_Notifications", "Win32_System_Power", "Win32_Globalization", "Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
+winreg = "0.55"
+windows = { workspace = true, features = ["ApplicationModel", "Data_Xml_Dom", "UI_Notifications", "Win32_System_Power", "Win32_Globalization", "Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-service-management = "0.3.2"

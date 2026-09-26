@@ -346,7 +346,7 @@ function render(nextSnapshot: Snapshot): void {
         )}
         ${panel(
           'schedule',
-          `<div class="panel-heading"><h2 id="night-schedule-title">Night schedule</h2><p>Set weekly Night Mode hours for the selected speaker. This schedule applies to your selected speaker when it supports Night Mode.</p></div>${scheduleMarkup(platform === 'linux')}`,
+          `<div class="panel-heading"><h2 id="night-schedule-title">Night schedule</h2><p>Set weekly Night Mode hours for the selected speaker. This schedule applies to your selected speaker when it supports Night Mode.</p></div>${scheduleMarkup(platform === 'linux', platform === 'windows')}`,
         )}
         ${panel(
           'volume',
@@ -383,6 +383,7 @@ function render(nextSnapshot: Snapshot): void {
         <output id="notice" aria-live="polite">${escapeHtml(currentNotice)}</output>
       </form>
     </div>`;
+  placeNotice();
   applySpeakerControls(app, speakerSettings, document.activeElement);
   app.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(updateRangeFill);
   refreshScheduleView();
@@ -475,6 +476,7 @@ function render(nextSnapshot: Snapshot): void {
 
 function activatePage(page: SettingsPage): void {
   activePage = page;
+  placeNotice();
   const title = document.querySelector('#toolbar-section-title');
   if (title)
     title.textContent =
@@ -655,6 +657,15 @@ async function updateSpeakerLevel(input: HTMLInputElement): Promise<void> {
     void refreshAllSettings();
   }
 }
+function placeNotice(): void {
+  if (platform !== 'windows') return;
+  const output = document.querySelector('#notice');
+  const target = document.querySelector(
+    activePage === 'schedule' ? '#schedule-feedback' : '#settings',
+  );
+  if (output && target) target.append(output);
+}
+
 function notice(value: string): void {
   currentNotice = value;
   const output = document.querySelector<HTMLOutputElement>('#notice');

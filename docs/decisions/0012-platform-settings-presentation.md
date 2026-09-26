@@ -23,6 +23,13 @@ Native title-bar controls remain in place. Light, dark, increased-contrast,
 forced-colors, and reduced-motion preferences are handled in the presentation.
 The background approximates the reference material with CSS; it is not native Mica.
 
+Windows Night schedule uses its third card for schedule state, next transition,
+notification guidance and action feedback. Move the existing live notice output
+into that card on navigation and rerender, then return it to the form on other
+pages. This avoids duplicate notices and retains error announcements. Disabled
+and outside-period messages remain visible in this Windows status card; macOS
+and Linux retain their previous placement and suppression of routine state text.
+
 Platform styling stays in the frontend; domain and synchronization behavior is
 unchanged. Color-scheme, increased-contrast, reduced-motion, and keyboard-focus
 preferences apply across themes. Icons are decorative; buttons retain text labels.
