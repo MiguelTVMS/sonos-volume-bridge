@@ -140,3 +140,11 @@ compilation. It does not validate camera-driver completeness, native event-sourc
 silence, packaging permissions, actual capture, physical Sonos firmware, or timing
 of OS suspend notifications. Record sanitized pass/fail outcomes privately; do not
 attach camera/app identifiers or activity traces to issues or PR descriptions.
+
+The production-coordinator regression for an explicit manual “on” action was
+mutation-checked: deliberately retaining automation ownership produced an unwanted
+restoration write and failed the test; restoring ownership revocation passed it.
+Listener orchestration tests also verify registration precedes the initial read,
+a device change during registration yields unknown, failed registration retries,
+and shutdown removes listeners. These tests do not substitute for native hardware
+and distribution validation.

@@ -157,6 +157,7 @@ impl CameraAutomation {
     }
 
     pub async fn configure(&self, configuration: AppConfiguration) {
+        let cleanup_started = tokio::time::Instant::now();
         self.revision.fetch_add(1, Ordering::SeqCst);
         let mut session = self.session.lock().await;
         let changed = session.configuration.selected_sonos_id != configuration.selected_sonos_id
@@ -164,12 +165,11 @@ impl CameraAutomation {
                 != configuration.camera_speech_enhancement_enabled;
         if changed {
             let speaker = (self.factory)(session.configuration.clone());
-            if tokio::time::timeout(
-                Duration::from_secs(5),
-                session.coordinator.cleanup(&*speaker),
-            )
-            .await
-            .is_err()
+            let remaining = Duration::from_secs(5).saturating_sub(cleanup_started.elapsed());
+            if remaining.is_zero()
+                || tokio::time::timeout(remaining, session.coordinator.cleanup(&*speaker))
+                    .await
+                    .is_err()
             {
                 session.coordinator.status = AutomationStatus::RestorationFailed;
             }
@@ -457,6 +457,23 @@ mod tests {
             .advance(camera(CameraActivity::Active), 15000, false)
             .await;
         assert_eq!(state.lock().unwrap().writes.len(), 3);
+    }
+    #[tokio::test]
+    async fn explicit_manual_on_keeps_speech_on_after_camera_stops() {
+        let (service, state) = setup();
+        activate(&service).await;
+        service.manual(configuration("first"), true).await.unwrap();
+        service
+            .advance(camera(CameraActivity::Inactive), 2000, true)
+            .await;
+        service
+            .advance(camera(CameraActivity::Inactive), 5000, false)
+            .await;
+        service.shutdown().await;
+        assert_eq!(
+            state.lock().unwrap().writes,
+            [("first".into(), true), ("first".into(), true)]
+        );
     }
     #[tokio::test]
     async fn disable_reset_and_quit_restore_only_owned_state() {

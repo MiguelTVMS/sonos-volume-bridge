@@ -54,6 +54,7 @@ impl AutomationStatus {
 #[derive(Default)]
 pub struct CameraCoordinator {
     policy: CameraPolicy,
+    ambiguous_write: bool,
     pub status: AutomationStatus,
 }
 
@@ -83,6 +84,7 @@ impl CameraCoordinator {
                             self.fail(error);
                             // Do not repeat an ambiguous write in this active period.
                             self.policy.manual_override();
+                            self.ambiguous_write = true;
                             return;
                         }
                     },
@@ -99,7 +101,12 @@ impl CameraCoordinator {
                 }
             }
         }
-        self.status = if self.policy.owned() {
+        if !self.policy.paused() {
+            self.ambiguous_write = false;
+        }
+        self.status = if self.ambiguous_write {
+            AutomationStatus::Unavailable
+        } else if self.policy.owned() {
             AutomationStatus::Owned
         } else if self.policy.paused() {
             AutomationStatus::Paused
@@ -125,6 +132,7 @@ impl CameraCoordinator {
         speaker: &dyn SpeechPort,
     ) -> Result<(), SpeechError> {
         self.policy.manual_override();
+        self.ambiguous_write = false;
         self.status = AutomationStatus::Paused;
         speaker.write(enabled).await
     }
@@ -261,5 +269,34 @@ mod tests {
         tick(&mut c, &s, CameraActivity::Inactive, 500).await;
         tick(&mut c, &s, CameraActivity::Inactive, 4000).await;
         assert!(s.0.lock().unwrap().1.is_empty());
+    }
+    struct UnconfirmedWrite(Mutex<Vec<bool>>);
+    #[async_trait]
+    impl SpeechPort for UnconfirmedWrite {
+        async fn read(&self) -> Result<bool, SpeechError> {
+            Ok(false)
+        }
+        async fn write(&self, enabled: bool) -> Result<(), SpeechError> {
+            self.0.lock().unwrap().push(enabled);
+            Err(SpeechError::Unavailable)
+        }
+    }
+    #[tokio::test]
+    async fn ambiguous_enable_is_not_retried_or_mislabelled_as_manual() {
+        let speaker = UnconfirmedWrite(Mutex::new(Vec::new()));
+        let mut coordinator = CameraCoordinator::default();
+        coordinator
+            .tick(observation(CameraActivity::Active), 0, &speaker)
+            .await;
+        coordinator
+            .tick(observation(CameraActivity::Active), 1000, &speaker)
+            .await;
+        coordinator
+            .tick(observation(CameraActivity::Active), 9000, &speaker)
+            .await;
+        assert_eq!(coordinator.status, AutomationStatus::Unavailable);
+        assert_eq!(*speaker.0.lock().unwrap(), [true]);
+        coordinator.cleanup(&speaker).await;
+        assert_eq!(*speaker.0.lock().unwrap(), [true]);
     }
 }
