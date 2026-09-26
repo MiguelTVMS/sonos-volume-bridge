@@ -275,6 +275,11 @@ pub async fn apply_saved(
         .evaluate(now, &zone)
         .map_err(|_| "Could not evaluate the schedule.")?
         .active;
+    tracing::info!(
+        was_scheduled,
+        is_scheduled,
+        "Schedule edit membership evaluated"
+    );
     let mut schedule = configuration.night_mode_schedule.clone();
     schedule.enabled = true; // Explicit Save tests the grid even when recurrence is disabled.
     let window = schedule

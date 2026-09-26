@@ -60,15 +60,19 @@ repeated saves, and saves with recurrence disabled are silent; there is no separ
 save-confirmation notification. The controller consumes
 notification intent once and clears superseded or recovery intent.
 
-The shell uses Tauri desktop notifications on Windows and the async notify-rust
-D-Bus sender on Linux. The plugin's Linux path calls a blocking sender inside a
+The shell uses Tauri desktop notifications on Windows and a persistent async
+D-Bus connection on Linux. The plugin's Linux path calls a blocking sender inside a
 Tokio task, which panics when zbus also uses Tokio. Linux delivery therefore awaits
-the native async API, bounded to two seconds, and records a generic delivery failure
-or timeout without interrupting synchronization. A private D-Bus regression service
+the native async API, bounded to two seconds, and retains the same sender connection
+for the process lifetime. GNOME watches app sender names and removes a source when
+its sender disconnects; acknowledging delivery alone does not guarantee a visible
+banner. Failed or timed-out delivery clears the connection for a later reconnect
+and records a generic delivery failure or timeout without interrupting
+synchronization. A private D-Bus regression service
 verifies applied-on/off and boundary-on/off delivery through the production sender
-inside the async runtime; it never posts test notifications to the user's desktop.
-Because Tauri's desktop
-permission helpers unconditionally report granted, macOS uses UserNotifications
+inside the async runtime and verifies that the sender remains connected after
+multiple sends. It never posts test notifications to the user's desktop.
+Because Tauri's desktop permission helpers unconditionally report granted, macOS uses UserNotifications
 for real authorization, delivery, and foreground presentation; Windows checks the
 native toast setting. OS permission is requested only from the user's opt-in action.
 Linux notification services do not expose a portable permission prompt/status;

@@ -214,9 +214,10 @@ identify a speaker. This applies to both scheduled boundaries and entry/exit cau
 Saving compares the previous and new enabled schedules at the same timestamp.
 Only a membership change produces notification intent after speaker confirmation;
 remaining inside/outside and disabled schedules stay silent.
-Linux delivery awaits notify-rust's async D-Bus API with a bounded timeout. The
-blocking plugin path is incompatible with the shell's Tokio-enabled D-Bus runtime
-and is bypassed on Linux (ADR 0013).
+Linux delivery uses one persistent asynchronous D-Bus connection with a bounded
+timeout. GNOME removes an app's notifications when their sender disappears, so
+the shell retains that connection after delivery. The blocking plugin path is
+incompatible with the shell's Tokio runtime and is bypassed (ADR 0013).
 
 
 Linux settings use a shared Ubuntu/Yaru-inspired presentation on x86-64 and

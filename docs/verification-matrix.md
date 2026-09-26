@@ -437,3 +437,18 @@ that includes the current half-hour. With On start selected, the entry notificat
 should appear even though the speaker was already on. Editing another day while
 remaining inside the current period should not notify. Save with recurrence off
 and confirm no notification, even if the one-shot apply changes Night Mode.
+
+### GNOME notification source lifetime
+
+The private-service regression also checks that repeated notifications use the
+same sender and that it still owns its bus name after the production sender
+returns. The previous per-send connection was closed immediately after Ubuntu
+accepted delivery, causing GNOME to remove the app notification source. This
+regression fails before persistent-connection delivery and passes afterward.
+
+Manual reproduction: keep Settings open, enable the schedule and On start and
+end notifications. Clear the current half-hour block and save, then select it
+and save. Confirm both banners appear and remain available in Ubuntu's
+notification list after the send completes. Repeat without closing Settings.
+The mock service checks connection lifetime; actual GNOME presentation still
+requires this native verification.

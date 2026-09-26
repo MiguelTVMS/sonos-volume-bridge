@@ -107,22 +107,54 @@ pub async fn send<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
 
 #[cfg(target_os = "linux")]
 pub async fn send<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
-    // Tauri's plugin calls blocking notify-rust from a Tokio task. With our
-    // Tokio-enabled zbus that starts a nested runtime and panics before delivery.
-    let mut notification = notify_rust::Notification::new();
-    notification
-        .appname(
-            app.config()
-                .product_name
-                .as_deref()
-                .unwrap_or("Sonos Volume Bridge"),
-        )
-        .summary(title)
-        .body(body);
-    match tokio::time::timeout(std::time::Duration::from_secs(2), notification.show_async()).await {
-        Ok(Ok(_)) => {}
-        Ok(Err(_)) => tracing::warn!("Night schedule notification delivery failed"),
-        Err(_) => tracing::warn!("Night schedule notification delivery timed out"),
+    // GNOME watches the application's sender name and removes its notification
+    // source when that name vanishes. Reuse one asynchronous connection for the
+    // process lifetime instead of dropping a per-notification handle on return.
+    static CONNECTION: tokio::sync::Mutex<Option<zbus::Connection>> =
+        tokio::sync::Mutex::const_new(None);
+    let mut connection = CONNECTION.lock().await;
+    let delivery = async {
+        if connection.is_none() {
+            *connection = Some(zbus::Connection::session().await?);
+        }
+        let app_name = app
+            .config()
+            .product_name
+            .as_deref()
+            .unwrap_or("Sonos Volume Bridge");
+        let response = connection
+            .as_ref()
+            .unwrap()
+            .call_method(
+                Some("org.freedesktop.Notifications"),
+                "/org/freedesktop/Notifications",
+                Some("org.freedesktop.Notifications"),
+                "Notify",
+                &(
+                    app_name,
+                    0_u32,
+                    "",
+                    title,
+                    body,
+                    Vec::<String>::new(),
+                    std::collections::HashMap::<String, zbus::zvariant::Value<'_>>::new(),
+                    -1_i32,
+                ),
+            )
+            .await?;
+        let _: u32 = response.body().deserialize()?;
+        Ok::<(), zbus::Error>(())
+    };
+    match tokio::time::timeout(std::time::Duration::from_secs(2), delivery).await {
+        Ok(Ok(())) => tracing::info!("Night schedule notification accepted by desktop"),
+        Ok(Err(_)) => {
+            *connection = None;
+            tracing::warn!("Night schedule notification delivery failed");
+        }
+        Err(_) => {
+            *connection = None;
+            tracing::warn!("Night schedule notification delivery timed out");
+        }
     }
 }
 
@@ -186,12 +218,15 @@ mod tests {
     use super::{ScheduleNotice, schedule_body};
 
     #[cfg(target_os = "linux")]
-    struct TestNotifications(tokio::sync::mpsc::UnboundedSender<(String, String)>);
+    struct TestNotifications {
+        messages: tokio::sync::mpsc::UnboundedSender<(String, String)>,
+        senders: std::sync::Mutex<Vec<String>>,
+    }
 
     #[cfg(target_os = "linux")]
     #[zbus::interface(name = "org.freedesktop.Notifications")]
     impl TestNotifications {
-        #[allow(clippy::too_many_arguments)] // Freedesktop notification protocol signature.
+        #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)] // Protocol signature and zbus-injected header.
         fn notify(
             &self,
             app_name: &str,
@@ -202,6 +237,7 @@ mod tests {
             actions: Vec<String>,
             hints: std::collections::HashMap<String, zbus::zvariant::OwnedValue>,
             expire_timeout: i32,
+            #[zbus(header)] header: zbus::message::Header<'_>,
         ) -> u32 {
             let _ = (
                 app_name,
@@ -211,8 +247,33 @@ mod tests {
                 hints,
                 expire_timeout,
             );
-            self.0.send((summary.to_owned(), body.to_owned())).unwrap();
+            self.senders
+                .lock()
+                .unwrap()
+                .push(header.sender().unwrap().to_string());
+            self.messages
+                .send((summary.to_owned(), body.to_owned()))
+                .unwrap();
             1
+        }
+
+        async fn sender_still_connected(
+            &self,
+            #[zbus(connection)] connection: &zbus::Connection,
+        ) -> bool {
+            let senders = self.senders.lock().unwrap().clone();
+            let Some(first) = senders.first() else {
+                return false;
+            };
+            if !senders.iter().all(|sender| sender == first) {
+                return false;
+            }
+            zbus::fdo::DBusProxy::new(connection)
+                .await
+                .unwrap()
+                .name_has_owner(first.as_str().try_into().unwrap())
+                .await
+                .unwrap()
         }
     }
 
@@ -247,6 +308,24 @@ mod tests {
             )
             .await;
         }
+        let connection = zbus::Connection::session().await.unwrap();
+        let alive: bool = connection
+            .call_method(
+                Some("org.freedesktop.Notifications"),
+                "/org/freedesktop/Notifications",
+                Some("org.freedesktop.Notifications"),
+                "SenderStillConnected",
+                &(),
+            )
+            .await
+            .unwrap()
+            .body()
+            .deserialize()
+            .unwrap();
+        assert!(
+            alive,
+            "GNOME needs the app notification sender to remain connected after delivery"
+        );
     }
 
     #[cfg(target_os = "linux")]
@@ -371,7 +450,13 @@ mod tests {
             .unwrap()
             .name("org.freedesktop.Notifications")
             .unwrap()
-            .serve_at("/org/freedesktop/Notifications", TestNotifications(sender))
+            .serve_at(
+                "/org/freedesktop/Notifications",
+                TestNotifications {
+                    messages: sender,
+                    senders: std::sync::Mutex::default(),
+                },
+            )
             .unwrap()
             .build()
             .await

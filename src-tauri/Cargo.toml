@@ -55,7 +55,6 @@ objc2-foundation = { version = "0.3.2", default-features = false, features = ["s
 objc2-user-notifications = { version = "0.3.2", default-features = false, features = ["std", "UNUserNotificationCenter", "UNNotification", "UNNotificationSettings", "UNNotificationContent", "UNNotificationRequest", "UNNotificationTrigger", "block2"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-notify-rust = { version = "4.18", default-features = false, features = ["z-with-tokio"] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }
 futures-util = "0.3"
 
