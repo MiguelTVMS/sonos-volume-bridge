@@ -15,7 +15,7 @@ test('Night schedule fits the default macOS window without vertical scrolling', 
   await page.goto('/preview.html?platform=macos');
   await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
   await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
-  await expect(page.locator('#notice')).toContainText('saved and applied');
+  await expect(page.locator('#notice')).toBeEmpty();
   const dimensions = await page.locator('.content').evaluate((element) => ({
     content: element.scrollHeight,
     viewport: element.clientHeight,
@@ -194,7 +194,7 @@ test('Save stays available for repeatable application even without grid edits', 
   const save = page.getByRole('button', { name: 'Save schedule', exact: true });
   await expect(save).toBeEnabled();
   await save.click();
-  await expect(page.locator('#notice')).toContainText('saved and applied');
+  await expect(page.locator('#notice')).toBeEmpty();
   await expect(save).toBeEnabled();
   await save.click();
   await expect(save).toBeEnabled();

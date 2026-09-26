@@ -89,7 +89,7 @@ export function scheduleMarkup(linux = false, windows = false): string {
     <div class="settings-group">
     <label class="toggle"><span>Enable schedule</span><input id="schedule-enabled" type="checkbox" role="switch"></label>
     <div class="control-field"><label for="schedule-notifications">Night schedule notifications</label><select id="schedule-notifications"><option value="start">On start</option><option value="end">On end</option><option value="both">On start and end</option><option value="never">Never</option></select></div>
-    ${linux ? `<div class="schedule-status-row"><span>Status</span>${status}${permission}<p id="schedule-feedback" class="setting-note" aria-live="polite"></p></div>` : windows ? `<div class="schedule-status-card"><strong>Schedule status</strong>${status}${permission}<div id="schedule-feedback"></div></div>` : permission}
+    ${linux ? `<div class="schedule-status-row"><span>Status</span>${status}${permission}<p id="schedule-feedback" class="setting-note" aria-live="polite"></p></div>` : windows ? `<div class="schedule-status-card"><span class="schedule-status-label">Status</span><div class="schedule-status-content">${status}${permission}<div id="schedule-feedback"></div></div></div>` : permission}
     </div>
     ${linux || windows ? '' : status}
     <div class="settings-group schedule-editor"><div class="schedule-editor-content">

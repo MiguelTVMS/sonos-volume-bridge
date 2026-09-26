@@ -196,8 +196,11 @@ Windows schedule tooltips use an opaque platform surface in both color schemes;
 the shared hover interaction remains in the frontend (ADR 0013).
 
 Windows Night schedule presents current state, next change, notification guidance,
-and action feedback together in the third settings card. The shared notice output
+and action errors together in the third settings card. The shared notice output
 moves into this card while the schedule page is active (ADR 0012).
+The Status label sits left of the right-aligned, wrapping text. The Windows default
+height is 820 logical pixels to allow multiline status. Successful settings actions
+clear prior errors without adding confirmation messages on any platform.
 The Windows shell registers an unpackaged notification identity before checking
 permission and uses that same identity for native toast delivery. First-use sender
 registration submits a suppressed, expiring toast and removes it before querying

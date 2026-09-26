@@ -373,7 +373,7 @@ establish native installation or Apple notarization behavior.
 
 Change a General setting and immediately open Diagnostics and reset. Wait past
 the autosave debounce, return to General, and confirm defaults remain restored
-and the reset notice was not replaced by an old save response. Repeat with a slow
+and no success notice appears. Repeat with a slow
 configuration write. Browser regressions freeze the debounce clock or hold IPC
 completion to exercise both sequences deterministically through the real UI.
 
@@ -485,10 +485,13 @@ sequence listed above.
 
 Open the normal Windows app, navigate to Night schedule, enable scheduling, edit
 blocks and save. The third card must contain current state, next change when
-available, notification guidance and save/error feedback. There must be no second
+available, notification guidance and error feedback. Successful saves must show no
+confirmation. The Status label must be on the left with wrapping text on the right
+in the 960-by-820 default Windows window. There must be no second
 status line beneath the card or notice beneath Save. Disable and re-enable the
-schedule, navigate to General, save a setting and return; notices must stay visible
-in the appropriate page. Check light/dark and minimum/default window sizes.
+schedule, navigate to General, save a setting and return; errors must stay visible
+in the appropriate page while successful actions stay silent. Check light/dark and
+minimum/default window sizes.
 
 On a fresh Windows user profile, launch with `cargo tauri dev` without demo features.
 Choose a compatible speaker, select On start and end, and save a block covering
@@ -504,6 +507,10 @@ to Notification Center instead of showing a banner.
 CI browser coverage uses the production form and mocked IPC to check initial
 state, toggling, grid editing, saving, next transition, notification guidance,
 failure feedback and navigation. The layout regression fails before consolidation.
+Error-only notice regressions on all three platforms fail with the old save
+confirmation. They wait for the production form to finish saving, then exercise
+a failed save and successful retry, preserving visible errors and clearing them
+after recovery. Settings autosaves are also verified to remain silent.
 Rust CI exercises shared Windows notification orchestration from an unregistered
 sender through the initial permission check and Save/start/end delivery, and
 preserves denied/unavailable outcomes. Removing first-use preregistration fails

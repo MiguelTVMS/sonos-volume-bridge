@@ -6,7 +6,7 @@
         "title": "Sonos Volume Bridge Settings",
         "width": 960,
         "minWidth": 760,
-        "height": 760,
+        "height": 820,
         "minHeight": 460,
         "visible": false,
         "resizable": true

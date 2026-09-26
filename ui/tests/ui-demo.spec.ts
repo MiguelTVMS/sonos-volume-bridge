@@ -16,7 +16,7 @@ for (const platform of ['macos', 'windows', 'linux']) {
     await expect(speech).toBeChecked();
     await page.getByRole('button', { name: 'General', exact: true }).click();
     await page.locator('[name="startAtLogin"]').check();
-    await expect(page.locator('#notice')).toHaveText('Saved.');
+    await expect(page.locator('#notice')).toBeEmpty();
     await page.getByRole('button', { name: 'Speaker', exact: true }).click();
     await expect(speech).toBeChecked();
     await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
@@ -25,7 +25,7 @@ for (const platform of ['macos', 'windows', 'linux']) {
     await expect(page.locator('.schedule-cell').first()).toHaveAttribute('aria-selected', 'true');
     await page.getByRole('button', { name: 'Diagnostics', exact: true }).click();
     await page.getByRole('button', { name: 'Reset settings', exact: true }).click();
-    await expect(page.locator('#notice')).toHaveText('Settings reset.');
+    await expect(page.locator('#notice')).toBeEmpty();
     await page.getByRole('button', { name: 'Speaker', exact: true }).click();
     await expect(speech).not.toBeChecked();
     await page.getByRole('button', { name: 'General', exact: true }).click();
@@ -42,9 +42,9 @@ test('reset cancels a pending settings autosave', async ({ page }) => {
   await page.locator('[name="startAtLogin"]').check();
   await page.getByRole('button', { name: 'Diagnostics', exact: true }).click();
   await page.getByRole('button', { name: 'Reset settings', exact: true }).click();
-  await expect(page.locator('#notice')).toHaveText('Settings reset.');
+  await expect(page.locator('#notice')).toBeEmpty();
   await page.clock.fastForward(1000);
-  await expect(page.locator('#notice')).toHaveText('Settings reset.');
+  await expect(page.locator('#notice')).toBeEmpty();
   await page.getByRole('button', { name: 'General', exact: true }).click();
   await expect(page.locator('[name="startAtLogin"]')).not.toBeChecked();
 });
@@ -82,11 +82,10 @@ test('reset follows an autosave already in flight', async ({ page }) => {
   await page.getByRole('button', { name: 'Diagnostics', exact: true }).click();
   await page.getByRole('button', { name: 'Reset settings', exact: true }).click();
   await page.evaluate(() => (window as unknown as { releaseSave: () => void }).releaseSave());
-  await expect(page.locator('#notice')).toHaveText('Settings reset.');
-  expect(await page.evaluate(() => (window as unknown as { writes: string[] }).writes)).toEqual([
-    'save_configuration',
-    'reset_configuration',
-  ]);
+  await expect(page.locator('#notice')).toBeEmpty();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { writes: string[] }).writes))
+    .toEqual(['save_configuration', 'reset_configuration']);
   await page.getByRole('button', { name: 'General', exact: true }).click();
   await expect(page.locator('[name="startAtLogin"]')).not.toBeChecked();
 });

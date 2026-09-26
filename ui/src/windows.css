@@ -139,7 +139,20 @@
 }
 [data-platform='windows'] .schedule-status-card {
   display: grid;
+  grid-template-columns: minmax(70px, 1fr) minmax(0, 2fr);
+  align-items: center;
+  gap: 20px;
+}
+[data-platform='windows'] .schedule-status-label {
+  font-size: 14px;
+  font-weight: 400;
+}
+[data-platform='windows'] .schedule-status-content {
+  display: grid;
   gap: 8px;
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 [data-platform='windows'] .schedule-status-card .setting-note,
 [data-platform='windows'] .schedule-status-card #notice {
