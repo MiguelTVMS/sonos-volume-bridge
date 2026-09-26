@@ -9,6 +9,8 @@ mod windows;
 
 #[cfg(any(test, all(windows, feature = "camera-automation-windows")))]
 mod inventory;
+#[cfg(any(test, all(target_os = "macos", feature = "camera-automation-macos")))]
+mod observer;
 
 pub fn start() -> Box<dyn CameraPort> {
     #[cfg(all(target_os = "macos", feature = "camera-automation-macos"))]
@@ -73,24 +75,6 @@ mod worker {
         CameraObservation {
             activity: CameraActivity::Unknown,
             availability: CameraAvailability::Unavailable,
-        }
-    }
-    #[cfg(target_os = "macos")]
-    pub fn aggregate(values: impl IntoIterator<Item = Option<bool>>) -> CameraObservation {
-        let mut active = false;
-        for value in values {
-            match value {
-                Some(value) => active |= value,
-                None => return unavailable(),
-            }
-        }
-        CameraObservation {
-            activity: if active {
-                CameraActivity::Active
-            } else {
-                CameraActivity::Inactive
-            },
-            availability: CameraAvailability::Supported,
         }
     }
 }

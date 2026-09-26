@@ -1,6 +1,9 @@
 //! Read-only CoreMediaIO properties; no capture sessions or camera content.
 #![allow(unsafe_code)] // Narrow FFI boundary, matching platform-audio's native adapters.
-use super::worker::{Monitor, aggregate, unavailable};
+use super::{
+    observer::{CameraSource, Observer},
+    worker::{Monitor, unavailable},
+};
 use sonos_volume_bridge_integration::camera::CameraPort;
 use std::{
     ffi::c_void,
@@ -126,59 +129,57 @@ impl Drop for Listeners {
         }
     }
 }
+struct NativeSource {
+    listeners: Listeners,
+}
+impl CameraSource for NativeSource {
+    fn devices(&mut self) -> Option<Vec<u32>> {
+        let mut cameras = Vec::new();
+        for device in values(1, &DEVICES)? {
+            if !values(device, &STREAMS)?.is_empty() {
+                cameras.push(device);
+            }
+        }
+        cameras.sort_unstable();
+        Some(cameras)
+    }
+    fn watch(&mut self, devices: &[u32]) -> bool {
+        self.clear();
+        self.listeners.add(1, DEVICES)
+            && devices
+                .iter()
+                .all(|device| self.listeners.add(*device, RUNNING))
+    }
+    fn running(&mut self, device: u32) -> Option<bool> {
+        match values(device, &RUNNING)?.as_slice() {
+            [0] => Some(false),
+            [1] => Some(true),
+            _ => None,
+        }
+    }
+    fn clear(&mut self) {
+        self.listeners = Listeners(Vec::new());
+    }
+}
+
 pub fn start() -> Box<dyn CameraPort> {
     let state = Arc::new(Mutex::new((unavailable(), Instant::now())));
     let output = Arc::clone(&state);
     let (stop, stopped) = mpsc::channel();
     let thread = std::thread::spawn(move || {
-        let mut listeners = Listeners(Vec::new());
-        let mut inventory = Vec::new();
-        let mut last_scan = Instant::now()
-            .checked_sub(Duration::from_secs(5))
-            .unwrap_or_else(Instant::now);
+        let mut observer = Observer::new(NativeSource {
+            listeners: Listeners(Vec::new()),
+        });
+        let mut last_scan: Option<Instant> = None;
         loop {
-            if last_scan.elapsed() >= Duration::from_secs(5)
+            if last_scan.is_none_or(|t| t.elapsed() >= Duration::from_secs(5))
                 || CHANGED.swap(false, std::sync::atomic::Ordering::AcqRel)
             {
-                let observation = (|| {
-                    let devices = values(1, &DEVICES)?;
-                    if devices != inventory || listeners.0.is_empty() {
-                        listeners = Listeners(Vec::new());
-                        if !listeners.add(1, DEVICES) {
-                            return None;
-                        }
-                        for device in &devices {
-                            if !values(*device, &STREAMS)?.is_empty()
-                                && !listeners.add(*device, RUNNING)
-                            {
-                                return None;
-                            }
-                        }
-                        inventory.clone_from(&devices);
-                    }
-                    // Re-enumerate after registration. Never publish an incomplete inventory.
-                    if values(1, &DEVICES)? != devices {
-                        return None;
-                    }
-                    let mut readings = Vec::new();
-                    for device in devices {
-                        if !values(device, &STREAMS)?.is_empty() {
-                            readings.push(values(device, &RUNNING).and_then(
-                                |v| match v.as_slice() {
-                                    [0] => Some(false),
-                                    [1] => Some(true),
-                                    _ => None,
-                                },
-                            ));
-                        }
-                    }
-                    Some(aggregate(readings))
-                })()
-                .unwrap_or_else(unavailable);
+                let observation = observer.sample();
                 if let Ok(mut current) = output.lock() {
                     *current = (observation, Instant::now());
                 }
-                last_scan = Instant::now();
+                last_scan = Some(Instant::now());
             }
             match stopped.recv_timeout(Duration::from_millis(100)) {
                 Err(mpsc::RecvTimeoutError::Timeout) => {}

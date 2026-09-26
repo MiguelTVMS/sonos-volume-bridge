@@ -23,9 +23,11 @@ use windows::Win32::{
 use windows_core::{Ref, implement};
 type Cameras = Arc<Mutex<Inventory<Vec<u16>>>>;
 fn failure() -> windows_core::Error {
-    windows_core::Error::from_hresult(windows_core::HRESULT(0x80004005_u32.cast_signed()))
+    windows_core::Error::from_hresult(windows_core::HRESULT(0x8000_4005_u32.cast_signed()))
 }
 
+// The windows implementation macro emits these patterns in generated COM glue.
+#[allow(clippy::ref_as_ptr, clippy::inline_always)]
 #[implement(IMFSensorActivitiesReportCallback)]
 struct Callback {
     cameras: Cameras,
@@ -146,10 +148,19 @@ pub fn start() -> Box<dyn CameraPort> {
                 cameras: Arc::clone(&cameras),
             }
             .into();
-            let mut monitor = None;
+            let mut monitor: Option<
+                windows::Win32::Media::MediaFoundation::IMFSensorActivityMonitor,
+            > = None;
             let mut last_scan: Option<Instant> = None;
             loop {
                 if last_scan.is_none_or(|t| t.elapsed() >= Duration::from_secs(5)) {
+                    let needs_restart = cameras.lock().is_ok_and(|inventory| {
+                        inventory.observation().availability
+                            == sonos_volume_bridge_domain::camera::CameraAvailability::Unavailable
+                    });
+                    if needs_restart && let Some(previous) = monitor.take() {
+                        let _ = previous.Stop();
+                    }
                     if let Ok(mut inventory) = cameras.lock() {
                         match camera_keys() {
                             Ok(keys) => inventory.reconcile(keys),

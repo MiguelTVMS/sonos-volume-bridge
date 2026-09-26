@@ -104,6 +104,7 @@ pub struct CameraAutomation {
     revision: AtomicU64,
     refresh: AtomicBool,
     stopped: AtomicBool,
+    shutdown_complete: AtomicBool,
     resumed: AtomicBool,
     status: Mutex<CameraStatus>,
     factory: Arc<SpeakerFactory>,
@@ -122,6 +123,7 @@ impl CameraAutomation {
             revision: AtomicU64::new(0),
             refresh: AtomicBool::new(true),
             stopped: AtomicBool::new(false),
+            shutdown_complete: AtomicBool::new(false),
             resumed: AtomicBool::new(false),
             status: Mutex::new(CameraStatus {
                 available: false,
@@ -212,6 +214,13 @@ impl CameraAutomation {
         if result.is_err() {
             self.publish(AutomationStatus::RestorationFailed, false);
         }
+        self.shutdown_complete.store(true, Ordering::Release);
+    }
+    pub fn begin_shutdown(&self) -> bool {
+        !self.stopped.swap(true, Ordering::AcqRel)
+    }
+    pub fn shutdown_complete(&self) -> bool {
+        self.shutdown_complete.load(Ordering::Acquire)
     }
     pub fn stopping(&self) -> bool {
         self.stopped.load(Ordering::Acquire)
@@ -540,5 +549,103 @@ mod tests {
             .tick(camera(CameraActivity::Active), 1000, &guarded)
             .await;
         assert!(state.lock().unwrap().writes.is_empty());
+    }
+    struct GatedSpeaker {
+        inner: FakeSpeaker,
+        started: Arc<tokio::sync::Notify>,
+        release: Arc<tokio::sync::Notify>,
+    }
+    #[async_trait]
+    impl SpeechPort for GatedSpeaker {
+        async fn read(&self) -> Result<bool, SpeechError> {
+            self.inner.read().await
+        }
+        async fn write(&self, enabled: bool) -> Result<(), SpeechError> {
+            if enabled {
+                self.started.notify_one();
+                self.release.notified().await;
+            }
+            self.inner.write(enabled).await
+        }
+    }
+    #[tokio::test]
+    async fn switch_waits_for_inflight_enable_then_restores_old_target() {
+        let state = Arc::new(Mutex::new(FakeState::default()));
+        let started = Arc::new(tokio::sync::Notify::new());
+        let release = Arc::new(tokio::sync::Notify::new());
+        let output = Arc::clone(&state);
+        let notify_started = Arc::clone(&started);
+        let notify_release = Arc::clone(&release);
+        let service = CameraAutomation::with_factory(
+            configuration("first"),
+            Arc::new(move |c| {
+                Box::new(GatedSpeaker {
+                    inner: FakeSpeaker {
+                        key: c.selected_sonos_id.unwrap_or_default(),
+                        state: Arc::clone(&output),
+                    },
+                    started: Arc::clone(&notify_started),
+                    release: Arc::clone(&notify_release),
+                })
+            }),
+        );
+        service
+            .advance(camera(CameraActivity::Active), 0, true)
+            .await;
+        let pending = Arc::clone(&service);
+        let activation = tokio::spawn(async move {
+            pending
+                .advance(camera(CameraActivity::Active), 1000, false)
+                .await;
+        });
+        started.notified().await;
+        let pending = Arc::clone(&service);
+        let selection = tokio::spawn(async move {
+            pending.configure(configuration("second")).await;
+        });
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while service.revision.load(Ordering::SeqCst) == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        release.notify_one();
+        activation.await.unwrap();
+        selection.await.unwrap();
+        assert_eq!(
+            state.lock().unwrap().writes,
+            [("first".into(), true), ("first".into(), false)]
+        );
+    }
+
+    struct HangingSpeaker;
+    #[async_trait]
+    impl SpeechPort for HangingSpeaker {
+        async fn read(&self) -> Result<bool, SpeechError> {
+            std::future::pending().await
+        }
+        async fn write(&self, _: bool) -> Result<(), SpeechError> {
+            std::future::pending().await
+        }
+    }
+    #[tokio::test(start_paused = true)]
+    async fn shutdown_deadline_includes_waiting_for_an_inflight_read() {
+        let service = CameraAutomation::with_factory(
+            configuration("first"),
+            Arc::new(|_| Box::new(HangingSpeaker)),
+        );
+        let pending = Arc::clone(&service);
+        let read = tokio::spawn(async move {
+            pending
+                .advance(camera(CameraActivity::Active), 0, true)
+                .await;
+        });
+        tokio::task::yield_now().await;
+        let start = tokio::time::Instant::now();
+        service.shutdown().await;
+        assert_eq!(start.elapsed(), Duration::from_secs(5));
+        assert!(service.status().warning.is_some());
+        read.abort();
     }
 }

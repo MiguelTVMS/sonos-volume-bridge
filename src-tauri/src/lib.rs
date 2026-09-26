@@ -106,8 +106,11 @@ fn handle_runtime_event(app: &tauri::AppHandle, event: tauri::RunEvent) {
     let state = app.state::<AppState>();
     match event {
         tauri::RunEvent::Resumed => state.camera.resume(),
-        tauri::RunEvent::ExitRequested { api, code, .. } if !state.camera.stopping() => {
+        tauri::RunEvent::ExitRequested { api, code, .. } if !state.camera.shutdown_complete() => {
             api.prevent_exit();
+            if !state.camera.begin_shutdown() {
+                return;
+            }
             let app = app.clone();
             tauri::async_runtime::spawn(async move {
                 let state = app.state::<AppState>();
