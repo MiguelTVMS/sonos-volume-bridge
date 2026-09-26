@@ -236,3 +236,13 @@ Local validation: a packaged macOS debug app with `ui-windows` opened successful
 and displayed the Windows Night schedule layout with the demo label and simulated
 speaker. Browser control-edit/reset checks passed for all three presentations.
 Native Windows/Linux execution and hardware integration remain target-OS checks.
+
+## Schedule notification speaker names
+
+With a speaker whose discovery name contains a Sonos Media Renderer suffix, enable
+start/end notifications and save a schedule once inside and once outside its
+current block. Confirm each notification uses only the human speaker name. Verify
+scheduled start and end notifications likewise. Names with ordinary hyphens must
+remain intact. Automated tests cover the shared production notification formatter
+for all four paths and fail when raw discovery names are used. Native delivery
+and banner layout still require a real notification-capable host.

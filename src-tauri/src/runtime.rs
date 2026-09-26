@@ -102,7 +102,7 @@ pub fn available_audio_outputs() -> Result<Vec<AvailableAudioOutput>, String> {
 }
 /// Removes the implementation suffix emitted by some AirPlay renderer names.
 /// The stable UDN remains the identity used by the application.
-fn display_speaker_name(name: &str) -> String {
+pub(crate) fn display_speaker_name(name: &str) -> String {
     name.split_once(" - Sonos ")
         .filter(|(_, suffix)| suffix.contains("Media Renderer") && suffix.contains("RINCON"))
         .map_or_else(

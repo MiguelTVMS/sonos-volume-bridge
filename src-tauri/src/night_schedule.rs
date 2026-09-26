@@ -219,15 +219,13 @@ pub fn start<R: Runtime>(app: AppHandle<R>) {
                         .notify_night_mode_schedule_transitions
                         .allows(active)
                 {
-                    let name = &port.device.friendly_name;
-                    let body = if active {
-                        format!(
-                            "{name}: Night Mode is on until {}.",
-                            next.as_deref().unwrap_or("the schedule ends")
-                        )
-                    } else {
-                        format!("{name}: Night Mode is off. Manual control is available.")
-                    };
+                    let body = crate::schedule_notifications::schedule_body(
+                        &port.device.friendly_name,
+                        active,
+                        crate::schedule_notifications::ScheduleNotice::Boundary {
+                            next: next.as_deref(),
+                        },
+                    );
                     crate::schedule_notifications::send(
                         &app,
                         if active {
@@ -315,9 +313,10 @@ pub async fn notify_saved<R: Runtime>(
             } else {
                 "Night Mode schedule ended"
             },
-            &format!(
-                "{speaker}: Night Mode is {}. Applied from Save schedule.",
-                if active { "on" } else { "off" }
+            &crate::schedule_notifications::schedule_body(
+                speaker,
+                active,
+                crate::schedule_notifications::ScheduleNotice::Saved,
             ),
         );
     }

@@ -201,3 +201,7 @@ The default-off `ui-demo` debug feature selects a separate shell before runtime
 services start. Its frontend uses the shared preview simulator; native device
 handlers are not registered. Presentation overrides never change domain or
 synchronization behavior. See [ADR 0014](decisions/0014-ui-demo-build.md).
+
+Night schedule notifications share the shell's speaker display-name normalization
+with device selection; notification bodies never need the renderer suffix to
+identify a speaker. This applies to both scheduled boundaries and Save confirmations.
