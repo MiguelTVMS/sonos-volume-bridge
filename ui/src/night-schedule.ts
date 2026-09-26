@@ -96,7 +96,7 @@ export function scheduleMarkup(linux = false): string {
     <p class="schedule-legend"><span>■ Scheduled on</span> □ Manual control</p>
     <div class="schedule-scroll"><div class="schedule-grid" role="grid" aria-label="Weekly Night Mode schedule"></div></div>
     <p class="setting-note">Select 30-minute blocks. Drag to select a rectangle; arrow keys move and Space selects. Leaving a scheduled period turns Night Mode off. Times follow your computer's time zone.</p>
-    <p class="setting-note">Save schedule applies the current block immediately, even when scheduling is disabled. With notifications enabled, each save also tests the native notification.</p><div class="schedule-actions"><button type="button" id="schedule-save">Save schedule</button><button type="button" class="secondary" id="schedule-cancel">Cancel</button><button type="button" class="secondary" id="schedule-clear">Clear all</button></div>
+    <p class="setting-note">Save schedule applies the current block immediately, even when scheduling is disabled. Notifications follow entering or leaving the enabled schedule and your selected start/end preference.</p><div class="schedule-actions"><button type="button" id="schedule-save">Save schedule</button><button type="button" class="secondary" id="schedule-cancel">Cancel</button><button type="button" class="secondary" id="schedule-clear">Clear all</button></div>
     </div></div>
   </section>`;
 }

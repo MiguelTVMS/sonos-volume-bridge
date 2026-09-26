@@ -148,8 +148,10 @@ The checkmark represents enabled scheduling; the editor opens through Settings.
 
 **Night schedule notifications** saves immediately and offers **On start**,
 **On end**, **On start and end**, and **Never** (the default). Confirmed boundaries notify
-only when their direction is selected. Save also tests the matching direction:
-on counts as Start, off as End. Adjacent selected cells do not notify. Startup,
+only when their direction is selected. Applying an edited schedule also notifies
+only if it makes the current time enter or leave the enabled schedule, using the
+matching direction after the speaker state is confirmed. Saving while remaining
+inside or outside the schedule sends no notification. Disabled scheduling is silent. Adjacent selected cells do not notify. Startup,
 wake, recovery, selection changes, manual changes, and enforcement corrections
 remain silent. Permission denial and OS notification suppression never stop
 scheduling or volume synchronization.

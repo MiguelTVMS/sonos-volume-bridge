@@ -7,14 +7,14 @@ use tauri_plugin_notification::NotificationExt;
 #[derive(Clone, Copy)]
 pub enum ScheduleNotice<'a> {
     Boundary { next: Option<&'a str> },
-    Saved,
+    Applied,
 }
 
 pub fn schedule_body(speaker: &str, active: bool, notice: ScheduleNotice<'_>) -> String {
     let speaker = crate::runtime::display_speaker_name(speaker);
     match notice {
-        ScheduleNotice::Saved => format!(
-            "{speaker}: Night Mode is {}. Applied from Save schedule.",
+        ScheduleNotice::Applied => format!(
+            "{speaker}: Night Mode is {}.",
             if active { "on" } else { "off" }
         ),
         ScheduleNotice::Boundary { next } if active => format!(
@@ -230,8 +230,8 @@ mod tests {
             .unwrap();
         assert!(super::permitted(app.handle(), false).await);
         for (active, notice) in [
-            (true, ScheduleNotice::Saved),
-            (false, ScheduleNotice::Saved),
+            (true, ScheduleNotice::Applied),
+            (false, ScheduleNotice::Applied),
             (
                 true,
                 ScheduleNotice::Boundary {
@@ -251,7 +251,100 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[tokio::test]
-    async fn linux_notifications_reach_the_desktop_service_from_the_async_runtime() {
+    async fn saved_transition_probe() {
+        use crate::{
+            config::{AppConfiguration, ConfigStore, ScheduleNotifications},
+            state::AppState,
+        };
+        use sonos_volume_bridge_integration::night_mode::{
+            NightModePort, NightModeReading, apply_saved,
+        };
+        use tauri::Manager;
+        struct Speaker(std::sync::Mutex<bool>);
+        #[async_trait::async_trait]
+        impl NightModePort for Speaker {
+            async fn read(&self) -> NightModeReading {
+                NightModeReading::Supported(*self.0.lock().unwrap())
+            }
+            async fn write(&self, active: bool) -> Result<(), String> {
+                *self.0.lock().unwrap() = active;
+                Ok(())
+            }
+        }
+        if std::env::var_os("SVB_NOTIFICATION_TEST_CHILD").is_none() {
+            return;
+        }
+        let (_, guard) = tracing_appender::non_blocking(std::io::sink());
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_notification::init())
+            .manage(AppState::new(
+                ConfigStore::new(std::env::temp_dir().join("unused-notification-test-config.json")),
+                AppConfiguration::default(),
+                guard,
+            ))
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        for mode in [
+            ScheduleNotifications::Start,
+            ScheduleNotifications::End,
+            ScheduleNotifications::Both,
+            ScheduleNotifications::Never,
+        ] {
+            for enabled in [false, true] {
+                let mut configuration = AppConfiguration {
+                    selected_sonos_id: Some("test-speaker".into()),
+                    notify_night_mode_schedule_transitions: mode,
+                    ..AppConfiguration::default()
+                };
+                configuration.night_mode_schedule.enabled = enabled;
+                *app.state::<AppState>().configuration.lock().unwrap() = configuration.clone();
+                let speaker = Speaker(std::sync::Mutex::new(false));
+                let mut was_scheduled = false;
+                // Exercise the shared Save orchestration: unchanged outside,
+                // entry, repeated save, exit, repeated save. Only entry/exit notify.
+                for active in [false, true, true, false, false] {
+                    let is_scheduled = enabled && active;
+                    let applied = apply_saved(&speaker, active, was_scheduled, is_scheduled).await;
+                    was_scheduled = is_scheduled;
+                    assert!(applied.error.is_none());
+                    crate::night_schedule::notify_saved(
+                        app.handle(),
+                        &configuration,
+                        applied.notification,
+                        "Test speaker",
+                    )
+                    .await;
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn saving_notifies_only_on_confirmed_changes_matching_the_preference() {
+        let received =
+            capture_linux_notifications("schedule_notifications::tests::saved_transition_probe")
+                .await;
+        assert_eq!(received.len(), 4);
+        for active in [false, true] {
+            let expected = schedule_body("Test speaker", active, ScheduleNotice::Applied);
+            let title = if active {
+                "Night Mode schedule started"
+            } else {
+                "Night Mode schedule ended"
+            };
+            assert_eq!(
+                received
+                    .iter()
+                    .filter(|(summary, body)| summary == title && body == &expected)
+                    .count(),
+                2
+            );
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    async fn capture_linux_notifications(probe: &'static str) -> Vec<(String, String)> {
         use std::{
             io::{BufRead, BufReader},
             process::{Command, Stdio},
@@ -285,11 +378,7 @@ mod tests {
             .unwrap();
         let child = tokio::task::spawn_blocking(move || {
             Command::new(std::env::current_exe().unwrap())
-                .args([
-                    "--exact",
-                    "schedule_notifications::tests::linux_delivery_probe",
-                    "--nocapture",
-                ])
+                .args(["--exact", probe, "--nocapture"])
                 .env("SVB_NOTIFICATION_TEST_CHILD", "1")
                 .env("DBUS_SESSION_BUS_ADDRESS", address)
                 .output()
@@ -302,15 +391,28 @@ mod tests {
             "{}",
             String::from_utf8_lossy(&child.stderr)
         );
+        let mut notifications = Vec::new();
+        while let Ok(notification) = receiver.try_recv() {
+            notifications.push(notification);
+        }
+        notifications
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn linux_notifications_reach_the_desktop_service_from_the_async_runtime() {
+        let received =
+            capture_linux_notifications("schedule_notifications::tests::linux_delivery_probe")
+                .await;
         let mut bodies = Vec::new();
-        while let Ok((title, body)) = receiver.try_recv() {
+        for (title, body) in received {
             assert_eq!(title, "Night schedule test");
             bodies.push(body);
         }
         bodies.sort();
         let mut expected = vec![
-            "Test speaker: Night Mode is on. Applied from Save schedule.",
-            "Test speaker: Night Mode is off. Applied from Save schedule.",
+            "Test speaker: Night Mode is on.",
+            "Test speaker: Night Mode is off.",
             "Test speaker: Night Mode is on until 07:00.",
             "Test speaker: Night Mode is off. Manual control is available.",
         ];
@@ -342,13 +444,13 @@ mod tests {
                 ),
                 (
                     true,
-                    ScheduleNotice::Saved,
-                    "Office Desk Speaker: Night Mode is on. Applied from Save schedule.",
+                    ScheduleNotice::Applied,
+                    "Office Desk Speaker: Night Mode is on.",
                 ),
                 (
                     false,
-                    ScheduleNotice::Saved,
-                    "Office Desk Speaker: Night Mode is off. Applied from Save schedule.",
+                    ScheduleNotice::Applied,
+                    "Office Desk Speaker: Night Mode is off.",
                 ),
             ] {
                 assert_eq!(schedule_body(name, active, notice), expected);

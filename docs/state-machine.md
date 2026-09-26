@@ -30,8 +30,11 @@ while recurring scheduling is disabled. Unsupported/unavailable means paused wit
 Reconciliation establishes the expected current value without a notification.
 Scheduled entry enforces on; scheduled exit applies off once and permits subsequent
 manual changes. Transient failures retry with bounded backoff; confirmed normal
-boundaries produce notification intent. Explicit Save separately requests a
-notification after confirmation, including idempotent saves. On start/On end/On start and end/Never filters that intent without changing controller state. Selection or schedule changes discard old
+boundaries produce notification intent. Applying a saved schedule produces
+notification intent only when the edit changes whether the current time is inside
+the enabled schedule, after confirming the resulting speaker state. Saves that
+remain inside/outside and saves with recurrence disabled stay silent. On start/On end/On start and end/Never filters
+that intent without changing controller state. Selection or schedule changes discard old
 pending intent. Notification preferences never reset this controller. See ADR 0013.
 
 Opt-in UI demo builds run this state machine and the normal Night Mode scheduler

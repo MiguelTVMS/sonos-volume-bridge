@@ -260,32 +260,53 @@ pub async fn set_manual(configuration: &AppConfiguration, enabled: bool) -> Resu
 }
 
 /// Called with the same write gate as persistence and manual speaker operations.
-pub async fn apply_saved(configuration: &AppConfiguration) -> Result<(bool, String), String> {
+pub async fn apply_saved(
+    configuration: &AppConfiguration,
+    previous: &sonos_volume_bridge_domain::NightModeSchedule,
+) -> Result<(Option<bool>, String), String> {
     let zone = TimeZone::try_system().map_err(|_| "Computer time zone unavailable.")?;
+    let now = Timestamp::now();
+    let was_scheduled = previous
+        .evaluate(now, &zone)
+        .map_err(|_| "Could not evaluate the previous schedule.")?
+        .active;
+    let is_scheduled = configuration
+        .night_mode_schedule
+        .evaluate(now, &zone)
+        .map_err(|_| "Could not evaluate the schedule.")?
+        .active;
     let mut schedule = configuration.night_mode_schedule.clone();
     schedule.enabled = true; // Explicit Save tests the grid even when recurrence is disabled.
     let window = schedule
-        .evaluate(Timestamp::now(), &zone)
+        .evaluate(now, &zone)
         .map_err(|_| "Could not evaluate the schedule.")?;
     let port = port(configuration)
         .await
         .ok_or("Selected speaker is unavailable.")?;
-    let result =
-        sonos_volume_bridge_integration::night_mode::apply_saved(&port, window.active).await;
+    let result = sonos_volume_bridge_integration::night_mode::apply_saved(
+        &port,
+        window.active,
+        was_scheduled,
+        is_scheduled,
+    )
+    .await;
     if let Some(error) = result.error {
         return Err(error);
     }
     if !matches!(result.reading, NightModeReading::Supported(_)) {
         return Err("Night Mode is unavailable for this speaker.".into());
     }
-    Ok((window.active, port.device.friendly_name))
+    Ok((result.notification, port.device.friendly_name))
 }
 pub async fn notify_saved<R: Runtime>(
     app: &AppHandle<R>,
     configuration: &AppConfiguration,
-    active: bool,
+    transition: Option<bool>,
     speaker: &str,
 ) {
+    let Some(active) = transition else {
+        return;
+    };
     if !configuration
         .notify_night_mode_schedule_transitions
         .allows(active)
@@ -317,7 +338,7 @@ pub async fn notify_saved<R: Runtime>(
             &crate::schedule_notifications::schedule_body(
                 speaker,
                 active,
-                crate::schedule_notifications::ScheduleNotice::Saved,
+                crate::schedule_notifications::ScheduleNotice::Applied,
             ),
         )
         .await;

@@ -133,14 +133,22 @@ pub async fn apply_manual(
     Ok(())
 }
 
-/// An explicit Save is a repeatable one-shot application, independent of recurring
-/// enablement. Unlike background reconciliation, each confirmed Save may notify.
-pub async fn apply_saved(port: &impl NightModePort, expected: bool) -> NightModeResult {
+/// Save applies the current grid once. Notify only if the edit enters or leaves
+/// the enabled schedule, after the resulting Night Mode state is confirmed.
+pub async fn apply_saved(
+    port: &impl NightModePort,
+    expected: bool,
+    was_scheduled: bool,
+    is_scheduled: bool,
+) -> NightModeResult {
     let mut result = NightModeController::default()
         .step(port, expected, true)
         .await;
-    if result.error.is_none() && result.reading == NightModeReading::Supported(expected) {
-        result.notification = Some(expected);
+    if was_scheduled != is_scheduled
+        && result.error.is_none()
+        && result.reading == NightModeReading::Supported(expected)
+    {
+        result.notification = Some(is_scheduled);
     }
     result
 }
@@ -244,18 +252,48 @@ mod tests {
         assert_eq!(*next.writes.lock().unwrap(), vec![true, false]);
     }
     #[tokio::test]
-    async fn saving_applies_on_and_off_and_repeats_notifications_without_duplicate_writes() {
+    async fn saving_notifies_only_confirmed_schedule_entry_and_exit() {
         let port = Port::new(false);
-        assert_eq!(apply_saved(&port, true).await.notification, Some(true));
-        assert_eq!(apply_saved(&port, true).await.notification, Some(true));
+        assert_eq!(
+            apply_saved(&port, true, false, true).await.notification,
+            Some(true)
+        );
+        assert_eq!(
+            apply_saved(&port, true, true, true).await.notification,
+            None
+        );
         assert_eq!(*port.writes.lock().unwrap(), vec![true]);
-        assert_eq!(apply_saved(&port, false).await.notification, Some(false));
+        assert_eq!(
+            apply_saved(&port, false, true, false).await.notification,
+            Some(false)
+        );
+        assert_eq!(
+            apply_saved(&port, false, false, false).await.notification,
+            None
+        );
         assert_eq!(*port.writes.lock().unwrap(), vec![true, false]);
+        assert_eq!(
+            apply_saved(&port, true, false, false).await.notification,
+            None
+        );
+        assert_eq!(
+            apply_saved(&port, true, false, true).await.notification,
+            Some(true)
+        );
+        *port.value.lock().unwrap() = NightModeReading::Supported(false);
+        assert_eq!(
+            apply_saved(&port, true, true, true).await.notification,
+            None
+        );
+        *port.value.lock().unwrap() = NightModeReading::Supported(false);
         *port.fail.lock().unwrap() = true;
-        let failed = apply_saved(&port, true).await;
+        let failed = apply_saved(&port, true, false, true).await;
         assert!(failed.error.is_some());
         assert_eq!(failed.notification, None);
         *port.value.lock().unwrap() = NightModeReading::Unsupported;
-        assert_eq!(apply_saved(&port, true).await.notification, None);
+        assert_eq!(
+            apply_saved(&port, true, true, true).await.notification,
+            None
+        );
     }
 }

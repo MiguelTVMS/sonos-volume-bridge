@@ -185,8 +185,7 @@ wake delivery. Native notification display is controlled by the OS.
 
 8. On Night schedule, confirm there is no repeated selected-speaker label. Leave recurring
    scheduling disabled, select the current block and Save: Night Mode turns on.
-   Save unchanged again: notification repeats if its direction is selected, with no redundant Sonos
-   write. Clear the current block and Save: Night Mode turns off. Permission denial
+   Save unchanged again: no notification and no redundant Sonos write. Clear the current block and Save: Night Mode turns off. Permission denial
    must not prevent application, and failed confirmation must not announce success.
 
 9. Open the native tray menu with a compatible speaker selected. Verify Night schedule is immediately above Night sound and its checkmark reflects whether scheduling is enabled and no editor shortcut remains. Toggle
@@ -411,17 +410,30 @@ is outside mock coverage; manual validation is pending.
 ## Linux schedule notification delivery
 
 - Automated: the normal Rust suite starts a private D-Bus notification service
-  and a subprocess using the production sender inside Tokio. Save-on, Save-off,
+  and a subprocess using the production sender inside Tokio. Applied-on, applied-off,
   scheduled-start, and scheduled-end must all arrive. Before the fix all four were
   missing because the blocking plugin sender panicked inside the async runtime;
   the same regression passes with asynchronous delivery. Linux tests require
   `dbus-daemon`, installed by CI. The test never targets the desktop session bus.
 - Manual: in the normal Ubuntu app, select On start and end. Save once with the
-  current half-hour selected, and again with it cleared. Confirm a native banner
-  for each successful application, including repeated saves. Then enable the
+  schedule enabled and the current half-hour selected, and again with it cleared. Confirm a native banner
+  only when the edit enters or leaves the enabled schedule. Repeat each save and confirm
+  there is no additional notification. Then enable the
   schedule and verify an actual start and end boundary. Enabling/disabling alone
   does not notify. Confirm Never suppresses both directions, On start only shows
   on notifications, and On end only shows off notifications.
 - Coverage limit: the service test verifies delivery and message content, not
   GNOME banner rendering or desktop suppression. Native banner confirmation is
   still pending.
+
+The save-transition regression additionally exercises the shared application and
+notification orchestration with all four preferences, recurring scheduling on
+and off, and the sequence outside → enter → unchanged save → leave → unchanged
+save. Only permitted entry/exit transitions with recurrence enabled reach the private
+service after speaker confirmation. Disabled recurrence stays silent.
+
+Also turn Night Mode on manually while outside the schedule, then save an edit
+that includes the current half-hour. With On start selected, the entry notification
+should appear even though the speaker was already on. Editing another day while
+remaining inside the current period should not notify. Save with recurrence off
+and confirm no notification, even if the one-shot apply changes Night Mode.
