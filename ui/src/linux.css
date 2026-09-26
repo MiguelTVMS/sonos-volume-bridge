@@ -92,6 +92,7 @@
   display: none;
 }
 [data-platform='linux'] label,
+[data-platform='linux'] .schedule-status-row > span,
 [data-platform='linux'] .control-field > label {
   font-size: 15px;
   font-weight: 400;

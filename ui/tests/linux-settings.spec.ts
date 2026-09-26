@@ -12,6 +12,11 @@ test('Ubuntu schedule status stays in one row below notifications through save a
   await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
   const row = page.locator('.schedule-status-row');
   await expect(row).toBeVisible();
+  await expect(row.locator(':scope > span')).toHaveText('Status');
+  const labelFont = await page
+    .locator('label[for="schedule-notifications"]')
+    .evaluate((label) => getComputedStyle(label).font);
+  await expect(row.locator(':scope > span')).toHaveCSS('font', labelFont);
   await expect(row.locator('#schedule-status')).toHaveText('Schedule disabled.');
   await expect(row.locator('..').locator(':scope > :nth-child(3)')).toHaveClass(
     'schedule-status-row',
