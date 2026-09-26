@@ -7,6 +7,7 @@
 - Supports system volume controls, keyboard volume keys, and supported audio-device controls.
 - Optional two-way synchronization reflects speaker volume changes on the computer.
 - Settings include a maximum speaker volume, volume mapping, output selection, and start at login.
+- Night schedule applies one global weekly half-hour schedule to the selected compatible speaker only, with rectangular selection and optional native start/end notifications.
 - Does not play, stream, capture, or redirect audio. It does not replace the Sonos app.
 - macOS download: Apple Silicon (ARM64) only, macOS 13 or later. Intel Macs are not supported by this download.
 - Windows: Microsoft Store and a separate unsigned direct installer.

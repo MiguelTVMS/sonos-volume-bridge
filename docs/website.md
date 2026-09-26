@@ -101,3 +101,9 @@ privacy notice and cookie retention details aligned with the actual published ta
 
 Run `node --test scripts/tests/consent.test.cjs` and regenerate Markdown after HTML
 changes. The preference is website-only; the desktop app has no new telemetry.
+
+Night schedule appears alongside the other capabilities in the same feature-card
+grid, with matching illustrations, typography, and spacing. Five cards use two
+columns on desktop (two, two, then one), leaving space for a future feature. Feature copy describes the released
+product because the site publishes with the release. Keep the visible copy and
+llms.txt aligned. The section introduces no tracking or external assets.

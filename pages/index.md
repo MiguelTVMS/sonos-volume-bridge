@@ -40,6 +40,12 @@ Set a maximum speaker volume and choose how volume changes feel, including a gen
 
 Follow your current audio output or select a fixed one. Start at login and reconnect automatically after interruptions.
 
+05 / NIGHT SCHEDULE
+
+### Quieter evenings, on time.
+
+Set weekly half-hour blocks for Night Mode on your selected compatible speaker. Drag to select several days at once, and choose native notifications when the schedule starts or ends.
+
 DOWNLOAD SONOS VOLUME BRIDGE
 
 ## At home on your computer.

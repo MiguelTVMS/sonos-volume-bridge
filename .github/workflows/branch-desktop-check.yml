@@ -1,0 +1,60 @@
+name: Branch desktop check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/night-mode-schedule]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: branch-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUSTUP_TOOLCHAIN: stable
+
+jobs:
+  desktop:
+    name: Desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - uses: Swatinem/rust-cache@v2
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: pnpm --dir ui test
+      - run: pnpm --dir ui run lint
+      - run: pnpm --dir ui run format
+      - run: pnpm --dir ui run build
+      - run: pnpm --dir ui exec playwright install --with-deps chromium
+      - run: pnpm --dir ui run test:ui
+      - run: cargo fmt --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - run: pnpm dlx @tauri-apps/cli@2 build --debug --no-bundle --no-sign
+      - uses: actions/upload-artifact@v6
+        with:
+          name: night-schedule-${{ runner.os }}
+          path: |
+            target/debug/sonos-volume-bridge.exe
+            target/debug/sonos-volume-bridge
+          if-no-files-found: error

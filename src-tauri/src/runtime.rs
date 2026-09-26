@@ -26,7 +26,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::{
     net::UdpSocket,
     sync::watch,
@@ -186,6 +186,9 @@ pub async fn set_speaker_setting(
     setting: SpeakerSetting,
     enabled: bool,
 ) -> Result<(), String> {
+    if matches!(setting, SpeakerSetting::NightSound) {
+        return crate::night_schedule::set_manual(&configuration, enabled).await;
+    }
     let client = SonosClient::builder()
         .timeout(SONOS_TIMEOUT)
         .build()
@@ -501,6 +504,7 @@ async fn run_session(
                 if current_generation && notification.settings_changed
                     && (notification.sequence.is_none() || notification.sequence != last_settings_sequence) {
                     last_settings_sequence = notification.sequence;
+                    app.state::<crate::state::AppState>().schedule_refresh.store(true, std::sync::atomic::Ordering::Relaxed);
                     let _ = app.emit("speaker-settings-changed", ());
                     tray::refresh_speaker_controls(app);
                 }
@@ -604,7 +608,7 @@ async fn selected_local_bind(peer: SocketAddr) -> Result<SocketAddr, RuntimeErro
     ))
 }
 
-async fn resolve_device(
+pub(crate) async fn resolve_device(
     client: &SonosClient,
     configuration: &AppConfiguration,
 ) -> Result<SonosDevice, RuntimeError> {
@@ -731,7 +735,7 @@ impl LocalAudioPort for DeviceAudioPort {
 }
 
 #[derive(Debug)]
-enum RuntimeError {
+pub(crate) enum RuntimeError {
     SonosUnavailable,
     Local(PlatformAudioError),
     Integration(String),

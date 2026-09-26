@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const pages = ['Devices', 'Speaker', 'Volume', 'General', 'Diagnostics', 'About'];
+const pages = ['Devices', 'Speaker', 'Night schedule', 'Volume', 'General', 'Diagnostics', 'About'];
 
 for (const colorScheme of ['light', 'dark'] as const) {
   for (const viewport of [

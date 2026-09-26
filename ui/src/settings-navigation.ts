@@ -1,6 +1,7 @@
 export const settingsPages = [
   'devices',
   'speaker',
+  'schedule',
   'volume',
   'general',
   'diagnostics',

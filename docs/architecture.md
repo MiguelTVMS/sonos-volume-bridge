@@ -171,3 +171,25 @@ properties, never dispatch input/change events or enqueue writes. Existing audio
 origin/expected-write suppression remains in the synchronization adapters. Sonos
 notifications do not identify the originating controller, so an echoed value is
 not treated as proof of authorship and genuine external changes remain observable.
+
+## Global Night Mode scheduling
+
+A separate shell worker applies one global weekly half-hour schedule exclusively
+to the selected compatible speaker. Pure calendar calculation lives in `domain`;
+read/confirm/enforce policy lives in the integration Night Mode controller. It does
+not enter the volume synchronization state machine. Native wake and notification
+adapters stay in the shell. A shared configuration/Night Mode write gate prevents
+selection races, while volume synchronization continues independently. See
+[ADR 0013](decisions/0013-global-night-mode-schedule.md).
+
+Tray speaker controls retain their native menu objects for the tray lifetime.
+Refreshes update values in place; capability changes only attach or detach cached
+objects, preserving action targets while the OS is dispatching menu clicks.
+
+Desktop clock formatting is read by the shell adapter: Foundation on macOS,
+GetLocaleInfoEx on Windows, and GNOME clock-format/LC_TIME on Linux. The frontend
+applies that preference to both axis labels and interval tooltips. The shared
+rectangular editor and scheduler are used on all three platforms.
+
+Windows schedule tooltips use an opaque platform surface in both color schemes;
+the shared hover interaction remains in the frontend (ADR 0013).

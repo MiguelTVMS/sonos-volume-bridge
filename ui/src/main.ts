@@ -1,3 +1,15 @@
+import {
+  scheduleMarkup,
+  setSystemHour12,
+  captureScheduleView,
+  mountSchedule,
+  updateScheduleView,
+  scheduleDraft,
+  emptyBlocks,
+  type NightSchedule,
+  type ScheduleNotifications,
+  type ScheduleStatus,
+} from './night-schedule';
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -48,6 +60,8 @@ if (document.documentElement.dataset.platform === 'macos') {
 type MappingPoint = { local: number; sonos: number };
 type Configuration = {
   schemaVersion: number;
+  nightModeSchedule?: NightSchedule;
+  notifyNightModeScheduleTransitions?: ScheduleNotifications;
   selectedSonosId: string | null;
   lastKnownSonosAddress: string | null;
   followDefaultAudioDevice: boolean;
@@ -108,6 +122,14 @@ let speakerSettings: SpeakerSettings = {
   treble: null,
   bass: null,
 };
+let scheduleStatus: ScheduleStatus = {
+  active: false,
+  supported: false,
+  message: '',
+  nextTransition: null,
+  timeZone: '',
+  notificationsBlocked: false,
+};
 let activePage: SettingsPage = 'devices';
 let discoveryStatus = 'Not checked yet';
 let saveTimeout: number | undefined;
@@ -125,6 +147,7 @@ const userWrites = new UserWrites();
 const liveStatus = new LiveStatus<Snapshot>(refreshRuntimeStatus);
 let refreshRunning = false;
 let refreshAgain = false;
+let currentNotice = '';
 let appVersion = 'Loading…';
 
 const repositoryUrl = 'https://github.com/MiguelTVMS/sonos-volume-bridge';
@@ -248,6 +271,8 @@ const pageIcons: Record<SettingsPage, string> = {
     '<rect x="3" y="4" width="12" height="10" rx="2"/><path d="M6 18h6m-3-4v4"/><rect x="17" y="8" width="4" height="12" rx="1"/>',
   speaker:
     '<rect x="6" y="2" width="12" height="20" rx="3"/><circle cx="12" cy="14" r="4"/><circle cx="12" cy="6" r="1"/>',
+  schedule:
+    '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-14 4h3m4 0h3m-10 4h3"/>',
   volume: '<path d="M11 4 6 8H3v8h3l5 4V4Zm4 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
   general:
     '<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/>',
@@ -264,8 +289,10 @@ function panel(page: SettingsPage, content: string): string {
 }
 
 function render(nextSnapshot: Snapshot): void {
-  if (sliders.active) return;
+  if (sliders.active || scheduleDraft.painting !== null) return;
+  captureScheduleView(app);
   snapshot = nextSnapshot;
+  refreshScheduleView();
   const c = nextSnapshot.configuration;
   const speakerName = nextSnapshot.sonosName ?? 'No speaker selected';
   const status = connectionLabel(nextSnapshot.status);
@@ -276,13 +303,14 @@ function render(nextSnapshot: Snapshot): void {
           <button type="button" id="previous-section" aria-label="Previous settings section" title="Previous settings section"${adjacentPage(activePage, -1) ? '' : ' disabled'}><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m10 2-6 6 6 6"/></svg></button>
           <button type="button" id="next-section" aria-label="Next settings section" title="Next settings section"${adjacentPage(activePage, 1) ? '' : ' disabled'}><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m6 2 6 6-6 6"/></svg></button>
         </div>
-        <span id="toolbar-section-title" data-tauri-drag-region>${activePage[0].toUpperCase() + activePage.slice(1)}</span>
+        <span id="toolbar-section-title" data-tauri-drag-region>${activePage === 'schedule' ? 'Night schedule' : activePage[0].toUpperCase() + activePage.slice(1)}</span>
       </div>
       <aside class="sidebar">
         <div class="app-heading"><h1><span class="sonos-name">SONOS</span><span>Volume Bridge</span></h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
         <nav aria-label="Settings sections">
           ${pageButton('devices', 'Devices')}
           ${pageButton('speaker', 'Speaker')}
+          ${pageButton('schedule', 'Night schedule')}
           ${pageButton('volume', 'Volume')}
           ${pageButton('general', 'General')}
           ${pageButton('diagnostics', 'Diagnostics')}
@@ -304,6 +332,10 @@ function render(nextSnapshot: Snapshot): void {
         ${panel(
           'speaker',
           `<div class="panel-heading"><h2>Speaker</h2><p>Adjust sound settings available on the selected Sonos speaker.</p></div><div class="settings-group"><label class="toggle"><span>${settingCaption(platform, 'Night sound', 'Reduce loud sounds for quieter listening.', 'moon')}<small class="feature-status" data-feature-status="nightSound"></small></span><input type="checkbox" role="switch" data-speaker-setting="nightSound"${speakerSettings.nightSound ? ' checked' : ''}${speakerSettings.nightSound === null ? ' disabled' : ''}/></label><label class="toggle"><span>${settingCaption(platform, 'Loudness', 'Enhance bass and treble at lower volumes.', 'sound')}<small class="feature-status" data-feature-status="loudness"></small></span><input type="checkbox" role="switch" data-speaker-setting="loudness"${speakerSettings.loudness ? ' checked' : ''}${speakerSettings.loudness === null ? ' disabled' : ''}/></label><label class="toggle"><span>${settingCaption(platform, 'Status light', 'Show the indicator light on the speaker.', 'light')}<small class="feature-status" data-feature-status="statusLight"></small></span><input type="checkbox" role="switch" data-speaker-setting="statusLight"${speakerSettings.statusLight ? ' checked' : ''}${speakerSettings.statusLight === null ? ' disabled' : ''}/></label><label class="toggle"><span>${settingCaption(platform, 'Speech enhancement', 'Make voices easier to hear.', 'speech')}<small class="feature-status" data-feature-status="speechEnhancement"></small></span><input type="checkbox" role="switch" data-speaker-setting="speechEnhancement"${speakerSettings.speechEnhancement ? ' checked' : ''}${speakerSettings.speechEnhancement === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>${settingCaption(platform, 'Treble', 'Adjust the higher frequencies.', 'tone')} <output>${speakerSettings.treble ?? 'Unavailable'}</output><small class="feature-status" data-feature-status="treble"></small></span><input type="range" min="-10" max="10" value="${speakerSettings.treble ?? 0}" data-speaker-level="treble"${speakerSettings.treble === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>${settingCaption(platform, 'Bass', 'Adjust the lower frequencies.', 'tone')} <output>${speakerSettings.bass ?? 'Unavailable'}</output><small class="feature-status" data-feature-status="bass"></small></span><input type="range" min="-10" max="10" value="${speakerSettings.bass ?? 0}" data-speaker-level="bass"${speakerSettings.bass === null ? ' disabled' : ''}/></label><div class="speaker-settings-footer"><p class="setting-note">Unavailable settings are checked again on refresh.</p><div class="speaker-settings-actions"><button class="secondary" type="button" id="use-tv-audio">Use TV audio</button><button class="secondary icon-button" type="button" id="refresh-speaker-settings" title="Refresh speaker settings" aria-label="Refresh speaker settings">↻</button></div></div></div>`,
+        )}
+        ${panel(
+          'schedule',
+          `<div class="panel-heading"><h2 id="night-schedule-title">Night schedule</h2><p>Set weekly Night Mode hours for the selected speaker. This schedule applies to your selected speaker when it supports Night Mode.</p></div>${scheduleMarkup()}`,
         )}
         ${panel(
           'volume',
@@ -337,10 +369,11 @@ function render(nextSnapshot: Snapshot): void {
           <dl class="status-list about-list"><div><dt>Version</dt><dd>${escapeHtml(appVersion)}</dd></div><div><dt>Source code</dt><dd><a href="${repositoryUrl}" target="_blank" rel="noopener noreferrer">github.com/MiguelTVMS/sonos-volume-bridge</a></dd></div><div><dt>License</dt><dd>MIT License © 2026 João Miguel Tabosa Vaz Marques Silva</dd></div></dl>
           <section class="settings-group about-disclaimer" aria-labelledby="sonos-notice-title"><h3 id="sonos-notice-title">Sonos trademark and independence notice</h3><p>${escapeHtml(sonosDisclaimer)}</p></section><details class="technical-details about-license"><summary>Read the MIT License</summary><pre>${escapeHtml(mitLicense)}</pre></details>`,
         )}
-        <output id="notice" aria-live="polite"></output>
+        <output id="notice" aria-live="polite">${escapeHtml(currentNotice)}</output>
       </form>
     </div>`;
   applySpeakerControls(app, speakerSettings, document.activeElement);
+  refreshScheduleView();
   if (document.documentElement.dataset.platform === 'macos') sizeSelectedControls(app);
   document.querySelector('#previous-section')?.addEventListener('click', () => {
     const page = adjacentPage(activePage, -1);
@@ -350,8 +383,28 @@ function render(nextSnapshot: Snapshot): void {
     const page = adjacentPage(activePage, 1);
     if (page) activatePage(page);
   });
+  mountSchedule(
+    app,
+    snapshot?.configuration.nightModeSchedule ?? { enabled: false, blocks: emptyBlocks() },
+    snapshot?.configuration.notifyNightModeScheduleTransitions ?? 'never',
+    {
+      save: async (blocks) => {
+        const revision = scheduleDraft.revision;
+        await writeSchedule('save_night_schedule', { blocks }, (next) => {
+          if (revision === scheduleDraft.revision)
+            scheduleDraft.reset(next.configuration.nightModeSchedule!.blocks);
+        });
+        notice('Schedule saved and applied to the selected speaker.');
+      },
+      enable: async (enabled) => writeSchedule('enable_night_schedule', { enabled }),
+      notify: async (mode) => writeSchedule('set_schedule_notifications', { mode }),
+      error: notice,
+    },
+  );
+  refreshScheduleView();
   const form = document.querySelector<HTMLFormElement>('#settings');
   const scheduleConfigurationSave = (event: Event): void => {
+    if (event.target instanceof Element && event.target.closest('[data-schedule]')) return;
     if (
       !(event.target instanceof HTMLElement) ||
       (!event.target.dataset.speakerSetting &&
@@ -407,7 +460,9 @@ function render(nextSnapshot: Snapshot): void {
 function activatePage(page: SettingsPage): void {
   activePage = page;
   const title = document.querySelector('#toolbar-section-title');
-  if (title) title.textContent = page[0].toUpperCase() + page.slice(1);
+  if (title)
+    title.textContent =
+      page === 'schedule' ? 'Night schedule' : page[0].toUpperCase() + page.slice(1);
   const previous = document.querySelector<HTMLButtonElement>('#previous-section');
   const next = document.querySelector<HTMLButtonElement>('#next-section');
   if (previous) previous.disabled = !adjacentPage(page, -1);
@@ -427,6 +482,7 @@ function activatePage(page: SettingsPage): void {
 
 function refreshRuntimeStatus(nextSnapshot: Snapshot): void {
   snapshot = nextSnapshot;
+  refreshScheduleView();
   const status = connectionLabel(nextSnapshot.status);
   const speaker = nextSnapshot.sonosName ?? 'No speaker selected';
   const targets: Array<[string, string]> = [
@@ -529,6 +585,7 @@ async function refreshSpeakerSettings(): Promise<void> {
     return;
   speakerSettings = speaker;
   applySpeakerControls(app, speakerSettings, document.activeElement);
+  refreshScheduleView();
 }
 
 function schedulePushRefresh(): void {
@@ -582,6 +639,7 @@ async function updateSpeakerLevel(input: HTMLInputElement): Promise<void> {
   }
 }
 function notice(value: string): void {
+  currentNotice = value;
   const output = document.querySelector<HTMLOutputElement>('#notice');
   if (output) output.value = value;
 }
@@ -592,6 +650,8 @@ function formConfiguration(form: HTMLFormElement): Configuration {
   const output = String(values.get('audioOutputMode') ?? 'default');
   return {
     schemaVersion: 1,
+    nightModeSchedule: snapshot?.configuration.nightModeSchedule,
+    notifyNightModeScheduleTransitions: snapshot?.configuration.notifyNightModeScheduleTransitions,
     selectedSonosId: String(values.get('selectedSonosId') ?? '') || null,
     lastKnownSonosAddress: String(values.get('lastKnownSonosAddress') ?? '') || null,
     followDefaultAudioDevice: output === 'default',
@@ -694,8 +754,12 @@ async function reset(): Promise<void> {
   notice('Settings reset.');
 }
 
-invoke<Snapshot>('get_snapshot')
-  .then((nextSnapshot) => {
+Promise.all([
+  invoke<Snapshot>('get_snapshot'),
+  invoke<boolean | null>('get_system_hour12').catch(() => null),
+])
+  .then(([nextSnapshot, hour12]) => {
+    setSystemHour12(hour12);
     render(nextSnapshot);
     startStatusPolling();
     void refreshAllSettings();
@@ -710,17 +774,24 @@ async function refreshAllSettings(): Promise<void> {
     refreshAgain = true;
     return;
   }
-  if (sliders.active || saveTimeout !== undefined || pendingWrites > 0) return;
+  if (
+    scheduleDraft.painting !== null ||
+    sliders.active ||
+    saveTimeout !== undefined ||
+    pendingWrites > 0
+  )
+    return;
   refreshRunning = true;
   const request = ++refreshRequest;
   const revision = editRevision;
   try {
-    const [next, speaker, outputs, discovered, diagnostics] = await Promise.all([
+    const [next, speaker, outputs, discovered, diagnostics, hour12] = await Promise.all([
       invoke<Snapshot>('get_snapshot'),
       invoke<SpeakerSettings>('get_speaker_settings'),
       invoke<AudioOutput[]>('list_audio_outputs').catch(() => null),
       invoke<DiscoveredSonos[]>('discover_sonos').catch(() => null),
       invoke<Diagnostics>('diagnostics').catch(() => null),
+      invoke<boolean | null>('get_system_hour12').catch(() => null),
     ]);
     if (
       !canApplyRefresh(
@@ -732,6 +803,7 @@ async function refreshAllSettings(): Promise<void> {
       )
     )
       return;
+    setSystemHour12(hour12);
     speakerSettings = speaker;
     if (outputs) audioOutputs = outputs;
     if (discovered) {
@@ -781,4 +853,46 @@ if (isTauri()) {
   void listen('speaker-settings-changed', schedulePushRefresh).catch(() => {
     notice('Live speaker updates are unavailable. Reopen settings to refresh.');
   });
+}
+
+function refreshScheduleView(): void {
+  updateScheduleView(
+    app,
+    scheduleStatus,
+    speakerSettings.capabilities?.nightSound === 'supported' ||
+      (speakerSettings.capabilities?.nightSound === undefined &&
+        speakerSettings.nightSound !== null),
+    snapshot?.configuration.nightModeSchedule?.enabled ?? false,
+  );
+}
+if (isTauri()) {
+  void listen<ScheduleStatus>('night-schedule-changed', ({ payload }) => {
+    scheduleStatus = payload;
+    refreshScheduleView();
+  });
+  void invoke<ScheduleStatus>('get_schedule_status').then((status) => {
+    scheduleStatus = status;
+    refreshScheduleView();
+  });
+  void listen('open-night-schedule', () => {
+    activatePage('schedule');
+  });
+}
+
+async function writeSchedule(
+  command: string,
+  args: Record<string, unknown>,
+  accepted?: (next: Snapshot) => void,
+): Promise<void> {
+  editRevision++;
+  pendingWrites++;
+  try {
+    const next = await userWrites.run(() => invoke<Snapshot>(command, args));
+    accepted?.(next);
+    scheduleStatus = await invoke<ScheduleStatus>('get_schedule_status');
+    render(next);
+  } finally {
+    pendingWrites--;
+    void refreshAllSettings();
+  }
 }

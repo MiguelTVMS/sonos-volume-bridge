@@ -23,3 +23,14 @@ Volume changes are debounced and coalesced; mute changes bypass the debounce.
 The coordinator does not resend a volume or mute value until it differs from
 the last sent value. When GENA delivery is healthy it polls slowly for health;
 on subscription loss it polls once per second until event delivery recovers.
+
+Night Mode scheduling is an independent optional controller. Disabled or unselected
+means no recurring effects. Explicit Save remains a one-shot apply operation even
+while recurring scheduling is disabled. Unsupported/unavailable means paused with configuration retained.
+Reconciliation establishes the expected current value without a notification.
+Scheduled entry enforces on; scheduled exit applies off once and permits subsequent
+manual changes. Transient failures retry with bounded backoff; confirmed normal
+boundaries produce notification intent. Explicit Save separately requests a
+notification after confirmation, including idempotent saves. Never/On Start/On
+End/Both filters that intent without changing controller state. Selection or schedule changes discard old
+pending intent. Notification preferences never reset this controller. See ADR 0013.
