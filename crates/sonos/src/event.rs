@@ -127,3 +127,105 @@ fn attribute(
     }
     Ok(None)
 }
+
+/// RenderingControl notifications can contain only EQ/tone changes, with no
+/// volume or mute. Keep those invalidations independent of synchronization.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RenderingControlNotification {
+    pub sequence: Option<u32>,
+    pub volume_state: Option<GenaEvent>,
+    pub settings_changed: bool,
+    pub volume_changed: bool,
+}
+
+pub fn parse_rendering_control_notification(
+    body: &[u8],
+    sequence: Option<u32>,
+) -> Result<RenderingControlNotification, SonosError> {
+    let outer =
+        first_text(body, "LastChange")?.ok_or(SonosError::MissingSoapValue("LastChange"))?;
+    let mut reader = Reader::from_str(&outer);
+    let mut changed = false;
+    let mut volume_changed = false;
+    loop {
+        match reader.read_event() {
+            Ok(Event::Empty(tag) | Event::Start(tag)) => {
+                if matches!(tag.local_name().as_ref(), "Volume" | "Mute")
+                    && attribute(&tag, "channel")?
+                        .as_deref()
+                        .is_none_or(|channel| channel == "Master")
+                {
+                    volume_changed = true;
+                }
+                if matches!(
+                    tag.local_name().as_ref(),
+                    "EQ" | "DialogLevel"
+                        | "SpeechEnhanceEnabled"
+                        | "NightMode"
+                        | "Loudness"
+                        | "Bass"
+                        | "Treble"
+                ) {
+                    changed = true;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(error) => return Err(SonosError::Xml(error.to_string())),
+            _ => {}
+        }
+    }
+    let volume_state = parse_last_change(body, sequence).ok();
+    if volume_state.is_none() && !changed && !volume_changed {
+        return Err(SonosError::MissingSoapValue("RenderingControl state"));
+    }
+    Ok(RenderingControlNotification {
+        sequence,
+        volume_state,
+        settings_changed: changed,
+        volume_changed,
+    })
+}
+
+#[cfg(test)]
+mod notification_tests {
+    use super::*;
+
+    #[test]
+    fn eq_only_events_invalidate_settings_without_inventing_volume() {
+        for tag in [
+            "EQ",
+            "DialogLevel",
+            "SpeechEnhanceEnabled",
+            "NightMode",
+            "Loudness",
+            "Bass",
+            "Treble",
+        ] {
+            let body = format!(
+                "<LastChange>&lt;Event&gt;&lt;InstanceID val=\"0\"&gt;&lt;{tag} val=\"1\"/&gt;&lt;/InstanceID&gt;&lt;/Event&gt;</LastChange>"
+            );
+            let notification =
+                parse_rendering_control_notification(body.as_bytes(), Some(4)).unwrap();
+            assert!(notification.settings_changed);
+            assert!(notification.volume_state.is_none());
+            assert_eq!(notification.sequence, Some(4));
+        }
+    }
+
+    #[test]
+    fn volume_events_keep_existing_synchronization_state() {
+        let body = b"<LastChange>&lt;Event&gt;&lt;Volume channel=\"Master\" val=\"24\"/&gt;&lt;Mute channel=\"Master\" val=\"0\"/&gt;&lt;/Event&gt;</LastChange>";
+        let notification = parse_rendering_control_notification(body, Some(5)).unwrap();
+        assert!(!notification.settings_changed);
+        assert_eq!(notification.volume_state.unwrap().state.volume.get(), 24);
+    }
+
+    #[test]
+    fn invalid_or_unrelated_events_do_not_trigger_refreshes() {
+        assert!(parse_rendering_control_notification(b"<broken", None).is_err());
+        assert!(
+            parse_rendering_control_notification(b"<LastChange>&lt;Event/&gt;</LastChange>", None)
+                .is_err()
+        );
+    }
+}

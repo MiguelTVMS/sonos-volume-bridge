@@ -141,6 +141,7 @@ async fn mock_server_supports_rendering_control_round_trip() {
             control_url: base.join("control").unwrap(),
             event_url: base.join("event").unwrap(),
         },
+        device_properties: Some(base.join("DeviceProperties/Control").unwrap()),
         av_transport: Some(AvTransportService {
             control_url: base.join("avtransport").unwrap(),
         }),
@@ -181,4 +182,117 @@ fn rejects_invalid_utf8_in_xml_payloads() {
         parse_last_change(b"<LastChange>\xff</LastChange>", None),
         Err(SonosError::Xml(_))
     ));
+}
+
+#[tokio::test]
+async fn ray_speech_state_uses_dialog_level_for_read_write_and_confirmation() {
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+    };
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let task = tokio::spawn(async move {
+        for value in [Some("1"), None, Some("0")] {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut bytes = vec![0; 8192];
+            let size = stream.read(&mut bytes).await.unwrap();
+            let request = String::from_utf8_lossy(&bytes[..size]);
+            assert!(request.contains("<EQType>DialogLevel</EQType>"));
+            assert!(!request.contains("SpeechEnhanceEnabled"));
+            if value.is_none() {
+                assert!(request.contains("<DesiredValue>0</DesiredValue>"));
+            }
+            let body = value.map_or_else(
+                || "<Response/>".to_owned(),
+                |v| format!("<Response><CurrentValue>{v}</CurrentValue></Response>"),
+            );
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(response.as_bytes()).await.unwrap();
+        }
+    });
+    let base = Url::parse(&format!("http://{address}/")).unwrap();
+    let device = SonosDevice {
+        id: SonosId::new("test-speaker").unwrap(),
+        friendly_name: "Test speaker".to_owned(),
+        model_name: Some("Sonos Ray".to_owned()),
+        model_number: None,
+        rendering_control: RenderingControlService {
+            control_url: base.join("control").unwrap(),
+            event_url: base.join("event").unwrap(),
+        },
+        av_transport: None,
+        device_properties: None,
+    };
+    let client = SonosClient::builder().build().unwrap();
+    assert!(client.get_speech_enhancement(&device).await.unwrap());
+    client.set_speech_enhancement(&device, false).await.unwrap();
+    task.await.unwrap();
+}
+
+#[tokio::test]
+async fn callback_accepts_eq_only_push_without_volume_or_mute() {
+    use sonos_volume_bridge_sonos::{CallbackListener, Subscription};
+    use std::{
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+        time::Duration,
+    };
+    let peer = IpAddr::V4(Ipv4Addr::LOCALHOST);
+    let mut listener = CallbackListener::bind(SocketAddr::new(peer, 0), peer)
+        .await
+        .unwrap();
+    listener.set_subscription(&Subscription {
+        id: "uuid:test-subscription".to_owned(),
+        timeout: Duration::from_secs(300),
+    });
+    let body = "<propertyset><property><LastChange>&lt;Event&gt;&lt;InstanceID val=\"0\"&gt;&lt;DialogLevel val=\"1\"/&gt;&lt;/InstanceID&gt;&lt;/Event&gt;</LastChange></property></propertyset>";
+    let client = reqwest::Client::new();
+    let response = client
+        .request(
+            reqwest::Method::from_bytes(b"NOTIFY").unwrap(),
+            listener.callback_url().clone(),
+        )
+        .header("SID", "uuid:test-subscription")
+        .header("SEQ", "9")
+        .body(body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let event = tokio::time::timeout(Duration::from_secs(1), listener.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(event.settings_changed);
+    assert!(event.volume_state.is_none());
+    // Subscription validation still applies to settings-only notifications.
+    let rejected = client
+        .request(
+            reqwest::Method::from_bytes(b"NOTIFY").unwrap(),
+            listener.callback_url().clone(),
+        )
+        .header("SID", "uuid:other-subscription")
+        .header("SEQ", "10")
+        .body(body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(rejected.status(), reqwest::StatusCode::PRECONDITION_FAILED);
+}
+
+#[test]
+fn partial_volume_notifications_request_authoritative_read_without_inventing_mute() {
+    use sonos_volume_bridge_sonos::parse_rendering_control_notification;
+    for tag in ["Volume", "Mute"] {
+        let xml = format!(
+            "<LastChange>&lt;Event&gt;&lt;{tag} channel=\"Master\" val=\"1\"/&gt;&lt;/Event&gt;</LastChange>"
+        );
+        let event = parse_rendering_control_notification(xml.as_bytes(), Some(2)).unwrap();
+        assert!(event.volume_changed);
+        assert!(event.volume_state.is_none());
+        assert!(!event.settings_changed);
+    }
 }

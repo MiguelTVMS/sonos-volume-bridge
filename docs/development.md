@@ -1,6 +1,6 @@
 # Development
 
-Install Rust 1.98.1 (including `clippy` and `rustfmt`), Node.js 22, and pnpm 11. Run the complete local verification suite with:
+Install Rust 1.98.1 (including `clippy` and `rustfmt`), Node.js 26, and pnpm 12. Run the complete local verification suite with:
 
 ```sh
 pnpm run ci:all
@@ -26,6 +26,12 @@ pnpm run ci:all
 ```
 
 ## Pre-commit validation
+
+Run the settings tests with `pnpm --dir ui test`. For rendered UI coverage, run
+`pnpm --dir ui exec playwright install chromium` once, then
+`pnpm --dir ui run test:ui`. The browser suite starts a separate preview server
+and exercises the production settings renderer with mocked device commands.
+Both suites run in the UI tests pull-request workflow, followed by a frontend build.
 
 Enable local hooks once per clone:
 
@@ -141,9 +147,18 @@ and frontend formatting, lint, tests, and build without requiring signing secret
 
 ## Stable dependency baseline
 
-The workspace and CI use Rust 1.98.1. Update `rust-toolchain.toml`, the workspace
-`rust-version`, and workflow toolchain pins together, then run all validation.
+Local development uses the Rust version in `rust-toolchain.toml`. CI installs the
+latest stable Rust through `dtolnay/rust-toolchain@v1` and sets
+`RUSTUP_TOOLCHAIN=stable` so the local pin does not override that selection.
 Lockfile and workflow changes also trigger Rust checks.
+
+CI actions use their latest stable major tags. Node.js and pnpm are selected by
+major version (26 and 12), allowing stable minor and patch updates. The browser
+test job has a ten-minute timeout to bound failures during setup or teardown.
+Playwright launches Vite directly through Node. A nested `pnpm run dev` leaves
+Vite in a separate process group with pnpm 11.27.1 and 12.6.0 on Linux, causing
+shutdown to hang after every browser test passes. The browser suite must both
+pass its assertions and exit successfully to validate server cleanup.
 
 The frontend uses TypeScript 7 for builds. Its `typescript` dependency aliases
 `@typescript/typescript6` to supply the compiler API required by typescript-eslint;
@@ -155,3 +170,43 @@ The audio adapter and application shell inherit these versions. Upgrade `windows
 and `windows-core` together and validate on Windows before changing this baseline.
 `windows-core` 0.100 is incompatible with the published `windows` 0.62 bindings.
 The vendored Linux GLib patch remains tied to Tauri's dependency graph.
+
+## Dependency refresh (2026-09-25)
+
+Direct Rust and frontend dependencies were checked against stable registry releases,
+and the lockfiles were refreshed within upstream compatibility constraints. The
+updated direct crates are Tauri 2.11.6, the single-instance plugin 2.4.5, rand
+0.10.3, and thiserror 2.0.21. Frontend updates include ESLint 10.11.0, Prettier
+3.9.9, typescript-eslint 8.70.1, and Vite 8.3.1. The TypeScript compiler/API aliases
+remain necessary for lint-tool compatibility.
+
+GitHub Actions use the latest stable release tags verified for this refresh,
+including configure-pages 6.0.0, upload-pages-artifact 5.0.0, and deploy-pages
+5.0.1. The Pages actions run on GitHub-hosted Ubuntu runners. PR checks do not
+perform a production Pages deployment; verify the Website workflow when these
+changes reach the release branch used for publishing.
+
+The following upstream constraints remain:
+
+- `windows` 0.62.2 is the latest published stable bindings crate. Keep
+  `windows-core` at 0.62.2: the COM implementation macros require a direct matching
+  core dependency, and upgrading only core to 0.100.0 breaks Windows compilation.
+- The GTK/GLib dependency chain pins `toml_datetime` 0.6.3 and `toml_edit` 0.20.2
+  through `proc-macro-crate` 2.0.2, which also constrains the older `toml` branch.
+- Tauri's code-generation dependency chain uses `crypto-common` 0.1.7, which pins
+  `generic-array` exactly to 0.14.7.
+
+Local verification used Homebrew Rust 1.98.1, the existing Node.js 24 installation,
+and pnpm 12. The frontend lockfile also accepts frozen installation with CI's
+pnpm 11. Homebrew Rust updates use `brew update` followed by `brew upgrade rust`.
+
+## Settings presentation preview
+
+Run `pnpm --dir ui dev` and open `/preview.html` on the local development server.
+Use `?platform=macos`, `?platform=windows`, or `?platform=linux` to review each
+presentation. Add `&appearance=dark` or `&appearance=light` to force a color scheme.
+The preview uses sample data and mocks all Tauri commands; it does
+not control speakers or write app configuration. It is not included in the
+production frontend build. Test at a 740-pixel width on macOS, 960 on Windows
+(also its 760-pixel minimum), and 600 on Linux, and both default
+and minimum window heights, including dark mode, keyboard focus, and increased contrast.

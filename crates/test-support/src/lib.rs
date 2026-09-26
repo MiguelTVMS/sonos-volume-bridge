@@ -1,5 +1,8 @@
 //! Reusable deterministic Sonos protocol test support.
 
+mod soap;
+pub use soap::{MockSoapServer, SoapReply};
+
 use sonos_volume_bridge_domain::{MuteState, SonosVolume};
 use std::sync::Arc;
 use tokio::{

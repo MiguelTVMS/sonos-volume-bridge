@@ -1,0 +1,33 @@
+name: UI tests
+
+on:
+  pull_request:
+    branches-ignore: [main]
+    paths:
+      - "ui/**"
+      - "src-tauri/tauri*.conf.json"
+      - ".github/workflows/ui-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  settings:
+    name: Settings unit and browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: pnpm --dir ui test
+      - run: pnpm --dir ui exec playwright install --with-deps chromium
+      - run: pnpm --dir ui run test:ui
+      - run: pnpm --dir ui run build

@@ -1,19 +1,51 @@
 import { getVersion } from '@tauri-apps/api/app';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { listen } from '@tauri-apps/api/event';
+import { bindWindowFocus } from './window-appearance';
 import { connectionLabel } from './connection';
 import { diagnosticsDisclosureState } from './diagnostics';
+import { desktopPlatform } from './platform';
+import { settingCaption } from './setting-caption';
+import { sizeSelectedControls } from './select-sizing';
+import { canApplyRefresh } from './refresh-state';
+import { adjacentPage, type SettingsPage } from './settings-navigation';
+import { applySpeakerControls, type SpeakerSettings } from './speaker-controls';
+import { SliderInteraction } from './slider-interaction';
+import { LiveStatus } from './live-status';
+import { UserWrites } from './user-writes';
 import './style.css';
+import './platform.css';
+import './windows.css';
+
+const platform = desktopPlatform(navigator.userAgent);
+document.documentElement.dataset.platform = platform;
+
+if (document.documentElement.dataset.platform === 'macos') {
+  const applyFocus = (focused: boolean): void => {
+    document.documentElement.dataset.windowActive = String(focused);
+  };
+  applyFocus(document.hasFocus());
+  if (isTauri()) {
+    const nativeWindow = getCurrentWindow();
+    void bindWindowFocus(
+      {
+        listen: (update) => nativeWindow.onFocusChanged(({ payload }) => update(payload)),
+        current: () => nativeWindow.isFocused(),
+      },
+      applyFocus,
+    ).catch(() => {
+      window.addEventListener('focus', () => applyFocus(true));
+      window.addEventListener('blur', () => applyFocus(false));
+      applyFocus(document.hasFocus());
+    });
+  } else {
+    window.addEventListener('focus', () => applyFocus(true));
+    window.addEventListener('blur', () => applyFocus(false));
+  }
+}
 
 type MappingPoint = { local: number; sonos: number };
-type SettingsPage = 'devices' | 'speaker' | 'volume' | 'general' | 'diagnostics' | 'about';
-type SpeakerSettings = {
-  loudness: boolean | null;
-  nightSound: boolean | null;
-  speechEnhancement: boolean | null;
-  statusLight: boolean | null;
-  treble: number | null;
-  bass: number | null;
-};
 type Configuration = {
   schemaVersion: number;
   selectedSonosId: string | null;
@@ -82,6 +114,17 @@ let saveTimeout: number | undefined;
 let saveRevision = 0;
 let statusPoll: number | undefined;
 let diagnosticDetailsVisible = false;
+let speakerReadRequest = 0;
+let pushRefreshTimeout: number | undefined;
+let lastFallbackRefresh = 0;
+let refreshRequest = 0;
+let editRevision = 0;
+let pendingWrites = 0;
+const sliders = new SliderInteraction();
+const userWrites = new UserWrites();
+const liveStatus = new LiveStatus<Snapshot>(refreshRuntimeStatus);
+let refreshRunning = false;
+let refreshAgain = false;
 let appVersion = 'Loading…';
 
 const repositoryUrl = 'https://github.com/MiguelTVMS/sonos-volume-bridge';
@@ -144,12 +187,12 @@ function sonosOptions(configuration: Configuration): string {
   if (selected && !devices.some((device) => device.id === selected)) {
     devices.unshift({
       id: selected,
-      friendlyName: 'Previously chosen speaker (not nearby)',
+      friendlyName: 'Speaker unavailable',
       location: configuration.lastKnownSonosAddress ?? '',
     });
   }
   return [
-    option('', 'Select a Sonos speaker', !selected),
+    option('', 'Select speaker', !selected),
     ...devices.map((device) => option(device.id, device.friendlyName, device.id === selected)),
   ].join('');
 }
@@ -169,7 +212,7 @@ function outputOptions(configuration: Configuration): string {
   if (selected !== 'default' && !writableOutputs.some((output) => output.id === selected)) {
     writableOutputs.unshift({
       id: selected,
-      name: 'Previously chosen output (not available)',
+      name: 'Output unavailable',
       writableVolume: true,
     });
   }
@@ -200,8 +243,20 @@ function knownSonosAddress(configuration: Configuration): string {
   return selected?.location ?? configuration.lastKnownSonosAddress ?? '';
 }
 
+const pageIcons: Record<SettingsPage, string> = {
+  devices:
+    '<rect x="3" y="4" width="12" height="10" rx="2"/><path d="M6 18h6m-3-4v4"/><rect x="17" y="8" width="4" height="12" rx="1"/>',
+  speaker:
+    '<rect x="6" y="2" width="12" height="20" rx="3"/><circle cx="12" cy="14" r="4"/><circle cx="12" cy="6" r="1"/>',
+  volume: '<path d="M11 4 6 8H3v8h3l5 4V4Zm4 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
+  general:
+    '<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/>',
+  diagnostics: '<path d="M3 12h4l3-7 4 14 3-7h4"/>',
+  about: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-11v1"/>',
+};
+
 function pageButton(page: SettingsPage, label: string): string {
-  return `<button class="page-button${activePage === page ? ' active' : ''}" type="button" data-page="${page}"${activePage === page ? ' aria-current="page"' : ''}>${label}</button>`;
+  return `<button class="page-button${activePage === page ? ' active' : ''}" type="button" data-page="${page}"${activePage === page ? ' aria-current="page"' : ''}><span class="nav-icon nav-icon-${page}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${pageIcons[page]}</svg></span><span>${label}</span></button>`;
 }
 
 function panel(page: SettingsPage, content: string): string {
@@ -209,12 +264,20 @@ function panel(page: SettingsPage, content: string): string {
 }
 
 function render(nextSnapshot: Snapshot): void {
+  if (sliders.active) return;
   snapshot = nextSnapshot;
   const c = nextSnapshot.configuration;
   const speakerName = nextSnapshot.sonosName ?? 'No speaker selected';
   const status = connectionLabel(nextSnapshot.status);
   app.innerHTML = `
     <div class="settings-shell">
+      <div class="macos-titlebar" data-tauri-drag-region>
+        <div class="section-navigation" role="group" aria-label="Navigate settings sections">
+          <button type="button" id="previous-section" aria-label="Previous settings section" title="Previous settings section"${adjacentPage(activePage, -1) ? '' : ' disabled'}><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m10 2-6 6 6 6"/></svg></button>
+          <button type="button" id="next-section" aria-label="Next settings section" title="Next settings section"${adjacentPage(activePage, 1) ? '' : ' disabled'}><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m6 2 6 6-6 6"/></svg></button>
+        </div>
+        <span id="toolbar-section-title" data-tauri-drag-region>${activePage[0].toUpperCase() + activePage.slice(1)}</span>
+      </div>
       <aside class="sidebar">
         <div class="app-heading"><h1><span class="sonos-name">SONOS</span><span>Volume Bridge</span></h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
         <nav aria-label="Settings sections">
@@ -232,23 +295,23 @@ function render(nextSnapshot: Snapshot): void {
           'devices',
           `<div class="panel-heading"><h2>Devices</h2><p>Choose the speaker and audio output to keep in step.</p></div>
           <div class="settings-group">
-            <div class="control-field"><label for="sonos-device">Sonos speaker</label><div class="field-row"><select name="selectedSonosId" id="sonos-device">${sonosOptions(c)}</select><button class="secondary icon-button" type="button" id="discover" title="Refresh Sonos speakers" aria-label="Refresh Sonos speakers">↻</button></div></div>
+            <div class="control-field"><label for="sonos-device">${settingCaption(platform, 'Sonos speaker', 'Choose the speaker to control from this computer.', 'speaker')}</label><div class="field-row"><select name="selectedSonosId" id="sonos-device">${sonosOptions(c)}</select><button class="secondary icon-button" type="button" id="discover" title="Refresh Sonos speakers" aria-label="Refresh Sonos speakers">↻</button></div></div>
             <input type="hidden" name="lastKnownSonosAddress" value="${escapeHtml(knownSonosAddress(c))}" />
-            <div class="control-field"><label for="audio-output">Follow</label><div class="field-row"><select name="audioOutputMode" id="audio-output">${outputOptions(c)}</select><button class="secondary icon-button" type="button" id="outputs" title="Refresh local outputs" aria-label="Refresh local outputs">↻</button></div></div>
-            <label class="toggle"><span>Synchronize mute</span><input type="checkbox" role="switch" name="synchronizeMute" ${c.synchronizeMute ? 'checked' : ''}/></label>
+            <div class="control-field"><label for="audio-output">${settingCaption(platform, 'Follow', 'Choose which computer audio output to follow.', 'output')}</label><div class="field-row"><select name="audioOutputMode" id="audio-output">${outputOptions(c)}</select><button class="secondary icon-button" type="button" id="outputs" title="Refresh local outputs" aria-label="Refresh local outputs">↻</button></div></div>
+            <label class="toggle"><span>${settingCaption(platform, 'Synchronize mute', 'Keep the computer and speaker mute states in step.', 'mute')}</span><input type="checkbox" role="switch" name="synchronizeMute" ${c.synchronizeMute ? 'checked' : ''}/></label>
           </div>`,
         )}
         ${panel(
           'speaker',
-          `<div class="panel-heading"><h2>Speaker</h2><p>Adjust sound settings available on the selected Sonos speaker.</p></div><div class="settings-group"><label class="toggle"><span>Night sound</span><input type="checkbox" role="switch" data-speaker-setting="nightSound"${speakerSettings.nightSound ? ' checked' : ''}${speakerSettings.nightSound === null ? ' disabled' : ''}/></label><label class="toggle"><span>Loudness</span><input type="checkbox" role="switch" data-speaker-setting="loudness"${speakerSettings.loudness ? ' checked' : ''}${speakerSettings.loudness === null ? ' disabled' : ''}/></label><label class="toggle"><span>Status light</span><input type="checkbox" role="switch" data-speaker-setting="statusLight"${speakerSettings.statusLight ? ' checked' : ''}${speakerSettings.statusLight === null ? ' disabled' : ''}/></label><label class="toggle"><span>Speech enhancement</span><input type="checkbox" role="switch" data-speaker-setting="speechEnhancement"${speakerSettings.speechEnhancement ? ' checked' : ''}${speakerSettings.speechEnhancement === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>Treble <output>${speakerSettings.treble ?? 'Unavailable'}</output></span><input type="range" min="-10" max="10" value="${speakerSettings.treble ?? 0}" data-speaker-level="treble"${speakerSettings.treble === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>Bass <output>${speakerSettings.bass ?? 'Unavailable'}</output></span><input type="range" min="-10" max="10" value="${speakerSettings.bass ?? 0}" data-speaker-level="bass"${speakerSettings.bass === null ? ' disabled' : ''}/></label><div class="speaker-settings-footer"><p class="setting-note">Unavailable settings are shown in gray.</p><div class="speaker-settings-actions"><button class="secondary" type="button" id="use-tv-audio">Use TV audio</button><button class="secondary icon-button" type="button" id="refresh-speaker-settings" title="Refresh speaker settings" aria-label="Refresh speaker settings">↻</button></div></div></div>`,
+          `<div class="panel-heading"><h2>Speaker</h2><p>Adjust sound settings available on the selected Sonos speaker.</p></div><div class="settings-group"><label class="toggle"><span>${settingCaption(platform, 'Night sound', 'Reduce loud sounds for quieter listening.', 'moon')}<small class="feature-status" data-feature-status="nightSound"></small></span><input type="checkbox" role="switch" data-speaker-setting="nightSound"${speakerSettings.nightSound ? ' checked' : ''}${speakerSettings.nightSound === null ? ' disabled' : ''}/></label><label class="toggle"><span>${settingCaption(platform, 'Loudness', 'Enhance bass and treble at lower volumes.', 'sound')}<small class="feature-status" data-feature-status="loudness"></small></span><input type="checkbox" role="switch" data-speaker-setting="loudness"${speakerSettings.loudness ? ' checked' : ''}${speakerSettings.loudness === null ? ' disabled' : ''}/></label><label class="toggle"><span>${settingCaption(platform, 'Status light', 'Show the indicator light on the speaker.', 'light')}<small class="feature-status" data-feature-status="statusLight"></small></span><input type="checkbox" role="switch" data-speaker-setting="statusLight"${speakerSettings.statusLight ? ' checked' : ''}${speakerSettings.statusLight === null ? ' disabled' : ''}/></label><label class="toggle"><span>${settingCaption(platform, 'Speech enhancement', 'Make voices easier to hear.', 'speech')}<small class="feature-status" data-feature-status="speechEnhancement"></small></span><input type="checkbox" role="switch" data-speaker-setting="speechEnhancement"${speakerSettings.speechEnhancement ? ' checked' : ''}${speakerSettings.speechEnhancement === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>${settingCaption(platform, 'Treble', 'Adjust the higher frequencies.', 'tone')} <output>${speakerSettings.treble ?? 'Unavailable'}</output><small class="feature-status" data-feature-status="treble"></small></span><input type="range" min="-10" max="10" value="${speakerSettings.treble ?? 0}" data-speaker-level="treble"${speakerSettings.treble === null ? ' disabled' : ''}/></label><label class="speaker-level"><span>${settingCaption(platform, 'Bass', 'Adjust the lower frequencies.', 'tone')} <output>${speakerSettings.bass ?? 'Unavailable'}</output><small class="feature-status" data-feature-status="bass"></small></span><input type="range" min="-10" max="10" value="${speakerSettings.bass ?? 0}" data-speaker-level="bass"${speakerSettings.bass === null ? ' disabled' : ''}/></label><div class="speaker-settings-footer"><p class="setting-note">Unavailable settings are checked again on refresh.</p><div class="speaker-settings-actions"><button class="secondary" type="button" id="use-tv-audio">Use TV audio</button><button class="secondary icon-button" type="button" id="refresh-speaker-settings" title="Refresh speaker settings" aria-label="Refresh speaker settings">↻</button></div></div></div>`,
         )}
         ${panel(
           'volume',
           `<div class="panel-heading"><h2>Volume</h2><p>Control how your computer volume changes the speaker.</p></div>
           <div class="settings-group">
-            <label class="toggle"><span>Two-way synchronization</span><input type="checkbox" role="switch" name="twoWaySynchronization" ${c.twoWaySynchronization ? 'checked' : ''}/></label><label class="toggle"><span>Mute speaker at zero volume</span><input type="checkbox" role="switch" name="muteSpeakerAtZeroVolume" ${c.muteSpeakerAtZeroVolume ? 'checked' : ''}/></label>
-            <label>Highest speaker volume <output class="range-value" id="maximum-value">${c.maximumSonosVolume}%</output><input name="maximumSonosVolume" id="maximum-volume" type="range" min="0" max="100" step="1" value="${c.maximumSonosVolume}" /></label>
-            <label>Volume feel<select name="mapping">${mappingOptions(c)}</select></label>
+            <label class="toggle"><span>${settingCaption(platform, 'Two-way synchronization', 'Also follow volume changes made on the speaker.', 'sync')}</span><input type="checkbox" role="switch" name="twoWaySynchronization" ${c.twoWaySynchronization ? 'checked' : ''}/></label><label class="toggle"><span>${settingCaption(platform, 'Mute speaker at zero volume', 'Mute Sonos when computer volume reaches zero.', 'mute')}</span><input type="checkbox" role="switch" name="muteSpeakerAtZeroVolume" ${c.muteSpeakerAtZeroVolume ? 'checked' : ''}/></label>
+            <label class="volume-limit"><span>${settingCaption(platform, 'Highest speaker volume', 'Limit how loud the speaker can become.', 'sound')} <output class="range-value" id="maximum-value">${c.maximumSonosVolume}%</output></span><input name="maximumSonosVolume" id="maximum-volume" type="range" min="0" max="100" step="1" value="${c.maximumSonosVolume}" /></label>
+            <label class="select-setting"><span>${settingCaption(platform, 'Volume feel', 'Choose how computer volume maps to the speaker.', 'tone')}</span><select name="mapping">${mappingOptions(c)}</select></label>
             <details class="help"><summary>What do these options mean?</summary><dl><div><dt>Balanced</dt><dd>Gives you more control at lower volumes and rises more gently.</dd></div><div><dt>Direct</dt><dd>Keeps the speaker volume closely matched to your computer volume.</dd></div><div><dt>Scaled</dt><dd>Scales the full system volume range to the highest speaker volume you chose.</dd></div></dl></details>
             <button class="secondary test-button" type="button" id="test">Test speaker volume</button>
           </div>`,
@@ -257,8 +320,8 @@ function render(nextSnapshot: Snapshot): void {
           'general',
           `<div class="panel-heading"><h2>General</h2><p>Choose how the app behaves in the background.</p></div>
           <div class="settings-group">
-            <label class="toggle"><span>Start at login</span><input type="checkbox" role="switch" name="startAtLogin" ${c.startAtLogin ? 'checked' : ''}/></label>
-            <label class="toggle"><span>Keep checking if updates are missed</span><input type="checkbox" role="switch" name="fallbackPolling" ${c.fallbackPolling ? 'checked' : ''}/></label>
+            <label class="toggle"><span>${settingCaption(platform, 'Start at login', 'Run Volume Bridge when you sign in.', 'power')}</span><input type="checkbox" role="switch" name="startAtLogin" ${c.startAtLogin ? 'checked' : ''}/></label>
+            <label class="toggle"><span>${settingCaption(platform, 'Keep checking if updates are missed', 'Recover speaker updates when notifications are interrupted.', 'sync')}</span><input type="checkbox" role="switch" name="fallbackPolling" ${c.fallbackPolling ? 'checked' : ''}/></label>
           </div>`,
         )}
         ${panel(
@@ -277,11 +340,23 @@ function render(nextSnapshot: Snapshot): void {
         <output id="notice" aria-live="polite"></output>
       </form>
     </div>`;
+  applySpeakerControls(app, speakerSettings, document.activeElement);
+  if (document.documentElement.dataset.platform === 'macos') sizeSelectedControls(app);
+  document.querySelector('#previous-section')?.addEventListener('click', () => {
+    const page = adjacentPage(activePage, -1);
+    if (page) activatePage(page);
+  });
+  document.querySelector('#next-section')?.addEventListener('click', () => {
+    const page = adjacentPage(activePage, 1);
+    if (page) activatePage(page);
+  });
   const form = document.querySelector<HTMLFormElement>('#settings');
   const scheduleConfigurationSave = (event: Event): void => {
     if (
       !(event.target instanceof HTMLElement) ||
-      (!event.target.dataset.speakerSetting && !event.target.dataset.speakerLevel)
+      (!event.target.dataset.speakerSetting &&
+        !event.target.dataset.speakerLevel &&
+        !(event.target instanceof HTMLInputElement && event.target.type === 'range'))
     )
       scheduleSave();
   };
@@ -290,12 +365,22 @@ function render(nextSnapshot: Snapshot): void {
   document.querySelectorAll<HTMLInputElement>('[data-speaker-setting]').forEach((input) => {
     input.addEventListener('change', () => void updateSpeakerSetting(input));
   });
-  document.querySelectorAll<HTMLInputElement>('[data-speaker-level]').forEach((input) => {
-    input.addEventListener('input', () => {
-      const label = input.closest('label')?.querySelector<HTMLOutputElement>('output');
-      if (label) label.value = input.value;
-    });
-    input.addEventListener('change', () => void updateSpeakerLevel(input));
+  document.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach((input) => {
+    sliders.bind(
+      input,
+      () => {
+        editRevision++;
+        saveRevision++;
+      },
+      () => {
+        const label = input.closest('label')?.querySelector<HTMLOutputElement>('output');
+        if (label) label.value = input.id === 'maximum-volume' ? `${input.value}%` : input.value;
+      },
+      () => {
+        if (input.dataset.speakerLevel) void updateSpeakerLevel(input);
+        else scheduleSave();
+      },
+    );
   });
 
   document.querySelectorAll<HTMLButtonElement>('[data-page]').forEach((button) => {
@@ -321,14 +406,22 @@ function render(nextSnapshot: Snapshot): void {
 
 function activatePage(page: SettingsPage): void {
   activePage = page;
-  if (page === 'diagnostics') void refreshAudioInputFormat();
+  const title = document.querySelector('#toolbar-section-title');
+  if (title) title.textContent = page[0].toUpperCase() + page.slice(1);
+  const previous = document.querySelector<HTMLButtonElement>('#previous-section');
+  const next = document.querySelector<HTMLButtonElement>('#next-section');
+  if (previous) previous.disabled = !adjacentPage(page, -1);
+  if (next) next.disabled = !adjacentPage(page, 1);
+  document.querySelector('.content')?.scrollTo(0, 0);
+  void refreshAllSettings();
   document.querySelectorAll<HTMLElement>('[data-panel]').forEach((element) => {
     element.hidden = element.dataset.panel !== page;
   });
   document.querySelectorAll<HTMLButtonElement>('[data-page]').forEach((button) => {
     const active = button.dataset.page === page;
     button.classList.toggle('active', active);
-    button.toggleAttribute('aria-current', active);
+    if (active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
   });
 }
 
@@ -354,8 +447,16 @@ function refreshRuntimeStatus(nextSnapshot: Snapshot): void {
 function startStatusPolling(): void {
   if (statusPoll !== undefined) return;
   statusPoll = window.setInterval(() => {
-    void invoke<Snapshot>('get_snapshot')
-      .then(refreshRuntimeStatus)
+    void liveStatus
+      .read(() => invoke<Snapshot>('get_snapshot'))
+      .then(() => {
+        const next = snapshot;
+        if (!next) return;
+        if (document.visibilityState === 'visible' && Date.now() - lastFallbackRefresh > 5000) {
+          lastFallbackRefresh = Date.now();
+          schedulePushRefresh();
+        }
+      })
       .catch(() => undefined);
   }, 1_000);
 }
@@ -405,7 +506,10 @@ async function discoverSonos(): Promise<void> {
 }
 
 async function refreshSpeakerSettings(): Promise<void> {
-  speakerSettings = await invoke<SpeakerSettings>('get_speaker_settings').catch(() => ({
+  if (!snapshot || sliders.active || pendingWrites > 0 || saveTimeout !== undefined) return;
+  const request = ++speakerReadRequest;
+  const revision = editRevision;
+  const speaker = await invoke<SpeakerSettings>('get_speaker_settings').catch(() => ({
     loudness: null,
     nightSound: null,
     speechEnhancement: null,
@@ -413,7 +517,27 @@ async function refreshSpeakerSettings(): Promise<void> {
     treble: null,
     bass: null,
   }));
-  if (snapshot) render(snapshot);
+  if (
+    !canApplyRefresh(
+      request,
+      speakerReadRequest,
+      revision,
+      editRevision,
+      sliders.active || pendingWrites > 0 || saveTimeout !== undefined,
+    )
+  )
+    return;
+  speakerSettings = speaker;
+  applySpeakerControls(app, speakerSettings, document.activeElement);
+}
+
+function schedulePushRefresh(): void {
+  editRevision++;
+  if (pushRefreshTimeout !== undefined) window.clearTimeout(pushRefreshTimeout);
+  pushRefreshTimeout = window.setTimeout(() => {
+    pushRefreshTimeout = undefined;
+    void refreshSpeakerSettings();
+  }, 150);
 }
 
 async function useTvAudio(): Promise<void> {
@@ -426,31 +550,35 @@ async function useTvAudio(): Promise<void> {
   }
 }
 async function updateSpeakerSetting(input: HTMLInputElement): Promise<void> {
+  editRevision++;
+  pendingWrites++;
   try {
-    await invoke('set_speaker_setting', {
-      setting: input.dataset.speakerSetting,
-      enabled: input.checked,
-    });
-    speakerSettings[
-      input.dataset.speakerSetting as
-        'loudness' | 'nightSound' | 'speechEnhancement' | 'statusLight'
-    ] = input.checked;
+    const setting = input.dataset.speakerSetting;
+    const enabled = input.checked;
+    await userWrites.run(() => invoke('set_speaker_setting', { setting, enabled }));
     notice('Saved.');
   } catch (error) {
-    input.checked = !input.checked;
     notice(String(error));
+  } finally {
+    pendingWrites--;
+    void refreshAllSettings();
   }
 }
 
 async function updateSpeakerLevel(input: HTMLInputElement): Promise<void> {
+  editRevision++;
+  pendingWrites++;
   try {
     const setting = input.dataset.speakerLevel as 'treble' | 'bass';
     const value = Number(input.value);
-    await invoke('set_speaker_level', { setting, value });
+    await userWrites.run(() => invoke('set_speaker_level', { setting, value }));
     speakerSettings[setting] = value;
     notice('Saved.');
   } catch (error) {
     notice(String(error));
+  } finally {
+    pendingWrites--;
+    void refreshAllSettings();
   }
 }
 function notice(value: string): void {
@@ -494,22 +622,34 @@ function formConfiguration(form: HTMLFormElement): Configuration {
 }
 
 function scheduleSave(): void {
+  editRevision++;
   if (saveTimeout !== undefined) window.clearTimeout(saveTimeout);
   const revision = ++saveRevision;
   saveTimeout = window.setTimeout(() => {
+    saveTimeout = undefined;
+    if (sliders.active) {
+      scheduleSave();
+      return;
+    }
     const form = document.querySelector<HTMLFormElement>('#settings');
     if (form) void saveConfiguration(formConfiguration(form), revision);
   }, 350);
 }
 
 async function saveConfiguration(configuration: Configuration, revision: number): Promise<void> {
+  pendingWrites++;
+  let saved = false;
   try {
     const nextSnapshot = await invoke<Snapshot>('save_configuration', { configuration });
     if (revision !== saveRevision) return;
     render(nextSnapshot);
     notice('Saved.');
+    saved = true;
   } catch (error) {
     if (revision === saveRevision) notice(`Could not save: ${String(error)}`);
+  } finally {
+    pendingWrites--;
+    if (saved) void refreshAllSettings();
   }
 }
 
@@ -558,11 +698,87 @@ invoke<Snapshot>('get_snapshot')
   .then((nextSnapshot) => {
     render(nextSnapshot);
     startStatusPolling();
-    void refreshAudioOutputs();
-    void refreshSpeakerSettings();
-    discoveryStatus = 'Searching…';
-    void discoverSonos();
+    void refreshAllSettings();
   })
   .catch((error: unknown) => {
     app.textContent = `Unable to load settings: ${String(error)}`;
   });
+
+async function refreshAllSettings(): Promise<void> {
+  if (!snapshot) return;
+  if (refreshRunning) {
+    refreshAgain = true;
+    return;
+  }
+  if (sliders.active || saveTimeout !== undefined || pendingWrites > 0) return;
+  refreshRunning = true;
+  const request = ++refreshRequest;
+  const revision = editRevision;
+  try {
+    const [next, speaker, outputs, discovered, diagnostics] = await Promise.all([
+      invoke<Snapshot>('get_snapshot'),
+      invoke<SpeakerSettings>('get_speaker_settings'),
+      invoke<AudioOutput[]>('list_audio_outputs').catch(() => null),
+      invoke<DiscoveredSonos[]>('discover_sonos').catch(() => null),
+      invoke<Diagnostics>('diagnostics').catch(() => null),
+    ]);
+    if (
+      !canApplyRefresh(
+        request,
+        refreshRequest,
+        revision,
+        editRevision,
+        sliders.active || pendingWrites > 0 || saveTimeout !== undefined,
+      )
+    )
+      return;
+    speakerSettings = speaker;
+    if (outputs) audioOutputs = outputs;
+    if (discovered) {
+      discoveredSonos = discovered;
+      discoveryStatus = `Found ${discovered.length} speaker${discovered.length === 1 ? '' : 's'}`;
+    }
+    render({
+      ...next,
+      status: snapshot.status,
+      sonosName: snapshot.sonosName,
+      sonosVolume: snapshot.sonosVolume,
+      localVolume: snapshot.localVolume,
+      muted: snapshot.muted,
+    });
+    const audioInput = document.querySelector('#diagnostic-audio-input');
+    if (audioInput) audioInput.textContent = diagnostics?.audioInputFormat ?? 'Unavailable';
+    const payload = document.querySelector('#diagnostic-payload');
+    if (payload && diagnosticDetailsVisible && diagnostics)
+      payload.textContent = JSON.stringify(diagnostics, null, 2);
+  } catch {
+    notice('Could not refresh settings. Check the speaker connection and try again.');
+  } finally {
+    refreshRunning = false;
+    if (refreshAgain) {
+      refreshAgain = false;
+      void refreshAllSettings();
+    }
+  }
+}
+
+if (isTauri()) {
+  void listen<Snapshot>('runtime-status-changed', ({ payload }) => liveStatus.push(payload)).catch(
+    () => undefined,
+  );
+  void getCurrentWindow()
+    .onFocusChanged(({ payload: focused }) => {
+      if (focused) void refreshAllSettings();
+    })
+    .catch(() => {
+      window.addEventListener('focus', () => void refreshAllSettings());
+    });
+} else {
+  window.addEventListener('focus', () => void refreshAllSettings());
+}
+
+if (isTauri()) {
+  void listen('speaker-settings-changed', schedulePushRefresh).catch(() => {
+    notice('Live speaker updates are unavailable. Reopen settings to refresh.');
+  });
+}
