@@ -33,3 +33,6 @@ manual changes. Transient failures retry with bounded backoff; confirmed normal
 boundaries produce notification intent. Explicit Save separately requests a
 notification after confirmation, including idempotent saves. On start/On end/On start and end/Never filters that intent without changing controller state. Selection or schedule changes discard old
 pending intent. Notification preferences never reset this controller. See ADR 0013.
+
+Opt-in UI demo builds do not start this state machine; device status is simulated
+for Settings testing. See ADR 0014.

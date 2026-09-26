@@ -64,6 +64,12 @@ select {
   font: inherit;
 }
 
+.demo-indicator {
+  color: var(--accent);
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+
 .settings-shell {
   display: grid;
   grid-template-columns: 164px minmax(0, 1fr);

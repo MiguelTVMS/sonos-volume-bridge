@@ -15,3 +15,5 @@ This folder stores decision records. Keep one record per important design choice
 - [0011-ubuntu-pulse-audio-adapter](0011-ubuntu-pulse-audio-adapter.md)
 - [0012-platform-settings-presentation](0012-platform-settings-presentation.md)
 - [0013-global-night-mode-schedule](0013-global-night-mode-schedule.md)
+
+- [0014-ui-demo-build](0014-ui-demo-build.md)

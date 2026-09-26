@@ -164,3 +164,10 @@ Windows, and GNOME clock-format or LC_TIME on Linux. Preferences are reread when
 Settings regains focus. Other Linux desktop-specific clock overrides may require
 matching LC_TIME. The form omits repetitive disabled/outside-period status text;
 errors, capability guidance, and active-period restrictions remain visible.
+
+## UI demo builds
+
+Explicit `ui-demo` debug builds open Settings with simulated devices and a demo
+label. Edits stay in memory until reload/restart and do not affect real devices
+or normal saved configuration. See [development](development.md#hardware-free-ui-demo)
+for build commands and platform styling overrides.

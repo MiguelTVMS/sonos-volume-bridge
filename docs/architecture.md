@@ -194,3 +194,10 @@ rectangular editor and scheduler are used on all three platforms.
 
 Windows schedule tooltips use an opaque platform surface in both color schemes;
 the shared hover interaction remains in the frontend (ADR 0013).
+
+## Hardware-free UI demo
+
+The default-off `ui-demo` debug feature selects a separate shell before runtime
+services start. Its frontend uses the shared preview simulator; native device
+handlers are not registered. Presentation overrides never change domain or
+synchronization behavior. See [ADR 0014](decisions/0014-ui-demo-build.md).

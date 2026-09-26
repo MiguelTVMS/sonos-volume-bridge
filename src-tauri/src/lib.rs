@@ -2,6 +2,7 @@ mod autostart;
 mod clock_format;
 mod commands;
 mod config;
+mod demo;
 mod logging;
 mod night_schedule;
 mod runtime;
@@ -13,7 +14,44 @@ mod tray;
 use crate::{config::ConfigStore, state::AppState};
 use tauri::Manager;
 
+#[cfg(all(feature = "ui-demo", not(debug_assertions)))]
+compile_error!("ui-demo requires a debug build; pass --debug --features ui-demo");
+
+#[cfg(any(
+    all(feature = "ui-windows", feature = "ui-macos"),
+    all(feature = "ui-windows", feature = "ui-ubuntu"),
+    all(feature = "ui-macos", feature = "ui-ubuntu")
+))]
+compile_error!("choose only one UI override: ui-windows, ui-macos, or ui-ubuntu");
+
+#[tauri::command]
+fn ui_demo_enabled() -> bool {
+    cfg!(feature = "ui-demo")
+}
+
+#[tauri::command]
+fn ui_demo_platform() -> Option<&'static str> {
+    if cfg!(feature = "ui-windows") {
+        Some("windows")
+    } else if cfg!(feature = "ui-macos") {
+        Some("macos")
+    } else if cfg!(feature = "ui-ubuntu") {
+        Some("linux")
+    } else {
+        None
+    }
+}
+
 pub fn run() {
+    let context = tauri::generate_context!();
+    if ui_demo_enabled() {
+        demo::run(context);
+    } else {
+        run_normal(context);
+    }
+}
+
+fn run_normal(context: tauri::Context<tauri::Wry>) {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_single_instance::init(
@@ -90,6 +128,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            ui_demo_enabled,
             commands::get_snapshot,
             commands::get_system_hour12,
             commands::save_night_schedule,
@@ -108,6 +147,6 @@ pub fn run() {
             commands::set_speaker_level,
             commands::use_tv_audio
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("Tauri runtime failed");
 }

@@ -213,3 +213,26 @@ through the production form, waits for the save rerender, and checks the sizing
 label and rendered text width. It fails before the mount-order fix. Browser
 coverage does not establish native WebView popup rendering; repeat this check in
 the packaged macOS app before release.
+
+## UI demo builds
+
+Build without flags and confirm there is no demo label. Build with `--debug
+--features ui-demo`, start without a speaker, and verify Settings opens immediately
+with simulated devices. Edit sound controls, configuration, schedule, and
+notification modes; navigate away/back and check state. Reset and confirm defaults;
+restart and confirm session edits disappear. Normal saved settings, OS audio,
+login registration, and real devices must remain untouched.
+
+Repeat with `ui-windows`, `ui-macos`, and `ui-ubuntu` on the same host. Check the
+forced styling while retaining native window behavior (macOS width stays fixed).
+Try Settings/Quit from the demo tray and running demo alongside a normal instance.
+
+Automated coverage checks command routing, simulator edits/reset, all forced
+presentations, and native IPC rejection of production commands. Browser coverage
+does not prove native WebView, tray, audio, notification, or hardware behavior;
+forced styling does not replace target-OS VM testing.
+
+Local validation: a packaged macOS debug app with `ui-windows` opened successfully
+and displayed the Windows Night schedule layout with the demo label and simulated
+speaker. Browser control-edit/reset checks passed for all three presentations.
+Native Windows/Linux execution and hardware integration remain target-OS checks.

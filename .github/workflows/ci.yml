@@ -89,6 +89,10 @@ jobs:
         with:
           shared-key: workspace-${{ runner.os }}
       - run: cargo check --workspace
+      - run: cargo check -p sonos-volume-bridge --features ui-demo
+      - run: cargo check -p sonos-volume-bridge --features ui-windows
+      - run: cargo check -p sonos-volume-bridge --features ui-macos
+      - run: cargo check -p sonos-volume-bridge --features ui-ubuntu
 
   rust-quality:
     name: Rust quality
@@ -122,6 +126,8 @@ jobs:
       - run: pnpm run ci:rustfmt
       - run: pnpm run ci:clippy
       - run: pnpm run ci:test
+      - run: cargo clippy -p sonos-volume-bridge --all-targets --features ui-demo -- -D warnings
+      - run: cargo test -p sonos-volume-bridge --features ui-demo
 
   frontend:
     name: Frontend

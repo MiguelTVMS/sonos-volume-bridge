@@ -7,8 +7,18 @@ license.workspace = true
 repository.workspace = true
 default-run = "sonos-volume-bridge"
 
+[features]
+default = []
+ui-demo = []
+ui-windows = ["ui-demo"]
+ui-macos = ["ui-demo"]
+ui-ubuntu = ["ui-demo"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+
+[dev-dependencies]
+tauri = { version = "2.11.6", features = ["test"] }
 
 [dependencies]
 jiff = "0.2.37"

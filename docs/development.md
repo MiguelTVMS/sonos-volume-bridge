@@ -220,3 +220,37 @@ without opening a PR. Production builds always follow the machine clock; there i
 no forced AM/PM layout preview. Schedule tests run with ordinary frontend and Rust
 suites. Physical speaker, sleep/wake, and packaged notification checks remain in
 the verification matrix.
+
+## Hardware-free UI demo
+
+Build an app for the current host with simulated devices using an explicit flag:
+
+```sh
+pnpm --dir ui install --frozen-lockfile
+pnpm dlx @tauri-apps/cli@2 build --debug --features ui-demo
+```
+
+Replace `ui-demo` with exactly one of `ui-windows`, `ui-macos`, or `ui-ubuntu` to
+force that platform's presentation on the current host. Each enables demo mode:
+
+```sh
+pnpm dlx @tauri-apps/cli@2 build --debug --features ui-windows
+pnpm dlx @tauri-apps/cli@2 dev --features ui-ubuntu
+```
+
+Use `--no-bundle` for an executable in `target/debug`; packaged output lives under
+`target/debug/bundle`. Build on each target OS for its VM: forcing Windows styling
+on macOS still produces a macOS executable. The **Branch desktop check** workflow
+has an optional `ui_demo` checkbox for Windows/Linux debug artifacts, off by default.
+
+The app opens Settings with simulated devices. Sound controls, configuration,
+schedule editing and Save, notification preferences, diagnostics display, volume
+tests, and reset work without a speaker or audio endpoint. Values last until reload
+or restart. Login registration, audio playback, notifications, and diagnostic file
+export have no actual OS effects. The demo tray provides Settings/Quit; recurring
+schedule enforcement and tray speaker controls require normal native testing.
+
+Only styling is forced. Native chrome, WebView behavior, audio, notifications,
+and device integration need verification on the target OS. Host window constraints
+remain in effect (macOS stays fixed-width). Release builds reject demo features.
+With no feature flags, even debug builds run normally.

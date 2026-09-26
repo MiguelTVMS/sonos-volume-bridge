@@ -2,6 +2,11 @@ name: Branch desktop check
 
 on:
   workflow_dispatch:
+    inputs:
+      ui_demo:
+        description: Build a hardware-free UI demo
+        type: boolean
+        default: false
   push:
     branches: [feat/night-mode-schedule]
 
@@ -50,10 +55,10 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
-      - run: pnpm dlx @tauri-apps/cli@2 build --debug --no-bundle --no-sign
+      - run: pnpm dlx @tauri-apps/cli@2 build --debug --no-bundle --no-sign ${{ inputs.ui_demo && '--features ui-demo' || '' }}
       - uses: actions/upload-artifact@v6
         with:
-          name: night-schedule-${{ runner.os }}
+          name: desktop-${{ inputs.ui_demo && 'ui-demo' || 'normal' }}-${{ runner.os }}
           path: |
             target/debug/sonos-volume-bridge.exe
             target/debug/sonos-volume-bridge

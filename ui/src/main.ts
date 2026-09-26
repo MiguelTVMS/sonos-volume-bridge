@@ -11,7 +11,8 @@ import {
   type ScheduleStatus,
 } from './night-schedule';
 import { getVersion } from '@tauri-apps/api/app';
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { isTauri } from '@tauri-apps/api/core';
+import { invoke, demoMode, presentationOverride } from './app-commands';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 import { bindWindowFocus } from './window-appearance';
@@ -30,7 +31,7 @@ import './style.css';
 import './platform.css';
 import './windows.css';
 
-const platform = desktopPlatform(navigator.userAgent);
+const platform = presentationOverride ?? desktopPlatform(navigator.userAgent);
 document.documentElement.dataset.platform = platform;
 
 if (document.documentElement.dataset.platform === 'macos') {
@@ -306,7 +307,7 @@ function render(nextSnapshot: Snapshot): void {
         <span id="toolbar-section-title" data-tauri-drag-region>${activePage === 'schedule' ? 'Night schedule' : activePage[0].toUpperCase() + activePage.slice(1)}</span>
       </div>
       <aside class="sidebar">
-        <div class="app-heading"><h1><span class="sonos-name">SONOS</span><span>Volume Bridge</span></h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
+        <div class="app-heading">${demoMode ? '<p class="demo-indicator">UI demo · simulated devices</p>' : ''}<h1><span class="sonos-name">SONOS</span><span>Volume Bridge</span></h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
         <nav aria-label="Settings sections">
           ${pageButton('devices', 'Devices')}
           ${pageButton('speaker', 'Speaker')}
