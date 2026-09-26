@@ -20,54 +20,62 @@ use windows::Win32::{
     },
     System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoTaskMemFree, CoUninitialize},
 };
-use windows_core::{Ref, implement};
+use windows_core::Ref;
 type Cameras = Arc<Mutex<Inventory<Vec<u16>>>>;
 fn failure() -> windows_core::Error {
     windows_core::Error::from_hresult(windows_core::HRESULT(0x8000_4005_u32.cast_signed()))
 }
 
-// The windows implementation macro emits these patterns in generated COM glue.
+// Scope lint exceptions to COM macro output, not the native adapter implementation.
 #[allow(clippy::ref_as_ptr, clippy::inline_always)]
-#[implement(IMFSensorActivitiesReportCallback)]
-struct Callback {
-    cameras: Cameras,
-}
-impl IMFSensorActivitiesReportCallback_Impl for Callback_Impl {
-    fn OnActivitiesReport(
-        &self,
-        report: Ref<'_, IMFSensorActivitiesReport>,
-    ) -> windows_core::Result<()> {
-        let result = (|| {
-            let report = report.ok()?;
-            let mut cameras = self.cameras.lock().map_err(|_| failure())?;
-            // SAFETY: COM owns all interfaces during these calls. No process identity is queried.
-            unsafe {
-                for index in 0..report.GetCount()? {
-                    let device = report.GetActivityReport(index)?;
-                    let mut key = vec![0_u16; 4096];
-                    let mut used = 0;
-                    device.GetSymbolicLink(&mut key, &raw mut used)?;
-                    key.truncate(key.iter().position(|c| *c == 0).ok_or_else(failure)?);
-                    let mut active = false;
-                    for process in 0..device.GetProcessCount()? {
-                        active |= device
-                            .GetProcessActivity(process)?
-                            .GetStreamingState()?
-                            .as_bool();
+mod callback {
+    use super::{
+        Cameras, IMFSensorActivitiesReport, IMFSensorActivitiesReportCallback,
+        IMFSensorActivitiesReportCallback_Impl, Ref, failure,
+    };
+    use windows_core::implement;
+    #[implement(IMFSensorActivitiesReportCallback)]
+    pub(super) struct Callback {
+        pub(super) cameras: Cameras,
+    }
+    impl IMFSensorActivitiesReportCallback_Impl for Callback_Impl {
+        fn OnActivitiesReport(
+            &self,
+            report: Ref<'_, IMFSensorActivitiesReport>,
+        ) -> windows_core::Result<()> {
+            let result = (|| {
+                let report = report.ok()?;
+                let mut cameras = self.cameras.lock().map_err(|_| failure())?;
+                // SAFETY: COM owns all interfaces during these calls. No process identity is queried.
+                unsafe {
+                    for index in 0..report.GetCount()? {
+                        let device = report.GetActivityReport(index)?;
+                        let mut key = vec![0_u16; 4096];
+                        let mut used = 0;
+                        device.GetSymbolicLink(&mut key, &raw mut used)?;
+                        key.truncate(key.iter().position(|c| *c == 0).ok_or_else(failure)?);
+                        let mut active = false;
+                        for process in 0..device.GetProcessCount()? {
+                            active |= device
+                                .GetProcessActivity(process)?
+                                .GetStreamingState()?
+                                .as_bool();
+                        }
+                        cameras.update(&key, active);
                     }
-                    cameras.update(&key, active);
                 }
+                Ok::<_, windows_core::Error>(())
+            })();
+            if result.is_err()
+                && let Ok(mut cameras) = self.cameras.lock()
+            {
+                cameras.fail();
             }
-            Ok::<_, windows_core::Error>(())
-        })();
-        if result.is_err()
-            && let Ok(mut cameras) = self.cameras.lock()
-        {
-            cameras.fail();
+            Ok(())
         }
-        Ok(())
     }
 }
+use callback::Callback;
 
 struct Sources {
     pointer: *mut Option<IMFActivate>,
