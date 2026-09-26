@@ -369,3 +369,11 @@ and launch the installed app. Confirm Settings, tray and saved configuration wor
 Repeat on a clean supported Mac to check quarantine handling. Release CI verifies
 signing, notarization acceptance, stapling and image integrity; alias tests cannot
 establish native installation or Apple notarization behavior.
+
+## Reset during autosave
+
+Change a General setting and immediately open Diagnostics and reset. Wait past
+the autosave debounce, return to General, and confirm defaults remain restored
+and the reset notice was not replaced by an old save response. Repeat with a slow
+configuration write. Browser regressions freeze the debounce clock or hold IPC
+completion to exercise both sequences deterministically through the real UI.

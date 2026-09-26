@@ -715,7 +715,9 @@ async function saveConfiguration(configuration: Configuration, revision: number)
   pendingWrites++;
   let saved = false;
   try {
-    const nextSnapshot = await invoke<Snapshot>('save_configuration', { configuration });
+    const nextSnapshot = await userWrites.run(() =>
+      invoke<Snapshot>('save_configuration', { configuration }),
+    );
     if (revision !== saveRevision) return;
     render(nextSnapshot);
     notice('Saved.');
@@ -765,8 +767,23 @@ async function exportDiagnostics(): Promise<void> {
   notice(await invoke<string>('export_diagnostics'));
 }
 async function reset(): Promise<void> {
-  render(await invoke<Snapshot>('reset_configuration'));
-  notice('Settings reset.');
+  if (saveTimeout !== undefined) window.clearTimeout(saveTimeout);
+  saveTimeout = undefined;
+  saveRevision++;
+  editRevision++;
+  pendingWrites++;
+  try {
+    // Reset follows any write already sent, so an older save cannot restore it.
+    const next = await userWrites.run(() => invoke<Snapshot>('reset_configuration'));
+    scheduleDraft.reset(next.configuration.nightModeSchedule!.blocks);
+    render(next);
+    notice('Settings reset.');
+  } catch (error) {
+    notice(`Could not reset: ${String(error)}`);
+  } finally {
+    pendingWrites--;
+    void refreshAllSettings();
+  }
 }
 
 Promise.all([
