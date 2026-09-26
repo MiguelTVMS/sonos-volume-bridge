@@ -234,7 +234,8 @@ pub fn start<R: Runtime>(app: AppHandle<R>) {
                             "Night Mode schedule ended"
                         },
                         &body,
-                    );
+                    )
+                    .await;
                 }
             }
             publish(&app, status);
@@ -318,6 +319,7 @@ pub async fn notify_saved<R: Runtime>(
                 active,
                 crate::schedule_notifications::ScheduleNotice::Saved,
             ),
-        );
+        )
+        .await;
     }
 }

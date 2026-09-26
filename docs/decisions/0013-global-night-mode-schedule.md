@@ -56,7 +56,14 @@ are silent. Explicit Save is the exception: each confirmed save can notify, allo
 repeatable testing without editing the grid or enabling recurring scheduling. The controller consumes
 notification intent once and clears superseded or recovery intent.
 
-The shell uses Tauri desktop notifications on Windows/Linux. Because Tauri's desktop
+The shell uses Tauri desktop notifications on Windows and the async notify-rust
+D-Bus sender on Linux. The plugin's Linux path calls a blocking sender inside a
+Tokio task, which panics when zbus also uses Tokio. Linux delivery therefore awaits
+the native async API, bounded to two seconds, and records a generic delivery failure
+or timeout without interrupting synchronization. A private D-Bus regression service
+verifies Save-on/off and boundary-on/off delivery through the production sender
+inside the async runtime; it never posts test notifications to the user's desktop.
+Because Tauri's desktop
 permission helpers unconditionally report granted, macOS uses UserNotifications
 for real authorization, delivery, and foreground presentation; Windows checks the
 native toast setting. OS permission is requested only from the user's opt-in action.

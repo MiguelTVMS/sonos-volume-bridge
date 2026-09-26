@@ -211,6 +211,9 @@ See [ADR 0014](decisions/0014-ui-demo-build.md).
 Night schedule notifications share the shell's speaker display-name normalization
 with device selection; notification bodies never need the renderer suffix to
 identify a speaker. This applies to both scheduled boundaries and Save confirmations.
+Linux delivery awaits notify-rust's async D-Bus API with a bounded timeout. The
+blocking plugin path is incompatible with the shell's Tokio-enabled D-Bus runtime
+and is bypassed on Linux (ADR 0013).
 
 
 Linux settings use a shared Ubuntu/Yaru-inspired presentation on x86-64 and

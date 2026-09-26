@@ -71,7 +71,7 @@ plus `pulseaudio-utils` for the PulseAudio-compatible `pactl` interface. This
 works with either PulseAudio or PipeWire's `pipewire-pulse` service:
 
 ```sh
-sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev pulseaudio-utils
+sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev pulseaudio-utils dbus-daemon
 ```
 
 ### Linux ARM64
@@ -81,7 +81,7 @@ Install the Rust, Node.js and pnpm versions listed above for ARM64, plus:
 
 ```sh
 sudo apt update
-sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev pulseaudio-utils binutils file
+sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev pulseaudio-utils dbus-daemon binutils file
 pnpm --dir ui install --frozen-lockfile
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings

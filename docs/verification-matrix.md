@@ -407,3 +407,21 @@ clicks could maximize instead. The lockfile regression fails on that dependency
 and passes with the upgrade. The normal Rust suite exercises the shared close
 handler through first show and reopen without resize. Native GTK/compositor input
 is outside mock coverage; manual validation is pending.
+
+## Linux schedule notification delivery
+
+- Automated: the normal Rust suite starts a private D-Bus notification service
+  and a subprocess using the production sender inside Tokio. Save-on, Save-off,
+  scheduled-start, and scheduled-end must all arrive. Before the fix all four were
+  missing because the blocking plugin sender panicked inside the async runtime;
+  the same regression passes with asynchronous delivery. Linux tests require
+  `dbus-daemon`, installed by CI. The test never targets the desktop session bus.
+- Manual: in the normal Ubuntu app, select On start and end. Save once with the
+  current half-hour selected, and again with it cleared. Confirm a native banner
+  for each successful application, including repeated saves. Then enable the
+  schedule and verify an actual start and end boundary. Enabling/disabling alone
+  does not notify. Confirm Never suppresses both directions, On start only shows
+  on notifications, and On end only shows off notifications.
+- Coverage limit: the service test verifies delivery and message content, not
+  GNOME banner rendering or desktop suppression. Native banner confirmation is
+  still pending.
