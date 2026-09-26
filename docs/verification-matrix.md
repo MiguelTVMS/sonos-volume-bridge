@@ -452,3 +452,8 @@ and save. Confirm both banners appear and remain available in Ubuntu's
 notification list after the send completes. Repeat without closing Settings.
 The mock service checks connection lifetime; actual GNOME presentation still
 requires this native verification.
+
+Native verification (2026-09-27): the user confirmed that both Ubuntu banners
+appeared after clearing the current half-hour and saving, then selecting it and
+saving again with Settings open. This verifies edit-triggered exit and entry
+presentation; timed boundaries and other desktop sessions remain separate checks.
