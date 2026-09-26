@@ -171,6 +171,10 @@ wake delivery. Native notification display is controlled by the OS.
     with Save. Confirm Portuguese locale uses 24-hour labels and US English uses
     AM/PM, including midnight tooltips. Hover a grid cell and verify the tooltip
     appears promptly and disappears on leaving or painting.
+    On Windows, repeat in light and dark modes: hover a middle-row cell so the
+    tooltip overlaps the grid and verify no cells show through its background.
+    CI exercises the production renderer's hover sequence and checks an opaque
+    computed background in both modes; native WebView rendering remains manual.
 
 12. With macOS language English (US), region Portugal and a 24-hour clock, verify
     the schedule shows 13:00 rather than 01:00 PM. Change the system clock format,

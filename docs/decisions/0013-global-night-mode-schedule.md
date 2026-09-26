@@ -83,3 +83,6 @@ Clock presentation uses native macOS and Windows preferences and GNOME/LC_TIME
 on Linux. The grid itself is shared across platforms. No forced preview format is
 shipped. Native menu controls are retained across refreshes to keep action targets
 alive during OS menu tracking.
+
+Windows interval tooltips use the opaque platform surface color in both light
+and dark modes so underlying grid cells cannot show through the time label.

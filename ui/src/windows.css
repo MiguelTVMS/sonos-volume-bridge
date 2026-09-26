@@ -12,6 +12,9 @@
   --accent-hover: #005aab;
   --accent-text: #fff;
 }
+[data-platform='windows'] .schedule-tooltip {
+  background: var(--surface-strong);
+}
 [data-platform='windows'] .settings-shell {
   grid-template-columns: 296px minmax(0, 1fr);
   background: radial-gradient(ellipse at 85% 75%, #faf1ed70, transparent 65%), var(--background);

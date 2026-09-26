@@ -1,6 +1,25 @@
 import { expect, test } from '@playwright/test';
 test.use({ locale: 'en-GB' });
 
+for (const appearance of ['light', 'dark'] as const) {
+  test(`Windows schedule tooltip is opaque in ${appearance} mode`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: appearance });
+    await page.goto('/preview.html?platform=windows');
+    await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
+    await page.locator('[data-day="3"][data-slot="24"]').hover();
+    const tooltip = page.getByRole('tooltip');
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toHaveText('Thu 12:00–12:30');
+    await expect(tooltip).toHaveCSS(
+      'background-color',
+      appearance === 'light' ? 'rgb(255, 255, 255)' : 'rgb(53, 53, 53)',
+    );
+    await expect(tooltip).toHaveCSS('opacity', '1');
+    await page.getByRole('heading', { name: 'Night schedule', exact: true }).hover();
+    await expect(tooltip).toBeHidden();
+  });
+}
+
 test('global half-hour grid supports painting, saving, keyboard editing and notifications', async ({
   page,
 }) => {

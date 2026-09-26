@@ -190,3 +190,6 @@ Desktop clock formatting is read by the shell adapter: Foundation on macOS,
 GetLocaleInfoEx on Windows, and GNOME clock-format/LC_TIME on Linux. The frontend
 applies that preference to both axis labels and interval tooltips. The shared
 rectangular editor and scheduler are used on all three platforms.
+
+Windows schedule tooltips use an opaque platform surface in both color schemes;
+the shared hover interaction remains in the frontend (ADR 0013).
