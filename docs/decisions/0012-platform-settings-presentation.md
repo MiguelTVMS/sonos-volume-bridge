@@ -51,6 +51,8 @@ Apple references: [Pop-up buttons](https://developer.apple.com/design/human-inte
 macOS pop-up controls size to the selected label rather than the longest option
 or the trailing column. A hidden, accessibility-excluded label provides intrinsic
 width and updates on selection changes; long values remain capped to the row.
+Initialize these sizing labels after mounting controls and restoring saved values,
+including Night schedule notifications, so rerenders measure the displayed option.
 
 Native window focus controls the macOS accent appearance: the selected sidebar
 row and checked switches use the accent while active and neutral gray while

@@ -198,3 +198,14 @@ format comes from the user's regional time format. Linux honors GNOME's explicit
 clock format when available, otherwise LC_TIME; other desktop-specific overrides
 remain dependent on that desktop's locale configuration. No AM/PM preview override
 is enabled in branch builds.
+
+### Night schedule notification dropdown sizing
+
+On macOS, open Settings → Night schedule and select On Start, then On End.
+After each immediate save, verify the complete selected text remains visible
+beside the dropdown arrow. Leave and reopen Settings to check the restored value;
+repeat at the minimum window width. The browser regression selects all four modes
+through the production form, waits for the save rerender, and checks the sizing
+label and rendered text width. It fails before the mount-order fix. Browser
+coverage does not establish native WebView popup rendering; repeat this check in
+the packaged macOS app before release.

@@ -1,6 +1,36 @@
 import { expect, test } from '@playwright/test';
 test.use({ locale: 'en-GB' });
 
+test('macOS notification dropdown fits the saved option after rerendering', async ({ page }) => {
+  await page.setViewportSize({ width: 600, height: 650 });
+  await page.goto('/preview.html?platform=macos');
+  await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
+  for (const mode of ['start', 'end', 'both', 'never']) {
+    const previous = await page.locator('#schedule-notifications').elementHandle();
+    await page.locator('#schedule-notifications').selectOption(mode);
+    await expect.poll(() => previous!.evaluate((element) => element.isConnected)).toBe(false);
+    const select = page.locator('#schedule-notifications');
+    await expect(select).toHaveValue(mode);
+    const label = select.locator('..').locator('.selected-control-label');
+    await expect(label).toHaveText(await select.locator('option:checked').innerText());
+    const fits = await select.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const text = document.createElement('span');
+      text.style.font = style.font;
+      text.style.whiteSpace = 'nowrap';
+      text.textContent = element.selectedOptions[0].label;
+      document.body.append(text);
+      const required = text.getBoundingClientRect().width;
+      text.remove();
+      return (
+        element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) >=
+        required
+      );
+    });
+    expect(fits).toBe(true);
+  }
+});
+
 for (const appearance of ['light', 'dark'] as const) {
   test(`Windows schedule tooltip is opaque in ${appearance} mode`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: appearance });
