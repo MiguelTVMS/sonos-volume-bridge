@@ -210,3 +210,13 @@ not control speakers or write app configuration. It is not included in the
 production frontend build. Test at a 740-pixel width on macOS, 960 on Windows
 (also its 760-pixel minimum), and 600 on Linux, and both default
 and minimum window heights, including dark mode, keyboard focus, and increased contrast.
+
+## Night schedule branch testing
+
+For the pre-PR Windows/Linux trial, check out `feat/night-mode-schedule` and follow
+[the branch trial instructions](verification-matrix.md#windows-and-linux-branch-trial).
+The Branch desktop check workflow runs native checks and publishes debug binaries
+without opening a PR. Production builds always follow the machine clock; there is
+no forced AM/PM layout preview. Schedule tests run with ordinary frontend and Rust
+suites. Physical speaker, sleep/wake, and packaged notification checks remain in
+the verification matrix.

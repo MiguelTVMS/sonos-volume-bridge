@@ -5,7 +5,7 @@
 - Automated: the normal frontend suite validates platform selection, native
   window identity, resize bounds, tray-first startup, and retained Windows chrome.
 - Automated browser tests run the production renderer through the isolated preview:
-  all six pages at default/minimum size in light/dark mode, visible sidebar footer,
+  all seven pages at default/minimum size in light/dark mode, visible sidebar footer,
   card nesting, keyboard switch/select/slider changes across rerenders, forced colors,
   reduced motion, visible focus, and macOS/Linux presentation isolation.
 - Regression mutation verified: removing the compact-height rules makes the
@@ -112,3 +112,85 @@ issue before declaring a release candidate ready.
   release; confirm no jump during drag and only the final value applies. Change
   volume externally with Diagnostics open and check prompt updates. Native drag
   timing and physical notification latency are not simulated by the mock suite.
+
+## Global Night Mode schedule
+
+Automated coverage exercises calendar boundaries, DST, week wrapping, read/write
+confirmation, external-off restoration, selected-speaker rebinding, disabled/no-target
+behavior, manual-off rejection, retries and notification intent. Browser tests use
+the production editor through the isolated preview; they do not touch real speakers.
+
+Manual checks for the local candidate (not yet completed on physical hardware):
+
+1. Select a compatible speaker. Open the Night schedule sidebar item. Verify the grid is absent from Speaker. Paint a block containing the current time, save,
+   and enable. Confirm Night Mode on and the locked Settings/tray explanation.
+   Disable it from another controller; it should restore within the backup-read
+   interval plus network latency. Volume synchronization must continue.
+2. Disable scheduling: Night Mode stays unchanged and manual off succeeds. Re-enable
+   outside a selected block, manually turn on, and refresh Settings: it stays on.
+3. Cross a start/end boundary. Confirm one on/off application and, with the matching notification
+   mode and OS permission, one native notification after confirmation. Consecutive
+   selected cells must not notify. Try with Settings open and closed.
+4. Deny notifications, then enable them in system settings. Confirm clear guidance,
+   working synchronization, and subsequent delivery without a background permission
+   prompt. Check OS Do Not Disturb suppression. Windows requires an installed app;
+   development-shell notification branding is not representative.
+5. While selected, disconnect/reconnect the speaker and sleep/wake across a boundary.
+   Confirm the current expected value is applied without replayed transitions or
+   notifications. Repeat with volume fallback polling disabled and audio unavailable.
+6. Switch between compatible, unsupported, and unavailable speakers while writes
+   are pending. Only the backend's current selection may receive new commands;
+   switching sends no cleanup commands to the former speaker. The global grid stays.
+7. Verify light/dark presentation and keyboard painting on each desktop OS. Scroll
+   the grid while a draft is dirty and allow background refreshes: preserve cells,
+   focus, and scroll. Save/Cancel must not alter another speaker's configuration.
+
+Coverage limits: native wake delivery, OS permission prompts/toast presentation,
+physical speaker support, and network timing remain manual checks. Linux without
+logind uses the clock-discontinuity fallback and cannot guarantee immediate native
+wake delivery. Native notification display is controlled by the OS.
+
+8. On Night schedule, confirm there is no repeated selected-speaker label. Leave recurring
+   scheduling disabled, select the current block and Save: Night Mode turns on.
+   Save unchanged again: notification repeats if its direction is selected, with no redundant Sonos
+   write. Clear the current block and Save: Night Mode turns off. Permission denial
+   must not prevent application, and failed confirmation must not announce success.
+
+9. Open the native tray menu with a compatible speaker selected. Verify Night schedule is immediately above Night sound and its checkmark reflects whether scheduling is enabled and no editor shortcut remains. Toggle
+   it on and verify the saved schedule takes effect, then uncheck Night schedule and verify Night Mode stays unchanged and manual off is available.
+   Repeat disabling with the speaker unavailable. Native menu placement and click
+   delivery need this local check; CI covers the menu model and shared command policy.
+
+10. On macOS, launch the app, open the tray immediately, hover repeatedly, then
+    click the schedule toggle and Night sound while background speaker reads finish.
+    Verify the process stays running and the controls update in place. Repeat after
+    speaker loss/recovery. CI covers the shared menu-diff sequence; native Cocoa
+    action-target lifetime and menu tracking require this packaged-app check.
+
+11. In the schedule form, verify Never/On Start/On End/Both at both boundaries and
+    with Save. Confirm Portuguese locale uses 24-hour labels and US English uses
+    AM/PM, including midnight tooltips. Hover a grid cell and verify the tooltip
+    appears promptly and disappears on leaving or painting.
+
+12. With macOS language English (US), region Portugal and a 24-hour clock, verify
+    the schedule shows 13:00 rather than 01:00 PM. Change the system clock format,
+    refocus Settings, and verify labels/tooltips update without losing grid edits.
+    CI covers a US WebView locale with a native 24-hour override at startup.
+
+### Windows and Linux branch trial
+
+Use `feat/night-mode-schedule` before opening a PR. The Branch desktop check
+workflow builds and tests on Windows and Linux and uploads an unsigned debug
+executable for each platform. Windows requires the WebView2 runtime; Linux needs
+GTK3, WebKitGTK 4.1, and an AppIndicator implementation. Native notifications may
+require an installed/packaged app identity, so the standalone executable does not
+replace packaged-app notification validation.
+
+Run `pnpm --dir ui install --frozen-lockfile`, `pnpm --dir ui build`, and
+`cargo run -p sonos-volume-bridge` from a local checkout for a source trial.
+Verify rectangular add/clear gestures, the checked tray schedule control, selected
+speaker changes, wake/recovery and all four notification modes. Windows clock
+format comes from the user's regional time format. Linux honors GNOME's explicit
+clock format when available, otherwise LC_TIME; other desktop-specific overrides
+remain dependent on that desktop's locale configuration. No AM/PM preview override
+is enabled in branch builds.

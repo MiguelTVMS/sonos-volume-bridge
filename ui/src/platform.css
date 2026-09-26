@@ -501,3 +501,7 @@
   overflow: hidden;
   clip-path: inset(50%);
 }
+
+[data-platform='macos'] .night-schedule .settings-group > .control-field {
+  grid-template-columns: minmax(0, 1fr) auto;
+}

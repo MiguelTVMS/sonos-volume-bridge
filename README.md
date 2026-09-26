@@ -32,6 +32,8 @@ Open it when you want to change a setting; otherwise, it stays out of the way.
 - **Choose how volume changes feel.** Use a direct match, a gentler curve with
   more control at low volumes, or scale the full computer range to your chosen
   maximum.
+- **Schedule Night Mode.** Use one weekly schedule for the selected compatible
+  speaker, with half-hour blocks and optional start/end notifications.
 - **Start automatically.** Run the bridge when you sign in so it is ready when
   you need it.
 - **Recover from interruptions.** The app reconnects when a speaker, audio
@@ -46,7 +48,8 @@ Open it when you want to change a setting; otherwise, it stays out of the way.
 - A Sonos speaker on the same local network as the computer
 - A computer audio output whose volume can be changed by software
 
-Sonos Volume Bridge controls volume and optional mute state only. It does not
+Sonos Volume Bridge controls volume, optional mute, and supported speaker settings
+such as Night Mode. It does not
 play, stream, capture, redirect, or modify your audio, and it is not intended to
 replace the Sonos app as a full speaker controller.
 
@@ -61,7 +64,9 @@ replace the Sonos app as a full speaker controller.
 5. Adjust mute synchronization, two-way synchronization, volume feel, and the
    maximum speaker volume to suit you.
 
-Your settings are saved automatically. After setup, you can close the settings
+Most settings are saved automatically. Night schedule grid edits use **Save schedule**;
+saving also applies the current block immediately, even with recurring scheduling
+disabled. See the [Night schedule guide](docs/how-it-works.md#night-mode-schedule). After setup, you can close the settings
 window and leave the app running from the menu bar or system tray.
 
 ## Documentation and help

@@ -7,7 +7,7 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 use tauri::{
-    AppHandle, Manager, Runtime, Theme,
+    AppHandle, Emitter, Manager, Runtime, Theme,
     image::Image,
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -91,6 +91,7 @@ fn register_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .tooltip("Sonos Volume Bridge")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "settings" | "diagnostics" => show_settings(app),
+            "night-schedule-enabled" => toggle_schedule(app),
             "speaker-night-sound" => {
                 toggle_speaker_setting(app, SpeakerSetting::NightSound, event.id().as_ref());
             }
@@ -193,25 +194,129 @@ fn update_speaker_controls<R: Runtime>(app: &AppHandle<R>, settings: &SpeakerSet
     let Ok(mut controls) = items.speaker_controls.lock() else {
         return;
     };
-    for control in controls.drain(..) {
-        let _ = items.menu.remove(&control);
+    let schedule_enabled = app.try_state::<AppState>().is_some_and(|state| {
+        state
+            .configuration
+            .lock()
+            .is_ok_and(|configuration| configuration.night_mode_schedule.enabled)
+    });
+    let available = available_tray_controls(settings, schedule_enabled);
+    let visible: Vec<String> = items
+        .menu
+        .items()
+        .unwrap_or_default()
+        .iter()
+        .map(|item| item.id().as_ref().to_owned())
+        .collect();
+    let desired: Vec<&str> = available.iter().map(|(id, _, _)| *id).collect();
+    let (remove, insert) = control_changes(&visible, &desired);
+    for id in remove {
+        if let Some(control) = controls.iter().find(|control| control.id().as_ref() == id) {
+            let _ = items.menu.remove(control);
+        }
     }
-    let _ = items.menu.remove(&items.speaker_separator);
-
-    let available = available_speaker_controls(settings);
-    if available.is_empty() {
-        return;
+    let separator_visible = visible
+        .iter()
+        .any(|id| id == items.speaker_separator.id().as_ref());
+    if available.is_empty() && separator_visible {
+        let _ = items.menu.remove(&items.speaker_separator);
+    } else if !available.is_empty() && !separator_visible {
+        let _ = items.menu.insert(&items.speaker_separator, 3);
     }
-
-    let _ = items.menu.insert(&items.speaker_separator, 3);
-    for (index, (id, label, enabled)) in available.into_iter().enumerate() {
-        let Ok(control) = CheckMenuItem::with_id(app, id, label, true, enabled, None::<&str>)
-        else {
-            continue;
+    for (id, label, enabled) in available {
+        let locked = id == "speaker-night-sound"
+            && app.try_state::<AppState>().is_some_and(|state| {
+                state
+                    .configuration
+                    .lock()
+                    .is_ok_and(|configuration| crate::night_schedule::locked(&configuration))
+            });
+        let label = if locked {
+            "Night sound (disable schedule to turn off)"
+        } else {
+            label
         };
-        let _ = items.menu.insert(&control, 4 + index);
-        controls.push(control);
+        // Keep native action targets alive for the lifetime of the tray, including
+        // when capability changes hide them while macOS is tracking a menu click.
+        let control =
+            if let Some(control) = controls.iter().find(|control| control.id().as_ref() == id) {
+                control.clone()
+            } else {
+                let Ok(control) =
+                    CheckMenuItem::with_id(app, id, label, !locked, enabled, None::<&str>)
+                else {
+                    continue;
+                };
+                controls.push(control.clone());
+                control
+            };
+        let _ = control.set_text(label);
+        let _ = control.set_enabled(!locked);
+        let _ = control.set_checked(enabled);
+        if let Some((index, _)) = insert.iter().find(|(_, added)| *added == id) {
+            let _ = items.menu.insert(&control, 4 + index);
+        }
     }
+}
+
+fn control_changes<'a>(
+    visible: &'a [String],
+    desired: &'a [&str],
+) -> (Vec<&'a str>, Vec<(usize, &'a str)>) {
+    let remove = visible
+        .iter()
+        .map(String::as_str)
+        .filter(|id| {
+            (id.starts_with("speaker-") || *id == "night-schedule-enabled") && !desired.contains(id)
+        })
+        .collect();
+    let insert = desired
+        .iter()
+        .copied()
+        .enumerate()
+        .filter(|(_, id)| !visible.iter().any(|current| current == id))
+        .collect();
+    (remove, insert)
+}
+
+fn available_tray_controls(
+    settings: &SpeakerSettings,
+    schedule_enabled: bool,
+) -> Vec<(&'static str, &'static str, bool)> {
+    let mut controls = available_speaker_controls(settings);
+    if settings.night_sound.is_some() || schedule_enabled {
+        controls.insert(
+            0,
+            ("night-schedule-enabled", "Night schedule", schedule_enabled),
+        );
+    }
+    controls
+}
+
+fn toggle_schedule<R: Runtime>(app: &AppHandle<R>) {
+    let enabled = app.try_state::<TrayMenuItems<R>>().and_then(|items| {
+        items.speaker_controls.lock().ok().and_then(|controls| {
+            controls
+                .iter()
+                .find(|control| control.id().as_ref() == "night-schedule-enabled")
+                .and_then(|control| control.is_checked().ok())
+        })
+    });
+    let Some(enabled) = enabled else {
+        return;
+    };
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        if let Err(error) = crate::commands::enable_night_schedule(enabled, state.clone()).await
+            && let Ok(mut status) = state.schedule_status.lock()
+        {
+            status.message = error;
+            let _ = app.emit("night-schedule-changed", status.clone());
+        }
+        let _ = app.emit("speaker-settings-changed", ());
+        refresh_speaker_controls(&app);
+    });
 }
 
 fn available_speaker_controls(
@@ -251,7 +356,23 @@ fn toggle_speaker_setting<R: Runtime>(app: &AppHandle<R>, setting: SpeakerSettin
     if let (Some(enabled), Some(configuration)) = (enabled, configuration) {
         let app = app.clone();
         tauri::async_runtime::spawn(async move {
-            let _ = runtime::set_speaker_setting(configuration, setting, enabled).await;
+            let state = app.state::<AppState>();
+            let _gate = state.speaker_gate.lock().await;
+            let Ok(current) = state.configuration.lock().map(|c| c.clone()) else {
+                return;
+            };
+            if current.selected_sonos_id != configuration.selected_sonos_id {
+                return;
+            }
+            if matches!(setting, SpeakerSetting::NightSound)
+                && !enabled
+                && crate::night_schedule::locked(&current)
+            {
+                show_settings(&app);
+                let _ = app.emit("open-night-schedule", ());
+                return;
+            }
+            let _ = runtime::set_speaker_setting(current, setting, enabled).await;
             refresh_speaker_controls(&app);
         });
     }
@@ -463,6 +584,50 @@ mod tests {
             ]
         );
         assert!(available_speaker_controls(&SpeakerSettings::default()).is_empty());
+    }
+
+    #[test]
+    fn refresh_during_menu_tracking_keeps_existing_action_targets() {
+        let desired = ["night-schedule-enabled", "speaker-night-sound"];
+        let empty = Vec::new();
+        assert_eq!(
+            control_changes(&empty, &desired).1,
+            vec![(0, desired[0]), (1, desired[1])]
+        );
+        let visible = desired.iter().map(ToString::to_string).collect::<Vec<_>>();
+        // Startup has populated the menu. Hover refresh and a schedule toggle
+        // must only update values, not remove/recreate the clicked native item.
+        assert_eq!(control_changes(&visible, &desired), (vec![], vec![]));
+        assert_eq!(control_changes(&visible, &desired), (vec![], vec![]));
+        assert_eq!(
+            control_changes(&visible, &desired[..1]),
+            (vec![desired[1]], vec![])
+        );
+        let paused = vec![desired[0].to_string()];
+        assert_eq!(control_changes(&paused, &desired).1, vec![(1, desired[1])]);
+    }
+
+    #[test]
+    fn schedule_toggle_precedes_night_sound_and_can_always_be_disabled() {
+        let settings = SpeakerSettings {
+            night_sound: Some(false),
+            ..SpeakerSettings::default()
+        };
+        let controls = available_tray_controls(&settings, false);
+        assert_eq!(
+            controls[0],
+            ("night-schedule-enabled", "Night schedule", false)
+        );
+        assert_eq!(controls[1].0, "speaker-night-sound");
+        assert_eq!(
+            available_tray_controls(&settings, true)[0],
+            ("night-schedule-enabled", "Night schedule", true)
+        );
+        assert!(available_tray_controls(&SpeakerSettings::default(), false).is_empty());
+        assert_eq!(
+            available_tray_controls(&SpeakerSettings::default(), true),
+            vec![("night-schedule-enabled", "Night schedule", true)]
+        );
     }
 
     #[test]

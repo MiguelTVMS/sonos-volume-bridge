@@ -11,6 +11,8 @@ default-run = "sonos-volume-bridge"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+jiff = "0.2.37"
+tauri-plugin-notification = "2"
 async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -30,10 +32,19 @@ tokio.workspace = true
 url.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-windows = { workspace = true, features = ["ApplicationModel"] }
+windows = { workspace = true, features = ["ApplicationModel", "UI_Notifications", "Win32_System_Power", "Win32_Globalization", "Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-service-management = "0.3.2"
+objc2 = "0.6"
+block2 = "0.6"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSWorkspace"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSNotification", "NSOperation", "NSDateFormatter", "NSLocale", "NSString", "NSError", "block2"] }
+objc2-user-notifications = { version = "0.3.2", default-features = false, features = ["std", "UNUserNotificationCenter", "UNNotification", "UNNotificationSettings", "UNNotificationContent", "UNNotificationRequest", "UNNotificationTrigger", "block2"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5", default-features = false, features = ["tokio"] }
+futures-util = "0.3"
 
 [lints]
 workspace = true

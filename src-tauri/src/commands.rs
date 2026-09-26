@@ -5,7 +5,13 @@ use crate::{
     state::{AppState, UiSnapshot},
 };
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
+
+// WebView Intl defaults do not include macOS region and clock overrides.
+#[tauri::command]
+pub fn get_system_hour12() -> Option<bool> {
+    crate::clock_format::hour12()
+}
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri injects managed state by value.
@@ -19,11 +25,17 @@ pub fn get_snapshot(state: State<'_, AppState>) -> Result<UiSnapshot, String> {
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri owns command argument extraction.
-pub fn save_configuration(
-    configuration: AppConfiguration,
+pub async fn save_configuration(
+    mut configuration: AppConfiguration,
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<UiSnapshot, String> {
+    let gate = state.speaker_gate.lock().await;
+    if let Ok(current) = state.configuration.lock() {
+        configuration.night_mode_schedule = current.night_mode_schedule.clone();
+        configuration.notify_night_mode_schedule_transitions =
+            current.notify_night_mode_schedule_transitions;
+    }
     let previous_start_at_login = state
         .configuration
         .lock()
@@ -37,6 +49,7 @@ pub fn save_configuration(
     )?;
     state.replace_configuration(configuration);
     state.start_runtime(app);
+    drop(gate);
     get_snapshot(state)
 }
 
@@ -60,13 +73,15 @@ fn persist_settings(
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri owns command argument extraction.
-pub fn reset_configuration(
+pub async fn reset_configuration(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<UiSnapshot, String> {
+    let gate = state.speaker_gate.lock().await;
     let configuration = state.store.reset().map_err(|error| error.to_string())?;
     state.replace_configuration(configuration);
     state.start_runtime(app);
+    drop(gate);
     get_snapshot(state)
 }
 
@@ -256,7 +271,24 @@ pub async fn set_speaker_setting(
         .lock()
         .map_err(|_| "application state is unavailable".to_owned())?
         .clone();
-    runtime::set_speaker_setting(configuration, setting, enabled).await
+    let gate = state.speaker_gate.lock().await;
+    let current = state
+        .configuration
+        .lock()
+        .map_err(|_| "Configuration unavailable")?
+        .clone();
+    if current.selected_sonos_id != configuration.selected_sonos_id {
+        return Err("Selected speaker changed. Try again.".into());
+    }
+    if matches!(setting, SpeakerSetting::NightSound)
+        && !enabled
+        && crate::night_schedule::locked(&current)
+    {
+        return Err(crate::night_schedule::LOCK_MESSAGE.into());
+    }
+    let result = runtime::set_speaker_setting(current, setting, enabled).await;
+    drop(gate);
+    result
 }
 
 #[cfg(test)]
@@ -355,4 +387,102 @@ mod persistence_tests {
             assert_eq!(store.0.load_or_default().unwrap().start_at_login, enabled);
         }
     }
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)] // Tauri injects managed state.
+pub fn get_schedule_status(
+    state: State<'_, AppState>,
+) -> Result<crate::night_schedule::ScheduleStatus, String> {
+    state
+        .schedule_status
+        .lock()
+        .map(|s| s.clone())
+        .map_err(|_| "Schedule status unavailable".into())
+}
+fn persist_schedule(state: &AppState, configuration: &AppConfiguration) -> Result<(), String> {
+    state.store.save(configuration).map_err(|e| e.to_string())?;
+    *state
+        .configuration
+        .lock()
+        .map_err(|_| "Configuration unavailable")? = configuration.clone();
+    state
+        .snapshot
+        .lock()
+        .map_err(|_| "Snapshot unavailable")?
+        .configuration = configuration.clone();
+    Ok(())
+}
+#[tauri::command]
+pub async fn save_night_schedule(
+    blocks: Vec<Vec<bool>>,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<UiSnapshot, String> {
+    let gate = state.speaker_gate.lock().await;
+    let mut configuration = state
+        .configuration
+        .lock()
+        .map_err(|_| "Configuration unavailable")?
+        .clone();
+    if !crate::night_schedule::supported(&configuration).await {
+        return Err("Select a speaker that supports Night Mode.".into());
+    }
+    configuration.night_mode_schedule.blocks = blocks;
+    persist_schedule(&state, &configuration)?;
+    let applied = crate::night_schedule::apply_saved(&configuration).await;
+    state
+        .schedule_reconcile
+        .store(true, std::sync::atomic::Ordering::Relaxed);
+    drop(gate);
+    let (active, speaker) =
+        applied.map_err(|error| format!("Schedule saved, but {error} Try Save schedule again."))?;
+    crate::night_schedule::notify_saved(&app, &configuration, active, &speaker).await;
+    let _ = app.emit("speaker-settings-changed", ());
+    crate::tray::refresh_speaker_controls(&app);
+    get_snapshot(state)
+}
+#[tauri::command]
+pub async fn enable_night_schedule(
+    enabled: bool,
+    state: State<'_, AppState>,
+) -> Result<UiSnapshot, String> {
+    let gate = state.speaker_gate.lock().await;
+    let mut configuration = state
+        .configuration
+        .lock()
+        .map_err(|_| "Configuration unavailable")?
+        .clone();
+    if enabled && !crate::night_schedule::supported(&configuration).await {
+        return Err("Select a speaker that supports Night Mode.".into());
+    }
+    configuration.night_mode_schedule.enabled = enabled;
+    persist_schedule(&state, &configuration)?;
+    drop(gate);
+    get_snapshot(state)
+}
+#[tauri::command]
+pub async fn set_schedule_notifications(
+    mode: crate::config::ScheduleNotifications,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<UiSnapshot, String> {
+    let gate = state.speaker_gate.lock().await;
+    let mut configuration = state
+        .configuration
+        .lock()
+        .map_err(|_| "Configuration unavailable")?
+        .clone();
+    configuration.notify_night_mode_schedule_transitions = mode;
+    persist_schedule(&state, &configuration)?;
+    drop(gate);
+    if mode.enabled() {
+        let granted = crate::schedule_notifications::permitted(&app, true).await;
+        if let Ok(mut status) = state.schedule_status.lock() {
+            status.notifications_blocked = !granted;
+        }
+    } else if let Ok(mut status) = state.schedule_status.lock() {
+        status.notifications_blocked = false;
+    }
+    get_snapshot(state)
 }

@@ -1,8 +1,12 @@
 mod autostart;
+mod clock_format;
 mod commands;
 mod config;
 mod logging;
+mod night_schedule;
 mod runtime;
+mod schedule_notifications;
+mod schedule_wake;
 mod state;
 mod tray;
 
@@ -10,14 +14,16 @@ use crate::{config::ConfigStore, state::AppState};
 use tauri::Manager;
 
 pub fn run() {
-    let builder = tauri::Builder::default().plugin(tauri_plugin_single_instance::init(
-        |app, _arguments, _working_directory| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
-        },
-    ));
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_single_instance::init(
+            |app, _arguments, _working_directory| {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            },
+        ));
     #[cfg(not(target_os = "macos"))]
     let builder = builder.plugin(tauri_plugin_autostart::init(
         tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -64,6 +70,9 @@ pub fn run() {
             tray::install(app.handle())?;
             let state = app.state::<AppState>();
             state.start_runtime(app.handle().clone());
+            schedule_wake::install(app.handle());
+            schedule_notifications::install();
+            night_schedule::start(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -82,6 +91,11 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_snapshot,
+            commands::get_system_hour12,
+            commands::save_night_schedule,
+            commands::enable_night_schedule,
+            commands::set_schedule_notifications,
+            commands::get_schedule_status,
             commands::save_configuration,
             commands::reset_configuration,
             commands::diagnostics,

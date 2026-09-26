@@ -12,6 +12,11 @@ Object.defineProperty(navigator, 'userAgent', { value: agents[platform] ?? 'Prev
 const snapshot = {
   configuration: {
     schemaVersion: 1,
+    nightModeSchedule: {
+      enabled: false,
+      blocks: Array.from({ length: 7 }, () => Array<boolean>(48).fill(false)),
+    },
+    notifyNightModeScheduleTransitions: 'never',
     selectedSonosId: 'sample-speaker',
     lastKnownSonosAddress: null,
     followDefaultAudioDevice: true,
@@ -42,6 +47,36 @@ mockIPC((command, payload) => {
   switch (command) {
     case 'plugin:app|version':
       return 'Preview';
+    case 'get_schedule_status':
+      return {
+        active: false,
+        supported: true,
+        message: snapshot.configuration.nightModeSchedule.enabled
+          ? 'Outside scheduled hours. Manual control is available.'
+          : 'Schedule disabled.',
+        nextTransition: null,
+        timeZone: 'Europe/Lisbon',
+        notificationsBlocked: false,
+      };
+    case 'save_night_schedule': {
+      snapshot.configuration.nightModeSchedule.blocks = (payload as { blocks: boolean[][] }).blocks;
+      const now = new Date();
+      speakerSettings.nightSound =
+        snapshot.configuration.nightModeSchedule.blocks[(now.getDay() + 6) % 7][
+          now.getHours() * 2 + Math.floor(now.getMinutes() / 30)
+        ];
+      return snapshot;
+    }
+    case 'enable_night_schedule':
+      snapshot.configuration.nightModeSchedule.enabled = (payload as { enabled: boolean }).enabled;
+      return snapshot;
+    case 'set_schedule_notifications':
+      snapshot.configuration.notifyNightModeScheduleTransitions = (
+        payload as { mode: string }
+      ).mode;
+      return snapshot;
+    case 'get_system_hour12':
+      return new URLSearchParams(location.search).get('hour12') === 'false' ? false : null;
     case 'get_snapshot':
       return snapshot;
     case 'save_configuration':
