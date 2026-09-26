@@ -55,7 +55,7 @@ and one Windows executable per version. The protected macOS direct-download job 
 executable produced by the unprivileged build job, imports the Developer ID
 identity into an ephemeral keychain, bundles a sandboxed application, signs it
 with Hardened Runtime, submits it to Apple for notarization, staples the ticket,
-and verifies the result before the archive is published. The protected Mac App
+and verifies the result before the installers are published. The protected Mac App
 Store job runs only when **Build Mac App Store package** is checked. It
 independently imports its Apple Distribution and Mac Installer
 Distribution identities, embeds the Mac App Store provisioning profile, verifies
@@ -134,7 +134,7 @@ package version is derived from the workspace semantic version as
 Build on Apple Silicon at minimum. macOS 13 or later is required because the
 sandboxed app uses Apple's `SMAppService` login-item API instead of a
 filesystem LaunchAgent. The release workflow packages the notarized
-direct-download app as a ZIP preserving the `.app` bundle and creates a signed
+direct-download app as a drag-to-Applications DMG and a compatibility ZIP preserving the `.app` bundle and creates a signed
 `.pkg` for Mac App Store upload. The sandbox entitlement set grants only App
 Sandbox plus incoming and outgoing network access. This is required for Sonos
 discovery, control, and event callbacks. Core Audio, local configuration,
@@ -199,7 +199,8 @@ are not migrated and must be configured again.
 The GitHub Release publishing job runs `scripts/prepare-release-downloads.sh`
 to add fixed filenames for direct downloads, alongside the versioned installers:
 
-- `sonos-volume-bridge-macos.zip`
+- `sonos-volume-bridge-macos.dmg` (website download)
+- `sonos-volume-bridge-macos.zip` (compatibility archive)
 - `sonos-volume-bridge-windows-unsigned.exe`
 - `sonos-volume-bridge-linux-amd64.deb`
 - `sonos-volume-bridge-linux-arm64.deb`
@@ -208,3 +209,9 @@ The website uses `releases/latest/download/<filename>` so stable downloads follo
 the latest non-prerelease without a website deployment. Missing or empty source
 installers fail preparation before any aliases are created. Store packages are
 not used as direct-download aliases.
+
+The macOS DMG contains the notarized app and an Applications shortcut. The release
+job also signs the disk image, requires an Accepted notarization response, staples
+and validates its ticket, and verifies integrity and Gatekeeper assessment before
+upload. Publish the first GA release containing the DMG before deploying the new
+website link; earlier releases do not provide the stable DMG asset.

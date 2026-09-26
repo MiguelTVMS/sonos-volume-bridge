@@ -56,11 +56,11 @@ Latest stable release · [Check the latest release ↗](https://github.com/Migue
 
 ### macOS
 
-For Macs running macOS 13 or later. Signed with Developer ID and notarized by Apple.
+For Macs running macOS 13 or later. Signed with Developer ID and notarized by Apple. Open the DMG and drag the app into Applications.
 
 Apple Silicon (ARM64) only. Intel Macs are not supported.
 
-[Download for macOS ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-macos.zip)
+[Download for macOS (DMG) ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-macos.dmg)
 
 ### Windows
 

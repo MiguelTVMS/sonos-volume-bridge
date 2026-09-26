@@ -346,9 +346,9 @@ jobs:
       - name: Bundle, sign, notarize, and staple the existing executable
         run: |
           if [ "${HAS_DEVELOPER_ID_PROFILE:-false}" = true ]; then
-            cargo tauri bundle --bundles app --config src-tauri/tauri.direct.conf.json
+            cargo tauri bundle --bundles app,dmg --config src-tauri/tauri.direct.conf.json
           else
-            cargo tauri bundle --bundles app
+            cargo tauri bundle --bundles app,dmg
           fi
       - name: Verify the signed and notarized app
         run: |
@@ -356,6 +356,27 @@ jobs:
           ./scripts/verify-macos-artifact.sh direct "$app_path"
           xcrun stapler validate "$app_path"
           spctl --assess --type execute --verbose=4 "$app_path"
+      - name: Sign, notarize, and verify the disk image
+        env:
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=(target/release/bundle/dmg/*.dmg)
+          test "${#images[@]}" -eq 1
+          image="sonos-volume-bridge-${RELEASE_TAG}-macos.dmg"
+          cp "${images[0]}" "$image"
+          codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$image"
+          xcrun notarytool submit "$image" \
+            --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" \
+            --issuer "$APPLE_API_ISSUER" --wait --output-format json \
+            > "$RUNNER_TEMP/dmg-notarization.json"
+          python3 -c 'import json, sys; assert json.load(open(sys.argv[1]))["status"] == "Accepted", "DMG notarization was not accepted"' "$RUNNER_TEMP/dmg-notarization.json"
+          xcrun stapler staple "$image"
+          xcrun stapler validate "$image"
+          codesign --verify --verbose=2 "$image"
+          hdiutil verify "$image"
+          spctl --assess --type open --context context:primary-signature --verbose=4 "$image"
       - name: Archive the notarized app bundle
         env:
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
@@ -366,7 +387,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: macos-release
-          path: sonos-volume-bridge-*-macos.zip
+          path: |
+            sonos-volume-bridge-*-macos.zip
+            sonos-volume-bridge-*-macos.dmg
           if-no-files-found: error
       - name: Remove temporary Apple credentials
         if: always()
@@ -709,7 +732,7 @@ jobs:
           ### Downloads
 
           - **Windows:** Download and run the Windows installer.
-          - **macOS:** Download the macOS archive, then move the app to Applications.
+          - **macOS:** Open the macOS DMG, then drag the app into Applications.
           - **Ubuntu:** Download and install the Debian package for your architecture (AMD64 or ARM64).
 
           ### Important

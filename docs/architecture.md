@@ -221,3 +221,7 @@ window bounds through `tauri.linux.conf.json`. See ADR 0012.
 
 The Linux tray adapter uses a white icon for Ubuntu's dark top bar independently
 of the application color scheme, retaining the disconnected badge (ADR 0012).
+
+The macOS release packages its signed and notarized app into a separately signed
+and notarized DMG for drag-to-Applications installation. A compatibility ZIP
+remains available; see [ADR 0015](decisions/0015-macos-dmg-download.md).

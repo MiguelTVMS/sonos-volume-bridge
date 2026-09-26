@@ -36,7 +36,7 @@ or third-party embeds without reviewing the website privacy notice.
 ## Permanent installer links
 
 Download buttons use GitHub's `releases/latest/download/` URLs. Release CI adds
-fixed-name copies of the macOS ZIP, Windows installer, and Ubuntu AMD64/ARM64 DEBs while
+fixed-name copies of the macOS DMG (plus a compatibility ZIP), Windows installer, and Ubuntu AMD64/ARM64 DEBs while
 retaining versioned assets. `scripts/prepare-release-downloads.sh` validates all
 four installers before copying them. Prereleases also receive these assets,
 but the latest stable URLs do not select prereleases.

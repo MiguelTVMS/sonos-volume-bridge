@@ -360,3 +360,12 @@ installers. Alias tests require both Linux packages and check the website URLs.
 After the first release, download each architecture from its website button,
 check `dpkg-deb -f <package.deb> Architecture`, and install on the matching Ubuntu
 machine. The ARM64 stable link is unavailable until that asset reaches a GA release.
+
+## macOS release DMG
+
+After a GA release, download the DMG from the website. Verify its stapled ticket
+and Gatekeeper assessment, open it, drag the app to Applications, eject the image,
+and launch the installed app. Confirm Settings, tray and saved configuration work.
+Repeat on a clean supported Mac to check quarantine handling. Release CI verifies
+signing, notarization acceptance, stapling and image integrity; alias tests cannot
+establish native installation or Apple notarization behavior.
