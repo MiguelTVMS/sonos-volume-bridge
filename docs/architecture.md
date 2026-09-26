@@ -137,6 +137,7 @@ unescaping and typed errors. See [ADR 0002](decisions/0002-local-sonos-client.md
 The settings form shares behavior across platforms while selecting separate
 macOS, Windows, and Linux presentation styles in the frontend. See
 [ADR 0012](decisions/0012-platform-settings-presentation.md).
+macOS dropdown sizing runs after saved selections are restored during form mounting.
 
 Windows uses a dedicated, scoped stylesheet and platform window configuration
 for its resizable Windows 11 Settings presentation. OS-specific presentation

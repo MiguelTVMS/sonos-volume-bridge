@@ -44,6 +44,9 @@ white switch and slider thumbs. HTML controls retain native keyboard semantics;
 these are WebView controls, not AppKit or SwiftUI controls, so exact system
 materials and animations are not guaranteed.
 
+The default macOS height is 700 points to give Night schedule more vertical room.
+Width remains fixed at 740 points; users can still resize vertically down to 460.
+
 Apple references: [Pop-up buttons](https://developer.apple.com/design/human-interface-guidelines/pop-up-buttons),
 [Toggles](https://developer.apple.com/design/human-interface-guidelines/toggles), and
 [Sliders](https://developer.apple.com/design/human-interface-guidelines/sliders).
@@ -51,6 +54,8 @@ Apple references: [Pop-up buttons](https://developer.apple.com/design/human-inte
 macOS pop-up controls size to the selected label rather than the longest option
 or the trailing column. A hidden, accessibility-excluded label provides intrinsic
 width and updates on selection changes; long values remain capped to the row.
+Initialize these sizing labels after mounting controls and restoring saved values,
+including Night schedule notifications, so rerenders measure the displayed option.
 
 Native window focus controls the macOS accent appearance: the selected sidebar
 row and checked switches use the accent while active and neutral gray while

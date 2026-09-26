@@ -49,7 +49,7 @@ notifications off. Invalid grid dimensions fail validation before persistence.
 
 ## Notifications
 
-A separate global Never/On Start/On End/Both preference filters native entry/exit notifications, including Save tests. Legacy false/true values migrate to Never/Both; the existing field and schema version are retained. A notification
+A separate global On start/On end/On start and end/Never preference filters native entry/exit notifications, including Save tests. Legacy false/true values migrate to Never/On start and end; the existing field and schema version are retained. A notification
 requires a confirmed speaker state and an ordinary boundary transition; already
 correct speaker state still qualifies. Startup, recovery, selection changes, manual changes, and enforcement corrections
 are silent. Explicit Save is the exception: each confirmed save can notify, allowing

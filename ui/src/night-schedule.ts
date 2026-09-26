@@ -86,7 +86,7 @@ export function scheduleMarkup(): string {
   return `<section id="night-schedule" data-schedule class="night-schedule" aria-labelledby="night-schedule-title">
     <div class="settings-group">
     <label class="toggle"><span>Enable schedule</span><input id="schedule-enabled" type="checkbox" role="switch"></label>
-    <div class="control-field"><label for="schedule-notifications">Notify when schedule starts or ends</label><select id="schedule-notifications"><option value="never">Never</option><option value="start">On Start</option><option value="end">On End</option><option value="both">Both</option></select></div>
+    <div class="control-field"><label for="schedule-notifications">Night schedule notifications</label><select id="schedule-notifications"><option value="start">On start</option><option value="end">On end</option><option value="both">On start and end</option><option value="never">Never</option></select></div>
     <p id="notification-permission" class="setting-note" aria-live="polite"></p>
     </div>
     <p id="schedule-status" class="setting-note" aria-live="polite"></p>

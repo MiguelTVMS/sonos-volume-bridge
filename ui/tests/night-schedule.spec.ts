@@ -1,5 +1,60 @@
 import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 test.use({ locale: 'en-GB' });
+
+test('Night schedule fits the default macOS window without vertical scrolling', async ({
+  page,
+}) => {
+  const config = JSON.parse(
+    readFileSync(new URL('../../src-tauri/tauri.macos.conf.json', import.meta.url), 'utf8'),
+  );
+  const { width, height, minWidth, maxWidth } = config.app.windows[0];
+  expect(minWidth).toBe(width);
+  expect(maxWidth).toBe(width);
+  await page.setViewportSize({ width, height });
+  await page.goto('/preview.html?platform=macos');
+  await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
+  await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
+  await expect(page.locator('#notice')).toContainText('saved and applied');
+  const dimensions = await page.locator('.content').evaluate((element) => ({
+    content: element.scrollHeight,
+    viewport: element.clientHeight,
+  }));
+  expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport);
+});
+
+test('macOS notification dropdown fits the saved option after rerendering', async ({ page }) => {
+  await page.setViewportSize({ width: 600, height: 650 });
+  await page.goto('/preview.html?platform=macos');
+  await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
+  for (const mode of ['start', 'end', 'both', 'never']) {
+    const previous = await page.locator('#schedule-notifications').elementHandle();
+    await page.locator('#schedule-notifications').selectOption(mode);
+    await expect.poll(() => previous!.evaluate((element) => element.isConnected)).toBe(false);
+    const select = page.locator('#schedule-notifications');
+    await expect(select).toHaveValue(mode);
+    const label = select.locator('..').locator('.selected-control-label');
+    await expect(label).toHaveText(await select.locator('option:checked').innerText());
+    const dimensions = await select.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const text = document.createElement('span');
+      text.style.font = style.font;
+      text.style.whiteSpace = 'nowrap';
+      text.textContent = element.selectedOptions[0].label;
+      document.body.append(text);
+      const required = text.getBoundingClientRect().width;
+      text.remove();
+      return {
+        available:
+          element.getBoundingClientRect().width -
+          parseFloat(style.paddingLeft) -
+          parseFloat(style.paddingRight),
+        required,
+      };
+    });
+    expect(dimensions.available, mode).toBeGreaterThanOrEqual(dimensions.required);
+  }
+});
 
 for (const appearance of ['light', 'dark'] as const) {
   test(`Windows schedule tooltip is opaque in ${appearance} mode`, async ({ page }) => {
@@ -34,11 +89,14 @@ test('global half-hour grid supports painting, saving, keyboard editing and noti
   await expect(page.getByRole('heading', { name: 'Night Mode schedule', exact: true })).toHaveCount(
     0,
   );
+  await expect(
+    page.getByRole('combobox', { name: 'Night schedule notifications', exact: true }),
+  ).toHaveValue('never');
   await expect(page.locator('#schedule-notifications option')).toHaveText([
+    'On start',
+    'On end',
+    'On start and end',
     'Never',
-    'On Start',
-    'On End',
-    'Both',
   ]);
   await expect(page.locator('#schedule-status')).toBeEmpty();
   const cells = page.locator('.schedule-cell');
