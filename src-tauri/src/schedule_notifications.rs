@@ -49,6 +49,7 @@ pub async fn permitted<R: Runtime>(_: &AppHandle<R>, request: bool) -> bool {
     .unwrap_or(false)
 }
 #[cfg(not(any(target_os = "macos", windows)))]
+#[allow(clippy::unused_async)] // Shared async interface; macOS awaits its native permission callback.
 pub async fn permitted<R: Runtime>(app: &AppHandle<R>, request: bool) -> bool {
     let result = if request {
         app.notification().request_permission()
@@ -80,6 +81,7 @@ pub fn send<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
 }
 
 #[cfg(windows)]
+#[allow(clippy::unused_async)] // Shared async interface; macOS awaits its native permission callback.
 pub async fn permitted<R: Runtime>(app: &AppHandle<R>, _: bool) -> bool {
     use windows::{
         UI::Notifications::{NotificationSetting, ToastNotificationManager},
