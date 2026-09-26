@@ -87,6 +87,14 @@ alive during OS menu tracking.
 Windows interval tooltips use the opaque platform surface color in both light
 and dark modes so underlying grid cells cannot show through the time label.
 
+Linux groups schedule status in the third boxed settings row, directly below
+notification preferences. Current status and the next transition appear once;
+notification permission guidance and error feedback share that row. Successful
+saves show no confirmation, and a successful retry clears the prior error. Disabled
+and outside-period states remain visible there. The shared initial status read
+also runs in browser previews so startup and subsequent actions use the same UI
+orchestration. Other platforms retain their existing status presentation.
+
 Scheduled start/end notifications and explicit Save confirmations share one body
 formatter. Speaker names use the same display-name normalization as device
 selection, removing Sonos renderer/model/identifier suffixes while retaining the

@@ -218,6 +218,10 @@ ARM64, with a 1080-pixel fixed-width native window, an 800-pixel default height 
 responsive grouped controls. Vertical resizing remains available.
 The platform stylesheet stays inside the frontend; the shell selects Linux
 window bounds through `tauri.linux.conf.json`. See ADR 0012.
+Linux Night schedule status, notification permission guidance, and schedule error
+feedback share the third settings row below notifications (ADR 0013).
+The shell requires Tauri 2.12 with Tao's repaired Wayland decorations so native
+title-bar buttons receive clicks on first show and after reopening (ADR 0012).
 
 The Linux tray adapter uses a white icon for Ubuntu's dark top bar independently
 of the application color scheme, retaining the disconnected badge (ADR 0012).

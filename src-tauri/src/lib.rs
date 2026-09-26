@@ -134,20 +134,7 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
             }
             Ok(())
         })
-        .on_window_event(|window, event| {
-            match event {
-                tauri::WindowEvent::CloseRequested { api, .. } => {
-                    // This is a menu-bar utility: closing Settings must leave its
-                    // synchronization runtime and tray controls available.
-                    let _ = window.hide();
-                    api.prevent_close();
-                }
-                tauri::WindowEvent::ThemeChanged(theme) => {
-                    tray::update_icon_for_theme(window.app_handle(), *theme);
-                }
-                _ => {}
-            }
-        })
+        .on_window_event(handle_window_event)
         .invoke_handler(tauri::generate_handler![
             ui_demo_enabled,
             ui_demo_platform,
@@ -171,6 +158,68 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
         ])
         .run(context)
         .expect("Tauri runtime failed");
+}
+
+fn handle_window_event<R: tauri::Runtime>(window: &tauri::Window<R>, event: &tauri::WindowEvent) {
+    match event {
+        tauri::WindowEvent::CloseRequested { api, .. } => {
+            // Closing Settings leaves synchronization and the tray running.
+            let _ = window.hide();
+            api.prevent_close();
+        }
+        tauri::WindowEvent::ThemeChanged(theme) => {
+            tray::update_icon_for_theme(window.app_handle(), *theme);
+        }
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+mod window_lifecycle_tests {
+    use super::*;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    #[test]
+    fn settings_can_close_immediately_after_first_show_and_reopen_without_resize() {
+        let app = tauri::test::mock_builder()
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        let window = tauri::WebviewWindowBuilder::new(&app, "main", tauri::WebviewUrl::default())
+            .visible(false)
+            .build()
+            .unwrap();
+        let closes = Arc::new(AtomicUsize::new(0));
+        let observed = closes.clone();
+        app.run(move |app, event| {
+            if matches!(event, tauri::RunEvent::Ready) {
+                window.show().unwrap();
+                window.close().unwrap();
+            }
+            if let tauri::RunEvent::WindowEvent { event, .. } = event {
+                // MockRuntime sends app events but does not dispatch the native
+                // per-window listeners. Exercise the production handler here.
+                let settings = app.get_webview_window("main").unwrap();
+                handle_window_event(&settings.as_ref().window(), &event);
+                assert!(!matches!(event, tauri::WindowEvent::Resized(_)));
+                if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                    let count = observed.fetch_add(1, Ordering::SeqCst) + 1;
+                    // The production close handler must preserve the window so
+                    // the same Settings instance can be reopened from the tray.
+                    let window = app.get_webview_window("main").unwrap();
+                    if count == 1 {
+                        window.show().unwrap();
+                        window.close().unwrap();
+                    } else {
+                        window.destroy().unwrap();
+                    }
+                }
+            }
+        });
+        assert_eq!(closes.load(Ordering::SeqCst), 2);
+    }
 }
 
 #[cfg(test)]

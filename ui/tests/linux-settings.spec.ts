@@ -5,6 +5,63 @@ const linuxWindow = JSON.parse(
   readFileSync(new URL('../../src-tauri/tauri.linux.conf.json', import.meta.url), 'utf8'),
 ).app.windows[0];
 
+test('Ubuntu schedule status stays in one row below notifications through save and navigation', async ({
+  page,
+}) => {
+  await page.goto('/preview.html?platform=linux');
+  await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
+  const row = page.locator('.schedule-status-row');
+  await expect(row).toBeVisible();
+  await expect(row.locator('#schedule-status')).toHaveText('Schedule disabled.');
+  await expect(row.locator('..').locator(':scope > :nth-child(3)')).toHaveClass(
+    'schedule-status-row',
+  );
+  await page.locator('#schedule-enabled').check();
+  await expect(row).toContainText('Outside scheduled hours. Manual control is available.');
+  await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
+  await expect(row.locator('#schedule-feedback')).toBeEmpty();
+  await expect(page.locator('#notice')).toBeEmpty();
+  await expect(page.locator('#night-schedule > #schedule-status')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Devices', exact: true }).click();
+  await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
+  await expect(row).toContainText('Outside scheduled hours. Manual control is available.');
+  await expect(
+    page.getByText('Schedule saved and applied to the selected speaker.', { exact: true }),
+  ).toHaveCount(0);
+});
+
+test('Ubuntu schedule shows save errors and clears them on a successful retry', async ({
+  page,
+}) => {
+  await page.goto('/preview.html?platform=linux');
+  await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
+  await page.evaluate(() => {
+    const host = window as unknown as {
+      __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> };
+    };
+    const invoke = host.__TAURI_INTERNALS__.invoke;
+    let fail = true;
+    host.__TAURI_INTERNALS__.invoke = (command, args) => {
+      if (command === 'save_night_schedule' && fail) {
+        fail = false;
+        return Promise.reject(new Error('Could not apply schedule.'));
+      }
+      return invoke(command, args);
+    };
+  });
+  const save = page.getByRole('button', { name: 'Save schedule', exact: true });
+  await save.click();
+  await expect(page.locator('.schedule-status-row #schedule-feedback')).toContainText(
+    'Could not apply schedule.',
+  );
+  await expect(page.locator('#notice')).toBeEmpty();
+  const previous = await save.elementHandle();
+  await save.click();
+  await expect.poll(() => previous!.evaluate((element) => element.isConnected)).toBe(false);
+  await expect(page.locator('#schedule-feedback')).toBeEmpty();
+  await expect(page.locator('#notice')).toBeEmpty();
+});
+
 test('Ubuntu Night schedule fits the default window after saving without scrolling', async ({
   page,
 }) => {
@@ -12,7 +69,7 @@ test('Ubuntu Night schedule fits the default window after saving without scrolli
   await page.goto('/preview.html?platform=linux');
   await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
   await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
-  await expect(page.locator('#notice')).toContainText('saved and applied');
+  await expect(page.locator('#schedule-feedback')).toBeEmpty();
   for (const selector of ['.content', '.schedule-scroll']) {
     const size = await page.locator(selector).evaluate((element) => ({
       height: element.clientHeight,
@@ -65,7 +122,7 @@ test('Ubuntu schedule keeps square cells through navigation, selection and save'
   await page.keyboard.press('Space');
   await expect(cell).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
-  await expect(page.locator('#notice')).toContainText('saved and applied');
+  await expect(page.locator('#schedule-feedback')).toBeEmpty();
   await page.getByRole('button', { name: 'Devices', exact: true }).click();
   await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
   await expect(cell).toHaveCSS('border-radius', '0px');

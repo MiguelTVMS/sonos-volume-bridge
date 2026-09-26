@@ -82,14 +82,16 @@ export function captureScheduleView(scope: ParentNode): void {
     : null;
 }
 
-export function scheduleMarkup(): string {
+export function scheduleMarkup(linux = false): string {
+  const status = '<p id="schedule-status" class="setting-note" aria-live="polite"></p>';
+  const permission = '<p id="notification-permission" class="setting-note" aria-live="polite"></p>';
   return `<section id="night-schedule" data-schedule class="night-schedule" aria-labelledby="night-schedule-title">
     <div class="settings-group">
     <label class="toggle"><span>Enable schedule</span><input id="schedule-enabled" type="checkbox" role="switch"></label>
     <div class="control-field"><label for="schedule-notifications">Night schedule notifications</label><select id="schedule-notifications"><option value="start">On start</option><option value="end">On end</option><option value="both">On start and end</option><option value="never">Never</option></select></div>
-    <p id="notification-permission" class="setting-note" aria-live="polite"></p>
+    ${linux ? `<div class="schedule-status-row"><span>Schedule status</span>${status}${permission}<p id="schedule-feedback" class="setting-note" aria-live="polite"></p></div>` : permission}
     </div>
-    <p id="schedule-status" class="setting-note" aria-live="polite"></p>
+    ${linux ? '' : status}
     <div class="settings-group schedule-editor"><div class="schedule-editor-content">
     <p class="schedule-legend"><span>■ Scheduled on</span> □ Manual control</p>
     <div class="schedule-scroll"><div class="schedule-grid" role="grid" aria-label="Weekly Night Mode schedule"></div></div>
@@ -268,6 +270,7 @@ export function updateScheduleView(
   const panel = scope.querySelector<HTMLElement>('#night-schedule');
   if (!panel) return;
   panel.querySelector('#schedule-status')!.textContent = [
+    !panel.querySelector('.schedule-status-row') &&
     ['Schedule disabled.', 'Outside scheduled hours. Manual control is available.'].includes(
       status.message,
     )

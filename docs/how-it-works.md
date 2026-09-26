@@ -164,6 +164,9 @@ Windows, and GNOME clock-format or LC_TIME on Linux. Preferences are reread when
 Settings regains focus. Other Linux desktop-specific clock overrides may require
 matching LC_TIME. The form omits repetitive disabled/outside-period status text;
 errors, capability guidance, and active-period restrictions remain visible.
+On Linux, a dedicated Schedule status row below notifications shows the current
+state, including disabled and outside-period states. Schedule errors appear in
+that same row instead of beneath the editor. Successful saves show no confirmation.
 
 ## UI demo builds
 

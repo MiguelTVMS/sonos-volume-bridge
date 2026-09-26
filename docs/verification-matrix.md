@@ -377,3 +377,33 @@ the autosave debounce, return to General, and confirm defaults remain restored
 and the reset notice was not replaced by an old save response. Repeat with a slow
 configuration write. Browser regressions freeze the debounce clock or hold IPC
 completion to exercise both sequences deterministically through the real UI.
+
+## Linux Night schedule status consolidation
+
+- Automated: the Linux browser suite opens Night schedule from startup, checks
+  the third row below notifications, enables scheduling, saves, navigates away
+  and returns. Status and error feedback must stay in that row, with no duplicate
+  status below the card or confirmation below the editor. Successful saves remain
+  silent; a failed save shows an error, cleared on a successful retry. The regression fails
+  before the fix and passes after it; default-window fit is also checked.
+- Manual: launch the normal Linux app, open Settings > Night schedule, enable
+  scheduling, and save a block. Confirm the status updates in the third white row
+  below notifications. Navigate away and back, then test an active period and
+  an unavailable speaker. Confirm current status and errors remain in the row.
+  Browser mocks cover layout and frontend orchestration, not native event delivery
+  or real speaker transitions. Native checks remain to be performed.
+
+## Wayland close button after first show
+
+1. In an Ubuntu Wayland session, launch the normal app with Settings initially hidden.
+2. Open Settings from the tray and click the native close button once, without
+   resizing, maximizing, or double-clicking the title bar first.
+3. Confirm Settings hides and synchronization and the tray continue running.
+4. Reopen from the tray and repeat the immediate close at least three times.
+5. Confirm title-bar dragging, minimize, maximize, and vertical resizing still work.
+
+Before the dependency repair, close could ignore clicks until a resize; repeated
+clicks could maximize instead. The lockfile regression fails on that dependency
+and passes with the upgrade. The normal Rust suite exercises the shared close
+handler through first show and reopen without resize. Native GTK/compositor input
+is outside mock coverage; manual validation is pending.
