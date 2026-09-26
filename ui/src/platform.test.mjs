@@ -12,6 +12,7 @@ test('desktop WebViews select only their host platform theme', () => {
     'windows',
   );
   assert.equal(desktopPlatform('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15'), 'linux');
+  assert.equal(desktopPlatform('Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/605.1.15'), 'linux');
   assert.equal(desktopPlatform('Unknown'), 'generic');
   assert.equal(desktopPlatform(''), 'generic');
 });

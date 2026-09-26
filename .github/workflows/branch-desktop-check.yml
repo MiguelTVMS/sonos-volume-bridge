@@ -8,7 +8,7 @@ on:
         type: boolean
         default: false
   push:
-    branches: [feat/night-mode-schedule]
+    branches: [feat/night-mode-schedule, feat/arm64-build]
 
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest, ubuntu-24.04-arm]
     steps:
       - uses: actions/checkout@v7
       - if: runner.os == 'Linux'
@@ -41,7 +41,7 @@ jobs:
           version: 12
       - uses: actions/setup-node@v7
         with:
-          node-version: 26
+          node-version: "lts/*"
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - uses: Swatinem/rust-cache@v2
@@ -55,10 +55,17 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      - if: inputs.ui_demo
+        run: cargo test -p sonos-volume-bridge --features ui-demo
       - run: pnpm dlx @tauri-apps/cli@2 build --debug --no-bundle --no-sign ${{ inputs.ui_demo && '--features ui-demo' || '' }}
+      - name: Verify Linux ARM64 executable
+        if: runner.os == 'Linux' && runner.arch == 'ARM64'
+        run: |
+          file target/debug/sonos-volume-bridge
+          readelf -h target/debug/sonos-volume-bridge | grep -Eq 'Machine:.*AArch64'
       - uses: actions/upload-artifact@v6
         with:
-          name: desktop-${{ inputs.ui_demo && 'ui-demo' || 'normal' }}-${{ runner.os }}
+          name: desktop-${{ inputs.ui_demo && 'ui-demo' || 'normal' }}-${{ runner.os }}-${{ runner.arch }}
           path: |
             target/debug/sonos-volume-bridge.exe
             target/debug/sonos-volume-bridge

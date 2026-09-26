@@ -195,18 +195,6 @@
   font-weight: 600;
 }
 
-/* Linux keeps a compact, neutral desktop layout with Ubuntu's accent. */
-:root[data-platform='linux'] {
-  font-family: Ubuntu, Cantarell, system-ui, sans-serif;
-  --accent: #c64600;
-  --accent-hover: #a83c00;
-}
-[data-platform='linux'] .settings-group,
-[data-platform='linux'] button,
-[data-platform='linux'] select {
-  border-radius: 6px;
-}
-
 @media (prefers-color-scheme: dark) {
   :root[data-platform='macos'] {
     --sidebar: #252527;
@@ -221,10 +209,6 @@
     --surface: #2b2b2b;
     --accent: #60cdff;
     --accent-text: #101010;
-  }
-  :root[data-platform='linux'] {
-    --accent: #e97439;
-    --accent-text: #171717;
   }
 }
 @media (prefers-contrast: more) {

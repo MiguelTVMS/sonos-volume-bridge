@@ -1,5 +1,38 @@
 # Hardware verification matrix
 
+## Linux ARM64 build
+
+Local validation (2026-09-26): Ubuntu 26.04 ARM64, Rust 1.98.1, Node.js
+24.21.0 LTS and pnpm 12.6.0 passed the standalone debug Tauri build, ELF
+architecture and linked-library checks, Rust formatting, workspace Clippy and
+tests, UI demo Rust tests, and frontend build, tests, lint and formatting.
+Graphical and physical-device scenarios below remain manual verification.
+
+Automated coverage: the Branch desktop check workflow builds on native
+`ubuntu-24.04-arm`, runs frontend and Rust checks, verifies the executable's ELF
+machine is AArch64, and uploads an artifact with the architecture in its name.
+PR Rust quality checks run workspace and UI demo tests on the same architecture.
+Workflow configuration alone is not evidence of a successful build; confirm the
+ARM64 job passes before treating an artifact as verified.
+
+Manual verification on an ARM64 Ubuntu desktop or VM:
+
+1. Follow the native build commands in [development](development.md#linux-arm64).
+2. Confirm `file` and `readelf -h` identify the executable as AArch64.
+3. Start the normal app in a graphical session. Open Settings from the tray,
+   select a local output and Sonos speaker, save, quit, and relaunch.
+4. Verify saved selections, volume/mute synchronization, tray controls, and
+   Night schedule interactions using the existing scenarios below.
+5. Build again with `--debug --features ui-demo`, launch without a physical
+   speaker, and repeat the UI demo scenarios below, including saved startup.
+6. If testing a Debian package, confirm `dpkg-deb -f <package.deb> Architecture`
+   reports `arm64`, install it, and repeat the desktop checks.
+
+Coverage limits: CI compilation and automated tests do not verify a graphical
+session, tray integration, audio service access, physical Sonos hardware, or
+package installation. Building on Ubuntu 24.04 does not establish compatibility
+with older distributions. Windows ARM64 and macOS builds are separate targets.
+
 ## Windows 11 settings presentation
 
 - Automated: the normal frontend suite validates platform selection, native
@@ -268,3 +301,48 @@ scheduled start and end notifications likewise. Names with ordinary hyphens must
 remain intact. Automated tests cover the shared production notification formatter
 for all four paths and fail when raw discovery names are used. Native delivery
 and banner layout still require a real notification-capable host.
+
+
+## Ubuntu settings presentation
+
+- Automated browser tests cover every page at 1080 by 800 and 1080 by 460 in
+  light and dark modes, keyboard switch and slider changes, and persisted schedule
+  selection. The rounded-cell regression was reproduced before the CSS fix.
+- On native Ubuntu, start `ui-demo` from a closed app and compare with GNOME
+  Settings: wide window, neutral sidebar, white rounded groups, row separators,
+  trailing dropdowns, orange switches and white slider thumbs. Check text renders
+  in Ubuntu/system sans-serif throughout, with no unexpected serif paragraphs.
+- Confirm horizontal resizing is blocked. At the default height, open Night
+  schedule and Save: the grid, actions and save notice must fit without scrolling.
+  Resize vertically to the minimum; scroll to every setting and action. Switch pages, change a dropdown, drag a slider, and save/reopen a schedule.
+  Schedule cells must stay rectangular before and after updates.
+- Repeat in dark mode, with increased text scaling and keyboard-only input.
+  Confirm select popups, native title bar and tray behavior in WebKitGTK.
+- Browser coverage cannot establish native title-bar appearance or desktop theme
+  integration. HTML controls follow Yaru styling but are not native GTK widgets.
+
+Ubuntu window follow-up: verify width stays at 1080 while height can change.
+At the 800-pixel default height, Night schedule must fit after Save without
+scrolling. On Volume, the Test speaker volume button must be inset from the card
+and usable with Enter. Automated browser regressions cover these cases.
+
+## Ubuntu top-bar icon contrast
+
+Start with Ubuntu in light application mode and the app closed. Launch the UI
+demo: the top-bar glyph must be white immediately, including before connection
+completes. Switch the application theme dark then light; the glyph must remain
+white. In a normal build, disconnect and reconnect the selected speaker and check
+the red disconnected badge appears and clears without changing glyph contrast.
+The CI regression exercises the production image-selection path in this sequence
+and failed before the fix. It cannot verify native AppIndicator rendering or
+custom desktop panels; manually check against Ubuntu's default dark top bar.
+
+## Linux release architectures
+
+Release CI builds native AMD64 and ARM64 Debian packages and checks their
+architecture metadata before upload. Automated release-script tests use real
+Debian package fixtures and reject mismatched, missing, empty or ambiguous
+installers. Alias tests require both Linux packages and check the website URLs.
+After the first release, download each architecture from its website button,
+check `dpkg-deb -f <package.deb> Architecture`, and install on the matching Ubuntu
+machine. The ARM64 stable link is unavailable until that asset reaches a GA release.

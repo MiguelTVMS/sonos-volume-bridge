@@ -36,9 +36,9 @@ or third-party embeds without reviewing the website privacy notice.
 ## Permanent installer links
 
 Download buttons use GitHub's `releases/latest/download/` URLs. Release CI adds
-fixed-name copies of the macOS ZIP, Windows installer, and Ubuntu DEB while
+fixed-name copies of the macOS ZIP, Windows installer, and Ubuntu AMD64/ARM64 DEBs while
 retaining versioned assets. `scripts/prepare-release-downloads.sh` validates all
-three installers before copying them. Prereleases also receive these assets,
+four installers before copying them. Prereleases also receive these assets,
 but the latest stable URLs do not select prereleases.
 
 The website does not need to be rebuilt when a release is published. Before
@@ -107,3 +107,7 @@ grid, with matching illustrations, typography, and spacing. Five cards use two
 columns on desktop (two, two, then one), leaving space for a future feature. Feature copy describes the released
 product because the site publishes with the release. Keep the visible copy and
 llms.txt aligned. The section introduces no tracking or external assets.
+
+The Ubuntu card provides distinct AMD64 and ARM64 download buttons. The ARM64
+URL targets the next release that includes `sonos-volume-bridge-linux-arm64.deb`;
+it will become available after the first GA release containing that asset.

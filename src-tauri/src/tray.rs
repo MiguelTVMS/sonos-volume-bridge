@@ -394,6 +394,13 @@ fn theme<R: Runtime>(app: &AppHandle<R>) -> Theme {
 }
 
 fn icon_for(theme: Theme, connection: ConnectionState) -> Image<'static> {
+    // Ubuntu's dark top bar is independent of the application window theme.
+    // AppIndicator uses the supplied pixels rather than a macOS template tint.
+    let theme = if cfg!(target_os = "linux") {
+        Theme::Dark
+    } else {
+        theme
+    };
     let bytes: &[u8] = match (theme, connection) {
         (Theme::Light, ConnectionState::Connected) => {
             include_bytes!("../icons/tray-icon-light.png")
@@ -509,6 +516,34 @@ fn opens_settings_on_double_click(button: MouseButton) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn ubuntu_panel_icon_stays_white_across_startup_theme_and_connection_changes() {
+        // Ubuntu's panel stays dark even when the Settings window is light.
+        // Exercise the image selection shared by registration, theme events
+        // and connection refreshes, without requiring a native tray in CI.
+        for (theme, connection) in [
+            (Theme::Light, ConnectionState::Disconnected),
+            (Theme::Light, ConnectionState::Connected),
+            (Theme::Dark, ConnectionState::Connected),
+            (Theme::Dark, ConnectionState::Disconnected),
+            (Theme::Light, ConnectionState::Disconnected),
+        ] {
+            let icon = icon_for(theme, connection);
+            let expected = Image::from_bytes(match connection {
+                ConnectionState::Connected => include_bytes!("../icons/tray-icon-dark.png"),
+                ConnectionState::Disconnected => {
+                    include_bytes!("../icons/tray-icon-dark-disconnected.png")
+                }
+            })
+            .unwrap();
+            assert!(
+                icon.rgba() == expected.rgba(),
+                "Ubuntu panel icon must keep the white glyph and connection badge"
+            );
+        }
+    }
 
     #[test]
     fn startup_requests_speaker_controls_without_any_mouse_event() {

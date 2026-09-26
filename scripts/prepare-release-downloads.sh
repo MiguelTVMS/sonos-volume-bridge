@@ -3,7 +3,7 @@
 set -euo pipefail
 assets_dir="${1:?Usage: prepare-release-downloads.sh ASSETS_DIR RELEASE_TAG}"
 release_tag="${2:?Release tag is required}"
-suffixes=(macos.zip windows-unsigned.exe linux-amd64.deb)
+suffixes=(macos.zip windows-unsigned.exe linux-amd64.deb linux-arm64.deb)
 
 # Validate every input before creating aliases.
 for suffix in "${suffixes[@]}"; do

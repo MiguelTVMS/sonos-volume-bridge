@@ -81,7 +81,7 @@ jobs:
           version: 12
       - uses: actions/setup-node@v7
         with:
-          node-version: 26
+          node-version: "lts/*"
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
@@ -168,7 +168,7 @@ jobs:
           version: 12
       - uses: actions/setup-node@v7
         with:
-          node-version: 26
+          node-version: "lts/*"
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
@@ -196,9 +196,17 @@ jobs:
           retention-days: 1
 
   linux-deb:
-    name: Build Ubuntu Debian package
+    name: Build Ubuntu Debian package (${{ matrix.arch }})
     needs: prepare-version
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            arch: arm64
     steps:
       - uses: actions/checkout@v7
         with:
@@ -211,7 +219,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: /var/cache/apt/archives
-          key: ${{ runner.os }}-apt-linux-desktop-v1
+          key: ${{ matrix.os }}-${{ matrix.arch }}-apt-linux-desktop-v1
       - name: Install Linux desktop build dependencies
         run: |
           sudo apt-get update
@@ -221,13 +229,13 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: workspace
+          shared-key: workspace-${{ matrix.os }}-${{ matrix.arch }}
       - uses: pnpm/action-setup@v6
         with:
           version: 12
       - uses: actions/setup-node@v7
         with:
-          node-version: 26
+          node-version: "lts/*"
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
@@ -242,14 +250,12 @@ jobs:
       - name: Collect the Debian installer
         env:
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
-        run: |
-          installer="$(find target/release/bundle/deb -maxdepth 1 -type f -name '*.deb' -print -quit)"
-          test -n "$installer"
-          cp "$installer" "sonos-volume-bridge-${RELEASE_TAG}-linux-amd64.deb"
+          RELEASE_ARCH: ${{ matrix.arch }}
+        run: bash scripts/collect-linux-installer.sh target/release/bundle/deb "$RELEASE_TAG" "$RELEASE_ARCH"
       - uses: actions/upload-artifact@v7
         with:
-          name: linux-release
-          path: sonos-volume-bridge-*-linux-amd64.deb
+          name: linux-${{ matrix.arch }}-release
+          path: sonos-volume-bridge-*-linux-${{ matrix.arch }}.deb
           if-no-files-found: error
   macos-direct:
     name: Sign and notarize macOS direct-download app
@@ -550,7 +556,7 @@ jobs:
           version: 12
       - uses: actions/setup-node@v7
         with:
-          node-version: 26
+          node-version: "lts/*"
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
       - run: pnpm --dir ui install --frozen-lockfile
@@ -704,7 +710,7 @@ jobs:
 
           - **Windows:** Download and run the Windows installer.
           - **macOS:** Download the macOS archive, then move the app to Applications.
-          - **Ubuntu:** Download and install the Debian package.
+          - **Ubuntu:** Download and install the Debian package for your architecture (AMD64 or ARM64).
 
           ### Important
 

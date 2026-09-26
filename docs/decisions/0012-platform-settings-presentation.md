@@ -69,3 +69,46 @@ insets keep the controls unobstructed. Windows and Linux retain standard chrome.
 The macOS toolbar includes previous/next section buttons and the current section
 title. Navigation follows sidebar order, does not wrap at the ends, and uses the
 same page activation path as the sidebar, including diagnostic refreshes.
+
+
+## Ubuntu presentation (2026-09-26)
+
+Linux uses `ui/src/linux.css` on both x86-64 and ARM64. The native window starts
+at 1080 by 800 logical pixels. Width is fixed at 1080; vertical resizing remains
+available down to 460. The default height fits Night schedule and its save notice
+without scrolling.
+A 270-pixel sidebar, neutral selection, symbolic icons, centered content, white
+rounded groups with separated rows, trailing selectors, 48-by-26 switches and
+white slider thumbs follow the Ubuntu Settings reference. At compact widths,
+controls move below their labels. Ubuntu Sans and system sans-serif fallbacks
+keep text consistent. Dark mode, focus, reduced motion and contrast remain supported.
+
+These are accessible HTML controls in the existing WebView, not GTK4 widgets.
+Native window chrome and select popups remain managed by the platform. The
+frontend mirrors Yaru/GNOME presentation without replacing the shared command
+contract or adopting a second native UI implementation. Slider fill is derived
+from the current input value during render, refresh and user input; it does not
+write configuration. Schedule cells explicitly retain square corners rather than
+inheriting the rounded action-button shape.
+
+References: [Ubuntu Yaru theme guidance](https://github.com/ubuntu/yaru/wiki/%233-Yaru-theme-suite-workflow-and-guidelines),
+[GNOME boxed lists](https://developer.gnome.org/hig/patterns/containers/boxed-lists.html),
+and [GNOME switches](https://developer.gnome.org/hig/patterns/controls/switches.html).
+
+Browser tests navigate the production form, select and save schedule blocks,
+check square cells before and after rerenders, and exercise switches and sliders
+at default/minimum heights in both color schemes. The square-cell regression failed
+with the previous generic Linux button radius and passes with the scoped styling.
+Native Ubuntu WebKit and desktop integration still require the verification matrix.
+
+The Ubuntu Volume test action keeps a 16-pixel inset and normal button sizing
+instead of inheriting full settings-row padding. Browser regressions verify the
+inset, keyboard activation, and that the default Night schedule view fits after
+Save; both layout defects were reproduced with the previous presentation.
+
+Ubuntu tray icons use the white glyph for both application color schemes: the
+default Ubuntu top bar stays dark independently of the Settings window theme.
+The disconnected red badge remains intact. Registration, theme notifications and
+connection refreshes share this image selection. Other platforms retain their
+existing theme-based selection. Custom Linux panels with light backgrounds are
+not covered by this Ubuntu-specific contrast policy.

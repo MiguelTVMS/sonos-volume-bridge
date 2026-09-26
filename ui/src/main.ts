@@ -30,9 +30,18 @@ import { UserWrites } from './user-writes';
 import './style.css';
 import './platform.css';
 import './windows.css';
+import './linux.css';
 
 const platform = presentationOverride ?? desktopPlatform(navigator.userAgent);
 document.documentElement.dataset.platform = platform;
+
+function updateRangeFill(input: HTMLInputElement): void {
+  if (platform !== 'linux') return;
+  const min = Number(input.min || 0);
+  const max = Number(input.max || 100);
+  const progress = max > min ? ((Number(input.value) - min) / (max - min)) * 100 : 0;
+  input.style.setProperty('--range-progress', `${Math.max(0, Math.min(100, progress))}%`);
+}
 
 if (document.documentElement.dataset.platform === 'macos') {
   const applyFocus = (focused: boolean): void => {
@@ -374,6 +383,7 @@ function render(nextSnapshot: Snapshot): void {
       </form>
     </div>`;
   applySpeakerControls(app, speakerSettings, document.activeElement);
+  app.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(updateRangeFill);
   refreshScheduleView();
   document.querySelector('#previous-section')?.addEventListener('click', () => {
     const page = adjacentPage(activePage, -1);
@@ -421,6 +431,7 @@ function render(nextSnapshot: Snapshot): void {
     input.addEventListener('change', () => void updateSpeakerSetting(input));
   });
   document.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach((input) => {
+    updateRangeFill(input);
     sliders.bind(
       input,
       () => {
@@ -430,6 +441,7 @@ function render(nextSnapshot: Snapshot): void {
       () => {
         const label = input.closest('label')?.querySelector<HTMLOutputElement>('output');
         if (label) label.value = input.id === 'maximum-volume' ? `${input.value}%` : input.value;
+        updateRangeFill(input);
       },
       () => {
         if (input.dataset.speakerLevel) void updateSpeakerLevel(input);
@@ -587,6 +599,7 @@ async function refreshSpeakerSettings(): Promise<void> {
     return;
   speakerSettings = speaker;
   applySpeakerControls(app, speakerSettings, document.activeElement);
+  app.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(updateRangeFill);
   refreshScheduleView();
 }
 

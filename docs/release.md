@@ -71,8 +71,12 @@ installation.
 
 ## Ubuntu packaging
 
-The release workflow builds an x86_64 Debian package on Ubuntu and uploads it
-to the GitHub Release. It targets Ubuntu systems using PulseAudio or PipeWire's
+The release workflow builds native AMD64 and ARM64 Debian packages in parallel
+on `ubuntu-latest` and `ubuntu-24.04-arm`, respectively, and uploads both to the
+GitHub Release. The matrix uses separate architecture-specific caches and
+artifacts. `scripts/collect-linux-installer.sh` verifies Debian architecture
+metadata before assigning each release filename. Publication waits for both
+architectures to succeed. It targets Ubuntu systems using PulseAudio or PipeWire's
 PulseAudio compatibility service; users need `pulseaudio-utils` for `pactl`.
 
 Rust caches use one shared logical key across CI and release job names. The
@@ -198,6 +202,7 @@ to add fixed filenames for direct downloads, alongside the versioned installers:
 - `sonos-volume-bridge-macos.zip`
 - `sonos-volume-bridge-windows-unsigned.exe`
 - `sonos-volume-bridge-linux-amd64.deb`
+- `sonos-volume-bridge-linux-arm64.deb`
 
 The website uses `releases/latest/download/<filename>` so stable downloads follow
 the latest non-prerelease without a website deployment. Missing or empty source

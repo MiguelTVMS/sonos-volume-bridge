@@ -2,13 +2,29 @@
 import subprocess
 import tempfile
 import unittest
+from html.parser import HTMLParser
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "prepare-release-downloads.sh"
-SUFFIXES = ("macos.zip", "windows-unsigned.exe", "linux-amd64.deb")
+SUFFIXES = ("macos.zip", "windows-unsigned.exe", "linux-amd64.deb", "linux-arm64.deb")
 
 
 class ReleaseDownloadsTests(unittest.TestCase):
+    def test_site_links_to_both_published_linux_architectures(self):
+        links = []
+
+        class Links(HTMLParser):
+            def handle_starttag(self, tag, attrs):
+                if tag == "a":
+                    links.append(dict(attrs).get("href", ""))
+
+        Links().feed((SCRIPT.parent.parent / "pages" / "index.html").read_text())
+        for suffix in ("linux-amd64.deb", "linux-arm64.deb"):
+            self.assertIn(suffix, SUFFIXES)
+            self.assertTrue(any(link.endswith(
+                f"/releases/latest/download/sonos-volume-bridge-{suffix}"
+            ) for link in links))
+
     def test_copies_preserve_source_content(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
