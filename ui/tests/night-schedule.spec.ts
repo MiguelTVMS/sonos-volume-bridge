@@ -35,7 +35,7 @@ test('macOS notification dropdown fits the saved option after rerendering', asyn
     await expect(select).toHaveValue(mode);
     const label = select.locator('..').locator('.selected-control-label');
     await expect(label).toHaveText(await select.locator('option:checked').innerText());
-    const fits = await select.evaluate((element) => {
+    const dimensions = await select.evaluate((element) => {
       const style = getComputedStyle(element);
       const text = document.createElement('span');
       text.style.font = style.font;
@@ -44,12 +44,15 @@ test('macOS notification dropdown fits the saved option after rerendering', asyn
       document.body.append(text);
       const required = text.getBoundingClientRect().width;
       text.remove();
-      return (
-        element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) >=
-        required
-      );
+      return {
+        available:
+          element.getBoundingClientRect().width -
+          parseFloat(style.paddingLeft) -
+          parseFloat(style.paddingRight),
+        required,
+      };
     });
-    expect(fits).toBe(true);
+    expect(dimensions.available, mode).toBeGreaterThanOrEqual(dimensions.required);
   }
 });
 
@@ -86,11 +89,14 @@ test('global half-hour grid supports painting, saving, keyboard editing and noti
   await expect(page.getByRole('heading', { name: 'Night Mode schedule', exact: true })).toHaveCount(
     0,
   );
+  await expect(
+    page.getByRole('combobox', { name: 'Night schedule notifications', exact: true }),
+  ).toHaveValue('never');
   await expect(page.locator('#schedule-notifications option')).toHaveText([
+    'On start',
+    'On end',
+    'On start and end',
     'Never',
-    'On Start',
-    'On End',
-    'Both',
   ]);
   await expect(page.locator('#schedule-status')).toBeEmpty();
   const cells = page.locator('.schedule-cell');

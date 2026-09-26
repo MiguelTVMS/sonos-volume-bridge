@@ -167,7 +167,7 @@ wake delivery. Native notification display is controlled by the OS.
     speaker loss/recovery. CI covers the shared menu-diff sequence; native Cocoa
     action-target lifetime and menu tracking require this packaged-app check.
 
-11. In the schedule form, verify Never/On Start/On End/Both at both boundaries and
+11. In the schedule form, verify On start/On end/On start and end/Never at both boundaries and
     with Save. Confirm Portuguese locale uses 24-hour labels and US English uses
     AM/PM, including midnight tooltips. Hover a grid cell and verify the tooltip
     appears promptly and disappears on leaving or painting.
@@ -205,7 +205,7 @@ The macOS Settings window opens at 740 by 700 points. Check Night schedule at
 that default size for unnecessary vertical scrolling; horizontal resizing must
 remain disabled. Browser coverage also checks the page with save feedback shown.
 
-On macOS, open Settings → Night schedule and select On Start, then On End.
+On macOS, open Settings → Night schedule and select On start, then On end.
 After each immediate save, verify the complete selected text remains visible
 beside the dropdown arrow. Leave and reopen Settings to check the restored value;
 repeat at the minimum window width. The browser regression selects all four modes
