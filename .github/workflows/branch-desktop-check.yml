@@ -50,7 +50,7 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
-      - run: cargo build -p sonos-volume-bridge
+      - run: pnpm dlx @tauri-apps/cli@2 build --debug --no-bundle --no-sign
       - uses: actions/upload-artifact@v6
         with:
           name: night-schedule-${{ runner.os }}

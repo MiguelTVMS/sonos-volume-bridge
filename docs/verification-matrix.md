@@ -186,8 +186,8 @@ GTK3, WebKitGTK 4.1, and an AppIndicator implementation. Native notifications ma
 require an installed/packaged app identity, so the standalone executable does not
 replace packaged-app notification validation.
 
-Run `pnpm --dir ui install --frozen-lockfile`, `pnpm --dir ui build`, and
-`cargo run -p sonos-volume-bridge` from a local checkout for a source trial.
+Run `pnpm --dir ui install --frozen-lockfile` and
+`pnpm dlx @tauri-apps/cli@2 dev` from a local checkout for a source trial.
 Verify rectangular add/clear gestures, the checked tray schedule control, selected
 speaker changes, wake/recovery and all four notification modes. Windows clock
 format comes from the user's regional time format. Linux honors GNOME's explicit
