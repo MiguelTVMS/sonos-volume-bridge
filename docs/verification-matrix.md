@@ -419,12 +419,12 @@ is outside mock coverage; manual validation is pending.
   schedule enabled and the current half-hour selected, and again with it cleared. Confirm a native banner
   only when the edit enters or leaves the enabled schedule. Repeat each save and confirm
   there is no additional notification. Then enable the
-  schedule and verify an actual start and end boundary. Enabling/disabling alone
-  does not notify. Confirm Never suppresses both directions, On start only shows
+  schedule and verify an actual start and end boundary. Enabling during a selected
+  period also notifies after speaker confirmation; disabling does not notify. Confirm Never suppresses both directions, On start only shows
   on notifications, and On end only shows off notifications.
 - Coverage limit: the service test verifies delivery and message content, not
-  GNOME banner rendering or desktop suppression. Native banner confirmation is
-  still pending.
+  GNOME banner rendering or desktop suppression. Native edit-triggered banner
+  confirmation is recorded below.
 
 The save-transition regression additionally exercises the shared application and
 notification orchestration with all four preferences, recurring scheduling on
@@ -472,5 +472,11 @@ manually turn Night Mode off. Choose On start or On start and end and enable the
 schedule from Settings; confirm Night Mode turns on and one Ubuntu banner appears.
 Repeat using the tray. Repeat outside selected periods and with On end/Never;
 expect no banner. Disable scheduling and confirm Night Mode stays unchanged with
-no end banner. Native verification is pending; the private service cannot prove
-GNOME banner presentation or desktop suppression settings.
+no end banner. The private service cannot prove GNOME banner presentation or
+desktop suppression settings.
+
+Native verification (2026-09-27): after the enable-notification fix, the user
+reported that everything was working. This confirms the reported active-period
+enable notification in the normal Ubuntu app. The report does not separately
+verify every preference, tray interaction, timed boundary, or first-open close
+sequence listed above.
