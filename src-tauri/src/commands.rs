@@ -444,9 +444,10 @@ pub async fn save_night_schedule(
     get_snapshot(state)
 }
 #[tauri::command]
-pub async fn enable_night_schedule(
+pub async fn enable_night_schedule<R: tauri::Runtime>(
     enabled: bool,
     state: State<'_, AppState>,
+    app: AppHandle<R>,
 ) -> Result<UiSnapshot, String> {
     let gate = state.speaker_gate.lock().await;
     let mut configuration = state
@@ -457,9 +458,24 @@ pub async fn enable_night_schedule(
     if enabled && !crate::night_schedule::supported(&configuration).await {
         return Err("Select a speaker that supports Night Mode.".into());
     }
+    let previous_schedule = configuration.night_mode_schedule.clone();
     configuration.night_mode_schedule.enabled = enabled;
     persist_schedule(&state, &configuration)?;
+    let applied = if enabled && !previous_schedule.enabled {
+        let result = crate::night_schedule::apply_saved(&configuration, &previous_schedule).await;
+        state
+            .schedule_reconcile
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        Some(result)
+    } else {
+        None
+    };
     drop(gate);
+    if let Some(applied) = applied {
+        let (transition, speaker) =
+            applied.map_err(|error| format!("Schedule enabled, but {error}"))?;
+        crate::night_schedule::notify_saved(&app, &configuration, transition, &speaker).await;
+    }
     get_snapshot(state)
 }
 #[tauri::command]

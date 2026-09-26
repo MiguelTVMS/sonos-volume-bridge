@@ -308,7 +308,8 @@ fn toggle_schedule<R: Runtime>(app: &AppHandle<R>) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
-        if let Err(error) = crate::commands::enable_night_schedule(enabled, state.clone()).await
+        if let Err(error) =
+            crate::commands::enable_night_schedule(enabled, state.clone(), app.clone()).await
             && let Ok(mut status) = state.schedule_status.lock()
         {
             status.message = error;

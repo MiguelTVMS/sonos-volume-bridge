@@ -423,6 +423,94 @@ mod tests {
     }
 
     #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn enable_transition_probe() {
+        use crate::{
+            config::{AppConfiguration, ConfigStore, ScheduleNotifications},
+            state::AppState,
+        };
+        use tauri::Manager;
+        if std::env::var_os("SVB_NOTIFICATION_TEST_CHILD").is_none() {
+            return;
+        }
+        let speaker = crate::demo::speaker().await.unwrap();
+        let directory =
+            std::env::temp_dir().join(format!("schedule-enable-test-{}", std::process::id()));
+        let (_, guard) = tracing_appender::non_blocking(std::io::sink());
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_notification::init())
+            .manage(AppState::new(
+                ConfigStore::new(directory.join("config.json")),
+                AppConfiguration::default(),
+                guard,
+            ))
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        // Call the same command as Settings and the tray before the worker's
+        // first tick. Cover current-time membership and every preference.
+        for mode in [
+            ScheduleNotifications::Start,
+            ScheduleNotifications::End,
+            ScheduleNotifications::Both,
+            ScheduleNotifications::Never,
+        ] {
+            for inside in [false, true] {
+                let mut configuration = AppConfiguration {
+                    selected_sonos_id: Some(crate::demo::SPEAKER_ID.into()),
+                    last_known_sonos_address: Some(speaker.location.to_string()),
+                    notify_night_mode_schedule_transitions: mode,
+                    ..AppConfiguration::default()
+                };
+                configuration.night_mode_schedule.blocks = vec![vec![inside; 48]; 7];
+                app.state::<AppState>()
+                    .replace_configuration(configuration.clone());
+                crate::commands::set_speaker_setting(
+                    crate::runtime::SpeakerSetting::NightSound,
+                    false,
+                    app.state(),
+                )
+                .await
+                .unwrap();
+                for enabled in [true, true, false] {
+                    crate::commands::enable_night_schedule(
+                        enabled,
+                        app.state(),
+                        app.handle().clone(),
+                    )
+                    .await
+                    .unwrap();
+                    assert_eq!(
+                        crate::runtime::speaker_settings(configuration.clone())
+                            .await
+                            .night_sound,
+                        Some(inside)
+                    );
+                }
+            }
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn enabling_inside_schedule_notifies_once_matching_start_preference() {
+        let received =
+            capture_linux_notifications("schedule_notifications::tests::enable_transition_probe")
+                .await;
+        assert_eq!(
+            received.len(),
+            2,
+            "only Start and Both notify on entry; repeated enable, disable and outside stay silent"
+        );
+        assert!(
+            received
+                .iter()
+                .all(|(title, body)| title == "Night Mode schedule started"
+                    && body.ends_with("Night Mode is on."))
+        );
+    }
+
+    #[cfg(target_os = "linux")]
     async fn capture_linux_notifications(probe: &'static str) -> Vec<(String, String)> {
         use std::{
             io::{BufRead, BufReader},

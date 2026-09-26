@@ -386,7 +386,7 @@ mod tests {
         commands::set_speaker_setting(runtime::SpeakerSetting::NightSound, false, app.state())
             .await
             .unwrap();
-        commands::enable_night_schedule(true, app.state())
+        commands::enable_night_schedule(true, app.state(), app.handle().clone())
             .await
             .unwrap();
         // Manual off must be rejected even before the worker's first startup tick.
@@ -411,7 +411,7 @@ mod tests {
             runtime::speaker_settings(saved.clone()).await.night_sound,
             Some(true)
         );
-        commands::enable_night_schedule(false, app.state())
+        commands::enable_night_schedule(false, app.state(), app.handle().clone())
             .await
             .unwrap();
         assert_eq!(
@@ -428,7 +428,7 @@ mod tests {
         // An enabled empty schedule must allow manual on and off.
         saved.night_mode_schedule.blocks = vec![vec![false; 48]; 7];
         state.replace_configuration(saved);
-        commands::enable_night_schedule(true, app.state())
+        commands::enable_night_schedule(true, app.state(), app.handle().clone())
             .await
             .unwrap();
         commands::set_speaker_setting(runtime::SpeakerSetting::NightSound, true, app.state())

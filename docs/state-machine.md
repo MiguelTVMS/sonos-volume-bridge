@@ -37,5 +37,12 @@ remain inside/outside and saves with recurrence disabled stay silent. On start/O
 that intent without changing controller state. Selection or schedule changes discard old
 pending intent. Notification preferences never reset this controller. See ADR 0013.
 
+Enabling a previously disabled schedule during a selected period applies Night Mode
+immediately and sends a start notification after speaker confirmation when On start or
+On start and end is selected. Enabling outside selected periods, enabling an already
+enabled schedule, and disabling scheduling do not notify. Disabling leaves the speaker
+state unchanged. The worker subsequently reconciles silently to avoid duplicate
+notifications.
+
 Opt-in UI demo builds run this state machine and the normal Night Mode scheduler
 against a loopback simulated Sonos speaker. Local audio remains native. See ADR 0014.

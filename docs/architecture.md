@@ -214,6 +214,13 @@ identify a speaker. This applies to both scheduled boundaries and entry/exit cau
 Saving compares the previous and new enabled schedules at the same timestamp.
 Only a membership change produces notification intent after speaker confirmation;
 remaining inside/outside and disabled schedules stay silent.
+Enabling a previously disabled schedule during a selected period applies Night Mode
+immediately and sends a start notification after speaker confirmation when On start or
+On start and end is selected. Enabling outside selected periods, enabling an already
+enabled schedule, and disabling scheduling do not notify. Disabling leaves the speaker
+state unchanged. The worker subsequently reconciles silently to avoid duplicate
+notifications.
+
 Linux delivery uses one persistent asynchronous D-Bus connection with a bounded
 timeout. GNOME removes an app's notifications when their sender disappears, so
 the shell retains that connection after delivery. The blocking plugin path is

@@ -457,3 +457,20 @@ Native verification (2026-09-27): the user confirmed that both Ubuntu banners
 appeared after clearing the current half-hour and saving, then selecting it and
 saving again with Settings open. This verifies edit-triggered exit and entry
 presentation; timed boundaries and other desktop sessions remain separate checks.
+
+### Enabling during an active period
+
+Automated Linux regression calls the production enable command before the worker's
+first tick with a simulated speaker and private notification service. It covers
+all four notification preferences, selected and unselected current-time periods,
+repeated enable, and disable. It verifies speaker confirmation and exactly two
+start notifications (Start and Both). The regression receives zero notifications
+before the fix and passes afterward. Existing worker tests cover reconciliation.
+
+Native check: with scheduling disabled, select/save the current half-hour, then
+manually turn Night Mode off. Choose On start or On start and end and enable the
+schedule from Settings; confirm Night Mode turns on and one Ubuntu banner appears.
+Repeat using the tray. Repeat outside selected periods and with On end/Never;
+expect no banner. Disable scheduling and confirm Night Mode stays unchanged with
+no end banner. Native verification is pending; the private service cannot prove
+GNOME banner presentation or desktop suppression settings.

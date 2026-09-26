@@ -156,6 +156,13 @@ wake, recovery, selection changes, manual changes, and enforcement corrections
 remain silent. Permission denial and OS notification suppression never stop
 scheduling or volume synchronization.
 
+Enabling a previously disabled schedule during a selected period applies Night Mode
+immediately and sends a start notification after speaker confirmation when On start or
+On start and end is selected. Enabling outside selected periods, enabling an already
+enabled schedule, and disabling scheduling do not notify. Disabling leaves the speaker
+state unchanged. The worker subsequently reconciles silently to avoid duplicate
+notifications.
+
 Scheduling follows the machine's time zone. Startup, wake, reconnection, selection
 changes, clock changes, and schedule enabling reconcile only the current expected
 state; missed transitions are never replayed. Scheduling runs independently of

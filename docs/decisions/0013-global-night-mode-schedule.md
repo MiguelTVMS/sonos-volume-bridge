@@ -60,6 +60,13 @@ repeated saves, and saves with recurrence disabled are silent; there is no separ
 save-confirmation notification. The controller consumes
 notification intent once and clears superseded or recovery intent.
 
+Enabling a previously disabled schedule during a selected period applies Night Mode
+immediately and sends a start notification after speaker confirmation when On start or
+On start and end is selected. Enabling outside selected periods, enabling an already
+enabled schedule, and disabling scheduling do not notify. Disabling leaves the speaker
+state unchanged. The worker subsequently reconciles silently to avoid duplicate
+notifications.
+
 The shell uses Tauri desktop notifications on Windows and a persistent async
 D-Bus connection on Linux. The plugin's Linux path calls a blocking sender inside a
 Tokio task, which panics when zbus also uses Tokio. Linux delivery therefore awaits
