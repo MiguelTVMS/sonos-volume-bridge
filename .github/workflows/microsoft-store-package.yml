@@ -17,7 +17,15 @@ env:
 jobs:
   msix:
     name: Build Microsoft Store MSIX
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+          - os: windows-11-arm
+            arch: arm64
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@v1
@@ -25,7 +33,7 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: workspace
+          shared-key: workspace-Windows-${{ matrix.arch }}
       - uses: pnpm/action-setup@v6
         with:
           version: 12
@@ -39,9 +47,9 @@ jobs:
       - run: cargo tauri build --no-bundle
       - name: Build and validate the MSIX package
         shell: pwsh
-        run: ./scripts/build-msix.ps1
+        run: ./scripts/build-msix.ps1 -Architecture ${{ matrix.arch }}
       - uses: actions/upload-artifact@v7
         with:
-          name: microsoft-store-msix
+          name: microsoft-store-msix-${{ matrix.arch }}
           path: target/release/bundle/msix/*.msix
           if-no-files-found: error

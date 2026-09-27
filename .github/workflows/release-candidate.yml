@@ -259,7 +259,7 @@ jobs:
           if-no-files-found: error
   macos-direct:
     name: Sign and notarize macOS direct-download app
-    needs: [prepare-version, macos-app]
+    needs: [prepare-version, all-platform-builds]
     runs-on: macos-latest
     environment: apple-signing
     env:
@@ -403,7 +403,7 @@ jobs:
   macos-app-store:
     name: Sign macOS App Store package
     if: ${{ inputs.build_app_store }}
-    needs: [prepare-version, macos-app]
+    needs: [prepare-version, all-platform-builds]
     runs-on: macos-latest
     environment: apple-app-store
     env:
@@ -555,7 +555,15 @@ jobs:
   windows-app:
     name: Build Windows executable
     needs: prepare-version
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+          - os: windows-11-arm
+            arch: arm64
     steps:
       - uses: actions/checkout@v7
         with:
@@ -573,7 +581,7 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: workspace
+          shared-key: workspace-Windows-${{ matrix.arch }}
       - uses: pnpm/action-setup@v6
         with:
           version: 12
@@ -591,12 +599,14 @@ jobs:
           if (-not (Test-Path -LiteralPath 'target/release/sonos-volume-bridge.exe' -PathType Leaf)) {
             throw 'The Windows release executable was not generated.'
           }
+          . ./scripts/windows-architecture.ps1
+          Assert-WindowsExecutableArchitecture -Path target/release/sonos-volume-bridge.exe -Architecture '${{ matrix.arch }}'
           if (-not (Test-Path -LiteralPath 'ui/dist' -PathType Container)) {
             throw 'The frontend distribution was not generated.'
           }
       - uses: actions/upload-artifact@v7
         with:
-          name: windows-build-${{ needs.prepare-version.outputs.tag }}
+          name: windows-build-${{ matrix.arch }}-${{ needs.prepare-version.outputs.tag }}
           path: |
             target/release/sonos-volume-bridge.exe
             ui/dist
@@ -606,7 +616,15 @@ jobs:
   windows-nsis:
     name: Package Windows NSIS installer
     needs: [prepare-version, windows-app]
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+          - os: windows-11-arm
+            arch: arm64
     steps:
       - uses: actions/checkout@v7
         with:
@@ -624,11 +642,11 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: workspace
+          shared-key: workspace-Windows-${{ matrix.arch }}
       - run: cargo install tauri-cli --version '^2' --locked
       - uses: actions/download-artifact@v8
         with:
-          name: windows-build-${{ needs.prepare-version.outputs.tag }}
+          name: windows-build-${{ matrix.arch }}-${{ needs.prepare-version.outputs.tag }}
           path: .
       - name: Bundle NSIS from the compiled executable
         run: cargo tauri bundle --bundles nsis
@@ -639,17 +657,25 @@ jobs:
         run: |
           $installer = Get-ChildItem target/release/bundle -Recurse -Filter '*.exe' | Select-Object -First 1
           if ($null -eq $installer) { throw 'No NSIS installer was generated.' }
-          Copy-Item $installer.FullName "sonos-volume-bridge-$env:RELEASE_TAG-windows-unsigned.exe"
+          Copy-Item $installer.FullName "sonos-volume-bridge-$env:RELEASE_TAG-windows-${{ matrix.arch }}-unsigned.exe"
       - uses: actions/upload-artifact@v7
         with:
-          name: windows-release
-          path: sonos-volume-bridge-*-windows-unsigned.exe
+          name: windows-${{ matrix.arch }}-release
+          path: sonos-volume-bridge-*-windows-${{ matrix.arch }}-unsigned.exe
           if-no-files-found: error
 
   windows-msix:
     name: Package Microsoft Store MSIX
     needs: [prepare-version, windows-app]
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+          - os: windows-11-arm
+            arch: arm64
     steps:
       - uses: actions/checkout@v7
         with:
@@ -667,16 +693,23 @@ jobs:
           toolchain: stable
       - uses: actions/download-artifact@v8
         with:
-          name: windows-build-${{ needs.prepare-version.outputs.tag }}
+          name: windows-build-${{ matrix.arch }}-${{ needs.prepare-version.outputs.tag }}
           path: .
       - name: Build and validate the MSIX from the compiled executable
         shell: pwsh
-        run: ./scripts/build-msix.ps1
+        run: ./scripts/build-msix.ps1 -Architecture ${{ matrix.arch }}
       - uses: actions/upload-artifact@v7
         with:
-          name: microsoft-store-msix-${{ needs.prepare-version.outputs.tag }}
+          name: microsoft-store-msix-${{ matrix.arch }}-${{ needs.prepare-version.outputs.tag }}
           path: target/release/bundle/msix/*.msix
           if-no-files-found: error
+  all-platform-builds:
+    name: All platform builds and packages succeeded
+    needs: [macos-app, linux-deb, windows-app, windows-nsis, windows-msix]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'All platform and architecture builds succeeded.'
+
   publish-release:
     name: Publish GitHub Release
     needs:
@@ -731,7 +764,7 @@ jobs:
 
           ### Downloads
 
-          - **Windows:** Download and run the Windows installer.
+          - **Windows:** Download and run the Windows installer for your processor: x64 (AMD64) or ARM64.
           - **macOS:** Open the macOS DMG, then drag the app into Applications.
           - **Ubuntu:** Download and install the Debian package for your architecture (AMD64 or ARM64).
 
@@ -775,7 +808,7 @@ jobs:
   publish-microsoft-store:
     name: Submit GA release to Microsoft Store
     if: ${{ inputs.channel == 'GA' && inputs.publish_microsoft_store }}
-    needs: [prepare-version, windows-msix, publish-release]
+    needs: [prepare-version, all-platform-builds, windows-msix, publish-release]
     runs-on: windows-latest
     environment: microsoft-store
     env:
@@ -789,7 +822,8 @@ jobs:
           }
       - uses: actions/download-artifact@v8
         with:
-          name: microsoft-store-msix-${{ needs.prepare-version.outputs.tag }}
+          pattern: microsoft-store-msix-*-${{ needs.prepare-version.outputs.tag }}
+          merge-multiple: true
           path: microsoft-store-msix
       - name: Configure Microsoft Store Developer CLI
         uses: microsoft/microsoft-store-apppublisher@v1
@@ -813,10 +847,17 @@ jobs:
         shell: pwsh
         run: |
           $packages = @(Get-ChildItem 'microsoft-store-msix' -Filter '*.msix')
-          if ($packages.Count -ne 1) {
-            throw "Expected exactly one MSIX package, found $($packages.Count)."
+          if ($packages.Count -ne 2 -or @($packages | Where-Object Name -Like '*_x64.msix').Count -ne 1 -or @($packages | Where-Object Name -Like '*_arm64.msix').Count -ne 1) {
+            throw "Expected one x64 and one ARM64 MSIX package, found $($packages.Count)."
           }
-          msstore publish $packages[0].FullName -id $env:MICROSOFT_STORE_PRODUCT_ID --uploadTimeout 300
+          $sdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10/bin'
+          $makeAppx = Get-ChildItem $sdkRoot -Filter MakeAppx.exe -Recurse | Where-Object FullName -Match '\\x64\\MakeAppx\.exe$' | Sort-Object FullName -Descending | Select-Object -First 1
+          if ($null -eq $makeAppx) { throw 'MakeAppx was not found.' }
+          & $makeAppx.FullName bundle /d microsoft-store-msix /p SonosVolumeBridge.msixbundle /o
+          if ($LASTEXITCODE -ne 0) { throw 'MSIX bundle creation failed.' }
+          Compress-Archive -LiteralPath SonosVolumeBridge.msixbundle -DestinationPath SonosVolumeBridge.zip
+          Move-Item -LiteralPath SonosVolumeBridge.zip -Destination SonosVolumeBridge.msixupload
+          msstore publish . --inputFile SonosVolumeBridge.msixupload -id $env:MICROSOFT_STORE_PRODUCT_ID --uploadTimeout 300
           if ($LASTEXITCODE -ne 0) {
             throw 'Microsoft Store submission failed.'
           }

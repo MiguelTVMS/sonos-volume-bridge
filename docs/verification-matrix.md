@@ -538,3 +538,27 @@ The opt-in `cargo test -p sonos-volume-bridge native_development_notification_sm
 API success. It passed locally after the fix. Automated success does not prove a
 visible banner, native WebView layout, hardware timing or packaged delivery;
 complete the manual sequences above before release.
+
+### Windows installer and architecture coverage
+
+CI builds a normal NSIS installer on Windows x64 and ARM64. Packaging the custom
+template with the updated Tauri bundler failed with a missing Restart Manager
+macro before its include was added, and succeeded after the fix. Keep this
+production packaging check in PR CI. The architecture script checks both valid
+PE machine types, rejects malformed files and invokes the MSIX packaging entry
+point with mismatched input to verify it fails before packaging. Local validation
+on ARM64 covers actual MSIX pack/unpack; x64 packaging is verified on its CI runner.
+
+Install the matching normal NSIS package, launch it from its installed location,
+then set notifications to On start and end. Save a change that excludes the current
+half-hour, and another that includes it. Confirm both speaker state changes and
+that Night Mode schedule ended/started appear in Windows Notification Center.
+Save again without crossing a boundary and confirm no additional notification.
+Restore the original grid. Automated delivery acceptance cannot prove that the
+Windows shell displayed a notification; record visible delivery separately.
+
+Windows unpackaged sender registration includes a persistent copy of the bundled
+PNG icon through `IconUri`, before the notifier is created. A regression test
+asserts the display assets exist at sender creation time. On the locally installed
+ARM64 NSIS build, the user confirmed notifications appear; verify the branded
+icon on a new notification after updating (old notifications may keep cached art).

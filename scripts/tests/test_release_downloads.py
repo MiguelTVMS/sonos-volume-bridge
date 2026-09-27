@@ -6,7 +6,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "prepare-release-downloads.sh"
-SUFFIXES = ("macos.zip", "macos.dmg", "windows-unsigned.exe", "linux-amd64.deb", "linux-arm64.deb")
+SUFFIXES = ("macos.zip", "macos.dmg", "windows-x64-unsigned.exe", "windows-arm64-unsigned.exe", "linux-amd64.deb", "linux-arm64.deb")
 
 
 class ReleaseDownloadsTests(unittest.TestCase):
@@ -19,7 +19,7 @@ class ReleaseDownloadsTests(unittest.TestCase):
                     links.append(dict(attrs).get("href", ""))
 
         Links().feed((SCRIPT.parent.parent / "pages" / "index.html").read_text())
-        for suffix in ("macos.dmg", "linux-amd64.deb", "linux-arm64.deb"):
+        for suffix in ("macos.dmg", "windows-x64-unsigned.exe", "windows-arm64-unsigned.exe", "linux-amd64.deb", "linux-arm64.deb"):
             self.assertIn(suffix, SUFFIXES)
             self.assertTrue(any(link.endswith(
                 f"/releases/latest/download/sonos-volume-bridge-{suffix}"
@@ -32,6 +32,7 @@ class ReleaseDownloadsTests(unittest.TestCase):
                 (root / f"sonos-volume-bridge-v1.2.3-{suffix}").write_bytes(suffix.encode())
             for _ in range(2):
                 subprocess.run(["bash", str(SCRIPT), directory, "v1.2.3"], check=True)
+            self.assertEqual((root / "sonos-volume-bridge-windows-unsigned.exe").read_bytes(), b"windows-x64-unsigned.exe")
             for suffix in SUFFIXES:
                 self.assertEqual((root / f"sonos-volume-bridge-{suffix}").read_bytes(), suffix.encode())
                 self.assertEqual((root / f"sonos-volume-bridge-v1.2.3-{suffix}").read_bytes(), suffix.encode())

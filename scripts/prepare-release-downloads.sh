@@ -3,7 +3,7 @@
 set -euo pipefail
 assets_dir="${1:?Usage: prepare-release-downloads.sh ASSETS_DIR RELEASE_TAG}"
 release_tag="${2:?Release tag is required}"
-suffixes=(macos.zip macos.dmg windows-unsigned.exe linux-amd64.deb linux-arm64.deb)
+suffixes=(macos.zip macos.dmg windows-x64-unsigned.exe windows-arm64-unsigned.exe linux-amd64.deb linux-arm64.deb)
 
 # Validate every input before creating aliases.
 for suffix in "${suffixes[@]}"; do
@@ -17,3 +17,7 @@ for suffix in "${suffixes[@]}"; do
   cp "$assets_dir/sonos-volume-bridge-$release_tag-$suffix" \
     "$assets_dir/sonos-volume-bridge-$suffix"
 done
+
+# Keep existing x64 download links working.
+cp "$assets_dir/sonos-volume-bridge-windows-x64-unsigned.exe" \
+  "$assets_dir/sonos-volume-bridge-windows-unsigned.exe"

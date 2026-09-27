@@ -202,6 +202,8 @@ to add fixed filenames for direct downloads, alongside the versioned installers:
 - `sonos-volume-bridge-macos.dmg` (website download)
 - `sonos-volume-bridge-macos.zip` (compatibility archive)
 - `sonos-volume-bridge-windows-unsigned.exe`
+- `sonos-volume-bridge-windows-x64-unsigned.exe`
+- `sonos-volume-bridge-windows-arm64-unsigned.exe`
 - `sonos-volume-bridge-linux-amd64.deb`
 - `sonos-volume-bridge-linux-arm64.deb`
 
@@ -215,3 +217,31 @@ job also signs the disk image, requires an Accepted notarization response, stapl
 and validates its ticket, and verifies integrity and Gatekeeper assessment before
 upload. Publish the first GA release containing the DMG before deploying the new
 website link; earlier releases do not provide the stable DMG asset.
+
+## Windows native architecture builds
+
+Windows builds run on `windows-latest` for x64 (AMD64) and `windows-11-arm`
+for ARM64. Each executable, NSIS installer and Store MSIX has a distinct
+architecture-qualified artifact name. Executable PE headers are checked before
+publishing build artifacts and before MSIX packaging; a mismatched requested
+architecture fails before packaging. MSIX staging, manifest and filenames use
+the executable architecture. Store submission combines both packages into one
+bundle/upload so one architecture does not replace the other in a later submission.
+The legacy architecture-free direct download remains an x64 compatibility alias.
+
+Windows PR validation runs the native tests and builds an NSIS installer on both
+architectures. This exercises the custom installer with the actual Tauri bundler,
+including its Restart Manager includes. After upgrading Tauri, verify this build
+before releasing: the template originally omitted `Win/RestartManager.nsh`,
+which caused NSIS compilation to fail before producing an installer.
+
+## Release build gate
+
+The `all-platform-builds` job requires successful macOS executable, Ubuntu
+AMD64/ARM64 DEB, Windows x64/ARM64 executable, NSIS and MSIX jobs. Default GitHub
+success semantics block the gate on any failed, cancelled or skipped required
+build. macOS signing/notarization and optional Mac App Store packaging depend
+on this gate; Microsoft Store submission also waits for GitHub publication.
+Mac App Store upload remains manual. Release graph regression tests check all
+required dependencies and reject cycles. Optional Apple packaging is deliberately
+outside the gate so leaving it unchecked cannot skip the entire release.

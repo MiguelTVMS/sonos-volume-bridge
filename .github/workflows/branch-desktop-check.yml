@@ -8,7 +8,8 @@ on:
         type: boolean
         default: false
   push:
-    branches: [feat/night-mode-schedule, feat/arm64-build]
+    branches:
+      [feat/night-mode-schedule, feat/arm64-build, fix/windows-schedule-status]
 
 permissions:
   contents: read
@@ -27,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, ubuntu-24.04-arm]
+        os: [windows-latest, windows-11-arm, ubuntu-latest, ubuntu-24.04-arm]
     steps:
       - uses: actions/checkout@v7
       - if: runner.os == 'Linux'
@@ -58,6 +59,13 @@ jobs:
       - if: inputs.ui_demo
         run: cargo test -p sonos-volume-bridge --features ui-demo
       - run: pnpm dlx @tauri-apps/cli@2 build --debug --no-bundle --no-sign ${{ inputs.ui_demo && '--features ui-demo' || '' }}
+      - name: Verify Windows architecture and package the installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          . ./scripts/windows-architecture.ps1
+          Assert-WindowsExecutableArchitecture -Path target/debug/sonos-volume-bridge.exe -Architecture '${{ runner.arch }}'
+          pnpm dlx @tauri-apps/cli@2 bundle --debug --bundles nsis
       - name: Verify Linux ARM64 executable
         if: runner.os == 'Linux' && runner.arch == 'ARM64'
         run: |
@@ -69,4 +77,5 @@ jobs:
           path: |
             target/debug/sonos-volume-bridge.exe
             target/debug/sonos-volume-bridge
+            target/debug/bundle/nsis/*.exe
           if-no-files-found: error
