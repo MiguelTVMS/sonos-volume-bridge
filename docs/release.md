@@ -262,26 +262,32 @@ a misleading architecture filename, and mismatched package versions.
 
 ## Retry or debug an existing Microsoft Store release
 
-Use **Actions → Microsoft Store Package → Run workflow** with the desired
-`release_tag` and `mode: validate` first. This finds the retained combined upload
-from the original release run, verifies the selected version and both Windows
-architectures, and parses the production publishing command with the pinned
-Store CLI. The CLI requires local configuration even for help; validation temporarily uses
-non-authenticating placeholders and restores the original configuration afterward.
-Validation does not authenticate, upload, or modify Store state.
-It does not rebuild packages, create a release, or bump the version.
+Use **Actions → Microsoft Store Publish → Run workflow**, leave the workflow
+source on `develop`, and enter the desired `release_tag`. Leave `dry_run` enabled
+(the default) to validate without authenticating or uploading. Disable it explicitly
+for an actual Store submission. GitHub does not provide a dynamic tag-picker input;
+the tag field is
+validated before submission, rejecting branches, unknown tags, drafts and
+prereleases. Only existing published GA releases are accepted.
 
-For an actual retry, run from `develop` with the same tag and `mode: submit`.
-Only published GA releases are accepted. The existing protected Microsoft Store
-environment still applies. The retry reuses the exact retained artifact even
-when the original run failed at Store submission. Expired artifacts and runs
-without successful package verification and GitHub publication are rejected;
-there is no automatic rebuild fallback. Manual and normal submissions share a
-concurrency group to prevent overlapping Store changes.
+The release flow calls this same reusable workflow after successful builds and
+GitHub publication when Store submission is selected, passing `dry_run: false`.
+Both paths find the retained
+combined upload from the original release run, verify the selected version and
+both Windows architectures, and validate the publishing command with the pinned
+Store CLI before entering the protected Microsoft Store environment. Submissions
+share a concurrency group to prevent overlapping Store changes.
 
-Leave `release_tag` empty in validation mode to retain the original standalone
-package-build workflow. Run it from the desired source ref when building fresh
-packages is explicitly intended.
+The retry reuses the retained artifact even when the original Store submission
+failed. Expired artifacts and runs without successful package verification and
+GitHub publication are rejected; there is no automatic rebuild fallback or
+version bump. **Microsoft Store Package** remains a separate build-only workflow.
+
+CLI preflight uses non-authenticating placeholder configuration for help parsing
+and restores the original configuration afterward. It does not authenticate or
+upload. When `dry_run` is false, the subsequent protected submission job performs
+the actual upload. Dry runs skip that job entirely, including environment approval
+and authentication.
 
 The CLI is pinned to `v0.4.3`, whose publish option is `--inputDirectory`.
 The shared publishing script requires a directory containing exactly one

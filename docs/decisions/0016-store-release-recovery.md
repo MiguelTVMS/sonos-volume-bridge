@@ -10,9 +10,13 @@ require successful package verification and GitHub publication even if submissio
 failed. Verify the bundle and embedded package version, identity and architecture
 before using it. Reject expired or incomplete artifacts rather than rebuilding.
 
-Default to validation without credentials or remote mutations. Actual submission
-is an explicit mode, accepts GA releases from develop, and uses the existing
-protected Store environment. Serialize manual and normal Store submissions.
+Use one reusable Microsoft Store Publish workflow for release calls and manual
+dispatch. Both accept a required published GA tag and a dry-run flag that defaults
+to true. The release caller explicitly disables dry run when publication is selected.
+Validate the tag text input because GitHub has no dynamic tag picker. Require execution
+from develop. Dry runs skip authentication and protected submission entirely.
+Run credential-free preflight before the protected submission job, and
+serialize manual and normal submissions. Keep standalone packaging separate.
 
 Pin the Store CLI version and share the production command between both paths.
 Exercise its argument parsing against the actual CLI in native CI using --help.

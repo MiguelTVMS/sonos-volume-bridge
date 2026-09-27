@@ -1,0 +1,111 @@
+name: Microsoft Store Publish
+run-name: Microsoft Store ${{ inputs.release_tag }} (dry run = ${{ inputs.dry_run }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing published GA tag (for example v1.5.3); branches are rejected
+        required: true
+        type: string
+      dry_run:
+        description: Validate the existing upload and CLI without authenticating or publishing
+        required: false
+        default: true
+        type: boolean
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Existing published GA tag
+        required: true
+        type: string
+      dry_run:
+        description: Validate the existing upload and CLI without authenticating or publishing
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  resolve-release:
+    name: Resolve existing release upload
+    runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.resolve.outputs.run_id }}
+      artifact: ${{ steps.resolve.outputs.artifact }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: python3 scripts/resolve-store-upload.py --tag "$RELEASE_TAG" --mode submit
+
+  validate-release:
+    name: Validate existing release and Store CLI
+    needs: resolve-release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.resolve-release.outputs.artifact }}
+          run-id: ${{ needs.resolve-release.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: store-upload
+      - name: Verify selected version and both architectures
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: python scripts/resolve-store-upload.py --tag $env:RELEASE_TAG --verify-directory store-upload
+      - uses: microsoft/microsoft-store-apppublisher@v1
+        with:
+          version: v0.4.3
+      - name: Validate the actual publishing command without upload
+        shell: pwsh
+        run: ./scripts/publish-msstore.ps1 -InputDirectory store-upload -ValidateOnly
+
+  submit-release:
+    name: Submit existing GA release to Microsoft Store
+    if: ${{ !inputs.dry_run }}
+    needs: [resolve-release, validate-release]
+    runs-on: windows-latest
+    environment: microsoft-store
+    concurrency:
+      group: microsoft-store-submission
+      cancel-in-progress: false
+    env:
+      MICROSOFT_STORE_PRODUCT_ID: ${{ vars.MICROSOFT_STORE_PRODUCT_ID }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.resolve-release.outputs.artifact }}
+          run-id: ${{ needs.resolve-release.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: store-upload
+      - uses: microsoft/microsoft-store-apppublisher@v1
+        with:
+          version: v0.4.3
+      - name: Authenticate with Partner Center
+        shell: pwsh
+        env:
+          AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+          SELLER_ID: ${{ secrets.SELLER_ID }}
+          AZURE_AD_APPLICATION_CLIENT_ID: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          AZURE_AD_APPLICATION_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+        run: |
+          msstore reconfigure --tenantId $env:AZURE_AD_TENANT_ID --sellerId $env:SELLER_ID --clientId $env:AZURE_AD_APPLICATION_CLIENT_ID --clientSecret $env:AZURE_AD_APPLICATION_SECRET
+          if ($LASTEXITCODE -ne 0) { throw 'Microsoft Store authentication failed.' }
+      - name: Submit the existing verified upload
+        shell: pwsh
+        run: ./scripts/publish-msstore.ps1 -InputDirectory store-upload

@@ -2,17 +2,6 @@ name: Microsoft Store Package
 
 on:
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: Existing release tag to retry (leave empty to build new packages)
-        required: false
-        type: string
-      mode:
-        description: Validate without upload, or submit the existing GA release
-        required: true
-        type: choice
-        default: validate
-        options: [validate, submit]
 
 permissions:
   contents: read
@@ -29,7 +18,6 @@ env:
 jobs:
   msix:
     name: Build Microsoft Store MSIX
-    if: inputs.release_tag == '' && inputs.mode == 'validate'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -85,85 +73,3 @@ jobs:
           name: microsoft-store-upload
           path: store-upload/*.msixupload
           if-no-files-found: error
-
-  resolve-release:
-    name: Resolve existing release upload
-    if: inputs.release_tag != '' || inputs.mode == 'submit'
-    runs-on: ubuntu-latest
-    outputs:
-      run_id: ${{ steps.resolve.outputs.run_id }}
-      artifact: ${{ steps.resolve.outputs.artifact }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - id: resolve
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
-          MODE: ${{ inputs.mode }}
-        run: python3 scripts/resolve-store-upload.py --tag "$RELEASE_TAG" --mode "$MODE"
-
-  validate-release:
-    name: Validate existing release and Store CLI
-    needs: resolve-release
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.resolve-release.outputs.artifact }}
-          run-id: ${{ needs.resolve-release.outputs.run_id }}
-          github-token: ${{ github.token }}
-          path: store-upload
-      - name: Verify selected version and both architectures
-        shell: pwsh
-        env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
-        run: python scripts/resolve-store-upload.py --tag $env:RELEASE_TAG --verify-directory store-upload
-      - uses: microsoft/microsoft-store-apppublisher@v1
-        with:
-          version: v0.4.3
-      - name: Validate the actual publishing command without upload
-        shell: pwsh
-        run: ./scripts/publish-msstore.ps1 -InputDirectory store-upload -ValidateOnly
-
-  submit-release:
-    name: Submit existing GA release to Microsoft Store
-    if: inputs.mode == 'submit'
-    needs: [resolve-release, validate-release]
-    runs-on: windows-latest
-    environment: microsoft-store
-    concurrency:
-      group: microsoft-store-submission
-      cancel-in-progress: false
-    env:
-      MICROSOFT_STORE_PRODUCT_ID: ${{ vars.MICROSOFT_STORE_PRODUCT_ID }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.resolve-release.outputs.artifact }}
-          run-id: ${{ needs.resolve-release.outputs.run_id }}
-          github-token: ${{ github.token }}
-          path: store-upload
-      - uses: microsoft/microsoft-store-apppublisher@v1
-        with:
-          version: v0.4.3
-      - name: Authenticate with Partner Center
-        shell: pwsh
-        env:
-          AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
-          SELLER_ID: ${{ secrets.SELLER_ID }}
-          AZURE_AD_APPLICATION_CLIENT_ID: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
-          AZURE_AD_APPLICATION_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
-        run: |
-          msstore reconfigure --tenantId $env:AZURE_AD_TENANT_ID --sellerId $env:SELLER_ID --clientId $env:AZURE_AD_APPLICATION_CLIENT_ID --clientSecret $env:AZURE_AD_APPLICATION_SECRET
-          if ($LASTEXITCODE -ne 0) { throw 'Microsoft Store authentication failed.' }
-      - name: Submit the existing verified upload
-        shell: pwsh
-        run: ./scripts/publish-msstore.ps1 -InputDirectory store-upload

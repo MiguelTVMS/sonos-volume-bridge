@@ -1,6 +1,7 @@
 """Tag-based Store recovery without network access or Partner Center mutations."""
 import importlib.util
 import io
+import re
 from pathlib import Path
 import tempfile
 import unittest
@@ -53,8 +54,13 @@ class StoreUploadTests(unittest.TestCase):
             {'jobs': [{'name': name, 'conclusion': 'success'} for name in
                       ('Build and verify combined Microsoft Store upload', 'Publish GitHub Release')]},
         ]
-        with patch.object(module, 'gh', side_effect=replies):
-            self.assertEqual(module.resolve('v1.2.3', 'submit', 'owner/repo', 'refs/heads/develop'), (42, 'microsoft-store-upload-v1.2.3'))
+        # Automatic release calls run before the parent workflow is complete;
+        # retries must also accept a parent that failed only at Store submission.
+        for conclusion in (None, 'failure', 'success'):
+            replies[1]['workflow_runs'][0]['conclusion'] = conclusion
+            with patch.object(module, 'gh', side_effect=replies):
+                self.assertEqual(module.resolve('v1.2.3', 'submit', 'owner/repo', 'refs/heads/develop'), (42, 'microsoft-store-upload-v1.2.3'))
+
 
     def test_rejects_unpublished_expired_and_unverified_artifacts(self):
         for artifacts, jobs in (([], []), ([{'name': 'microsoft-store-upload-v1.2.3', 'expired': True}], []),
@@ -67,15 +73,36 @@ class StoreUploadTests(unittest.TestCase):
 
     def test_submission_requires_ga_and_trusted_dispatch(self):
         with patch.object(module, 'gh') as mocked:
-            for tag, ref in (('--help', 'refs/heads/develop'), ('v1.2.3', 'refs/heads/feature')):
+            for tag, ref in (('--help', 'refs/heads/develop'), ('develop', 'refs/heads/develop'), ('', 'refs/heads/develop'), ('v1.2.3', 'refs/heads/feature')):
                 with self.assertRaises(ValueError):
                     module.resolve(tag, 'submit', 'owner/repo', ref)
             mocked.assert_not_called()
         with patch.object(module, 'gh', return_value={'isDraft': False, 'isPrerelease': True, 'tagName': 'v1.2.3'}), self.assertRaises(ValueError):
             module.resolve('v1.2.3', 'submit', 'owner/repo', 'refs/heads/develop')
 
+    def test_manual_and_release_publish_share_tag_and_dry_run_workflow(self):
+        text = (ROOT / '.github/workflows/microsoft-store-publish.yml').read_text()
+        for event in ('workflow_dispatch', 'workflow_call'):
+            block = text.split(f'  {event}:', 1)[1].split('\n\n', 1)[0].split('  workflow_call:', 1)[0]
+            self.assertEqual(re.findall(r'^      (\w+):', block, re.M), ['release_tag', 'dry_run'])
+            self.assertIn('required: true', block)
+            self.assertIn('default: true', block)
+            self.assertIn('type: boolean', block)
+        self.assertIn('--mode submit', text)
+        submission = text.split('  submit-release:', 1)[1]
+        self.assertIn('if: ${{ !inputs.dry_run }}', submission)
+        self.assertNotIn('secrets.', text.split('  submit-release:', 1)[0])
+        self.assertNotIn('msstore reconfigure', text.split('  submit-release:', 1)[0])
+        self.assertIn('environment: microsoft-store', text)
+        self.assertIn('group: microsoft-store-submission', text)
+        self.assertIn('needs: [resolve-release, validate-release]', text)
+        self.assertNotIn('build-msix', text)
+        package = (ROOT / '.github/workflows/microsoft-store-package.yml').read_text()
+        self.assertNotIn('publish-msstore', package)
+        self.assertNotIn('secrets.', package)
+
     def test_workflows_use_the_shared_tested_cli_command(self):
-        for name in ('release-candidate.yml', 'microsoft-store-package.yml'):
+        for name in ('microsoft-store-publish.yml',):
             text = (ROOT / '.github/workflows' / name).read_text()
             self.assertNotIn('--inputFile', text)
             self.assertIn('./scripts/publish-msstore.ps1 -InputDirectory store-upload', text)
