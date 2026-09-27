@@ -1,5 +1,8 @@
 """Release dependency graph checks (no GitHub credentials or network required)."""
 import re
+import os
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -43,14 +46,49 @@ class ReleaseWorkflowTests(unittest.TestCase):
         for job in graph:
             visit(job, set())
 
-    def test_downstream_checkouts_use_the_prepared_commit(self):
+    def test_downstream_checkouts_pin_a_commit_from_trusted_history(self):
         graph = jobs(WORKFLOW.read_text())
         for name, body in graph.items():
             if name == 'prepare-version':
                 continue
             for checkout in body.split('uses: actions/checkout@')[1:]:
-                settings = checkout.split('      - ', 1)[0]
-                self.assertIn('ref: ${{ needs.prepare-version.outputs.commit }}', settings, name)
+                settings, following = checkout.split('      - ', 1)
+                self.assertIn('ref: develop', settings, name)
+                self.assertIn('fetch-depth: 0', settings, name)
+                self.assertIn('persist-credentials: false', settings, name)
+                pin = following.split('      - ', 1)[0]
+                self.assertIn('name: Pin the trusted release commit', pin, name)
+                self.assertIn('RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}', pin)
+                self.assertIn('[[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]', pin)
+                ancestry = pin.index('git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop')
+                detach = pin.index('git checkout --detach "$RELEASE_COMMIT"')
+                self.assertLess(ancestry, detach)
+                self.assertIn('test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"', pin)
+
+    def test_release_pin_survives_branch_advance_and_rejects_untrusted_commits(self):
+        body = jobs(WORKFLOW.read_text())['macos-app']
+        step = body.split('name: Pin the trusted release commit', 1)[1].split('      - ', 1)[0]
+        script = '\n'.join(line[10:] for line in step.split('        run: |\n', 1)[1].splitlines())
+        with tempfile.TemporaryDirectory() as directory:
+            def git(*args):
+                return subprocess.check_output(['git', *args], cwd=directory, text=True, stderr=subprocess.DEVNULL).strip()
+            git('init', '-b', 'develop')
+            git('config', 'user.name', 'Test')
+            git('config', 'user.email', 'test@example.invalid')
+            git('commit', '--allow-empty', '-m', 'release')
+            release = git('rev-parse', 'HEAD')
+            git('commit', '--allow-empty', '-m', 'later approved change')
+            tip = git('rev-parse', 'HEAD')
+            git('update-ref', 'refs/remotes/origin/develop', tip)
+            git('checkout', '--orphan', 'unrelated')
+            git('commit', '--allow-empty', '-m', 'unrelated')
+            unrelated = git('rev-parse', 'HEAD')
+            for commit, accepted in ((release, True), (unrelated, False), ('--help', False)):
+                git('checkout', 'develop')
+                result = subprocess.run(['bash', '-e', '-o', 'pipefail', '-c', script], cwd=directory,
+                                        env=dict(os.environ, RELEASE_COMMIT=commit), capture_output=True)
+                self.assertEqual(result.returncode == 0, accepted, result.stderr)
+                self.assertEqual(git('rev-parse', 'HEAD'), release if accepted else tip)
 
     def test_combined_store_upload_is_built_before_publication_and_reused(self):
         graph = jobs(WORKFLOW.read_text())

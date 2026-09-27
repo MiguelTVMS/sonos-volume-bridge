@@ -152,11 +152,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
-      - name: Verify the checked-out release commit
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
-        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -210,11 +217,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
-      - name: Verify the checked-out release commit
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
-        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - name: Cache Linux desktop package archives
         uses: actions/cache@v6
         with:
@@ -270,11 +284,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
-      - name: Verify the checked-out release commit
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
-        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -412,11 +433,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
-      - name: Verify the checked-out release commit
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
-        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -567,15 +595,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
-      - name: Verify the checked-out release commit
-        shell: pwsh
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
         run: |
-          if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
-            throw 'The checked-out revision does not match the release commit.'
-          }
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -628,15 +659,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
-      - name: Verify the checked-out release commit
-        shell: pwsh
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
         run: |
-          if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
-            throw 'The checked-out revision does not match the release commit.'
-          }
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -679,15 +713,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
-      - name: Verify the checked-out release commit
-        shell: pwsh
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
         run: |
-          if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
-            throw 'The checked-out revision does not match the release commit.'
-          }
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -710,7 +747,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: actions/download-artifact@v8
         with:
           pattern: microsoft-store-msix-*-${{ needs.prepare-version.outputs.tag }}
@@ -748,9 +796,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
+          ref: develop
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: actions/download-artifact@v8
         with:
           pattern: "*-release"
@@ -823,9 +880,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
+          ref: develop
           fetch-depth: 0
           persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - name: Propose the exact published release
         env:
           GH_TOKEN: ${{ github.token }}

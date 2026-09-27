@@ -281,7 +281,9 @@ activation registration; in-place updates preserve them (ADR 0013).
 
 ## Release artifact flow
 
-Release jobs consume the prepared commit rather than a moving branch. Native
+Release jobs verify the prepared commit belongs to trusted `develop` history,
+then detach at that exact commit before executing release code. Moving the branch
+forward does not change or invalidate the selected release. Native
 Windows x64/ARM64 MSIX outputs are combined and verified in an unprivileged job
 before the all-platform build gate. Signing follows that gate; publication also
 requires successful Mac App Store packaging when requested. Store submission

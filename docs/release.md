@@ -26,8 +26,9 @@ to skip Store submission. Check it for a GA release when you want to upload the
 MSIX after GitHub publication succeeds. Alpha and Beta never submit, even when
 checked. Windows installers and MSIX packages are still built normally.
 
-The workflow validates `develop`, commits the version bump to `develop`, pins every subsequent build, packaging, signing, and publication checkout to
-the prepared release commit and verifies it before building, creates and pushes its annotated
+The workflow validates `develop`, commits the version bump to `develop`, verifies that the prepared commit belongs to trusted `develop` history, then
+detaches every subsequent build, packaging, signing, and publication checkout at
+that exact commit before executing release code, creates and pushes its annotated
 `vX.Y.Z` tag with the GitHub Actions bot identity, then creates or updates the
 GitHub Release with downloadable assets, a channel-aware installation and signing summary, and GitHub-generated change notes. Pull requests with `feature`, `enhancement`, `bug`, `fix`, `maintenance`, `refactor`, or `documentation` labels are grouped in those notes. It never merges branches. After a GA release is published, a separate job opens
 an approval-required PR from a release branch pinned to the validated release
