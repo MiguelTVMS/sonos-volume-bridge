@@ -306,3 +306,9 @@ a successful commit alone is insufficient. An incomplete check fails the job and
 requires inspection before any publishing retry. These read-only checks do not
 resubmit. Dry run does not query authenticated Store state and cannot establish
 remote acceptance. Certification and public availability remain separate.
+
+Store submission metadata may represent the combined upload as one Neutral
+package. Accept that representation only when its uploaded filename and version
+match the retained artifact and local verification confirms both embedded x64
+and ARM64 packages. Neutral alone does not prove architecture coverage. This
+submission check does not establish certification or public availability.

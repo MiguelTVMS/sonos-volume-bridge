@@ -300,3 +300,9 @@ with a published GA tag. It validates the tag and bundle before protected submis
 standalone packaging remains separate. Both paths share the pinned CLI publishing
 script and submission concurrency group. Publishing selects the upload file directly
 and verifies Store-reported package versions and architectures after commit. See [release recovery](release.md#retry-or-debug-an-existing-microsoft-store-release).
+
+Store submission metadata may represent the combined upload as one Neutral
+package. Accept that representation only when its uploaded filename and version
+match the retained artifact and local verification confirms both embedded x64
+and ARM64 packages. Neutral alone does not prove architecture coverage. This
+submission check does not establish certification or public availability.
