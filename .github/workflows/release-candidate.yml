@@ -152,7 +152,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: develop
+          ref: ${{ needs.prepare-version.outputs.commit }}
       - name: Verify the checked-out release commit
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
@@ -210,7 +210,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: develop
+          ref: ${{ needs.prepare-version.outputs.commit }}
       - name: Verify the checked-out release commit
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
@@ -270,7 +270,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: develop
+          ref: ${{ needs.prepare-version.outputs.commit }}
       - name: Verify the checked-out release commit
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
@@ -412,7 +412,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: develop
+          ref: ${{ needs.prepare-version.outputs.commit }}
       - name: Verify the checked-out release commit
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
@@ -567,7 +567,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: develop
+          ref: ${{ needs.prepare-version.outputs.commit }}
       - name: Verify the checked-out release commit
         shell: pwsh
         env:
@@ -628,7 +628,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: develop
+          ref: ${{ needs.prepare-version.outputs.commit }}
       - name: Verify the checked-out release commit
         shell: pwsh
         env:
@@ -679,7 +679,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: develop
+          ref: ${{ needs.prepare-version.outputs.commit }}
       - name: Verify the checked-out release commit
         shell: pwsh
         env:
@@ -703,24 +703,52 @@ jobs:
           name: microsoft-store-msix-${{ matrix.arch }}-${{ needs.prepare-version.outputs.tag }}
           path: target/release/bundle/msix/*.msix
           if-no-files-found: error
+  windows-store-upload:
+    name: Build and verify combined Microsoft Store upload
+    needs: [prepare-version, windows-msix]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare-version.outputs.commit }}
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: microsoft-store-msix-*-${{ needs.prepare-version.outputs.tag }}
+          merge-multiple: true
+          path: microsoft-store-msix
+      - name: Build and verify both architecture packages in one upload
+        shell: pwsh
+        run: ./scripts/build-msix-upload.ps1 -PackageDirectory microsoft-store-msix -OutputPath store-upload/SonosVolumeBridge.msixupload
+      - uses: actions/upload-artifact@v7
+        with:
+          name: microsoft-store-upload-${{ needs.prepare-version.outputs.tag }}
+          path: store-upload/*.msixupload
+          if-no-files-found: error
+
   all-platform-builds:
     name: All platform builds and packages succeeded
-    needs: [macos-app, linux-deb, windows-app, windows-nsis, windows-msix]
+    needs: [macos-app, linux-deb, windows-app, windows-nsis, windows-msix, windows-store-upload]
     runs-on: ubuntu-latest
     steps:
       - run: echo 'All platform and architecture builds succeeded.'
 
   publish-release:
     name: Publish GitHub Release
-    needs:
-      [prepare-version, macos-direct, linux-deb, windows-nsis, windows-msix]
+    needs: [prepare-version, all-platform-builds, macos-direct, macos-app-store]
+    if: >-
+      ${{ !cancelled() &&
+          needs.prepare-version.result == 'success' &&
+          needs.all-platform-builds.result == 'success' &&
+          needs.macos-direct.result == 'success' &&
+          (needs.macos-app-store.result == 'success' ||
+           (!inputs.build_app_store && needs.macos-app-store.result == 'skipped')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: develop
+          ref: ${{ needs.prepare-version.outputs.commit }}
           fetch-depth: 0
           persist-credentials: true
       - uses: actions/download-artifact@v8
@@ -786,7 +814,7 @@ jobs:
 
   propose-main-promotion:
     name: Open stable release PR into main
-    if: ${{ inputs.channel == 'GA' }}
+    if: ${{ !cancelled() && inputs.channel == 'GA' && needs.prepare-version.result == 'success' && needs.publish-release.result == 'success' }}
     needs: [prepare-version, publish-release]
     runs-on: ubuntu-latest
     permissions:
@@ -807,7 +835,7 @@ jobs:
 
   publish-microsoft-store:
     name: Submit GA release to Microsoft Store
-    if: ${{ inputs.channel == 'GA' && inputs.publish_microsoft_store }}
+    if: ${{ !cancelled() && inputs.channel == 'GA' && inputs.publish_microsoft_store && needs.prepare-version.result == 'success' && needs.all-platform-builds.result == 'success' && needs.windows-msix.result == 'success' && needs.publish-release.result == 'success' }}
     needs: [prepare-version, all-platform-builds, windows-msix, publish-release]
     runs-on: windows-latest
     environment: microsoft-store
@@ -822,9 +850,8 @@ jobs:
           }
       - uses: actions/download-artifact@v8
         with:
-          pattern: microsoft-store-msix-*-${{ needs.prepare-version.outputs.tag }}
-          merge-multiple: true
-          path: microsoft-store-msix
+          name: microsoft-store-upload-${{ needs.prepare-version.outputs.tag }}
+          path: store-upload
       - name: Configure Microsoft Store Developer CLI
         uses: microsoft/microsoft-store-apppublisher@v1
       - name: Authenticate with Partner Center
@@ -846,18 +873,7 @@ jobs:
       - name: Submit the package to Microsoft Store
         shell: pwsh
         run: |
-          $packages = @(Get-ChildItem 'microsoft-store-msix' -Filter '*.msix')
-          if ($packages.Count -ne 2 -or @($packages | Where-Object Name -Like '*_x64.msix').Count -ne 1 -or @($packages | Where-Object Name -Like '*_arm64.msix').Count -ne 1) {
-            throw "Expected one x64 and one ARM64 MSIX package, found $($packages.Count)."
-          }
-          $sdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10/bin'
-          $makeAppx = Get-ChildItem $sdkRoot -Filter MakeAppx.exe -Recurse | Where-Object FullName -Match '\\x64\\MakeAppx\.exe$' | Sort-Object FullName -Descending | Select-Object -First 1
-          if ($null -eq $makeAppx) { throw 'MakeAppx was not found.' }
-          & $makeAppx.FullName bundle /d microsoft-store-msix /p SonosVolumeBridge.msixbundle /o
-          if ($LASTEXITCODE -ne 0) { throw 'MSIX bundle creation failed.' }
-          Compress-Archive -LiteralPath SonosVolumeBridge.msixbundle -DestinationPath SonosVolumeBridge.zip
-          Move-Item -LiteralPath SonosVolumeBridge.zip -Destination SonosVolumeBridge.msixupload
-          msstore publish . --inputFile SonosVolumeBridge.msixupload -id $env:MICROSOFT_STORE_PRODUCT_ID --uploadTimeout 300
+          msstore publish . --inputFile store-upload/SonosVolumeBridge.msixupload -id $env:MICROSOFT_STORE_PRODUCT_ID --uploadTimeout 300
           if ($LASTEXITCODE -ne 0) {
             throw 'Microsoft Store submission failed.'
           }

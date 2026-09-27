@@ -53,3 +53,22 @@ jobs:
           name: microsoft-store-msix-${{ matrix.arch }}
           path: target/release/bundle/msix/*.msix
           if-no-files-found: error
+
+  upload:
+    name: Build combined Store upload
+    needs: msix
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: microsoft-store-msix-*
+          merge-multiple: true
+          path: microsoft-store-msix
+      - shell: pwsh
+        run: ./scripts/build-msix-upload.ps1 -PackageDirectory microsoft-store-msix -OutputPath store-upload/SonosVolumeBridge.msixupload
+      - uses: actions/upload-artifact@v7
+        with:
+          name: microsoft-store-upload
+          path: store-upload/*.msixupload
+          if-no-files-found: error

@@ -278,3 +278,13 @@ The registered Windows installation owns the normal Start menu target. Startup
 repairs older development targets while development runs retain a valid installed
 target. Full NSIS uninstall removes the per-user notification sender and COM
 activation registration; in-place updates preserve them (ADR 0013).
+
+## Release artifact flow
+
+Release jobs consume the prepared commit rather than a moving branch. Native
+Windows x64/ARM64 MSIX outputs are combined and verified in an unprivileged job
+before the all-platform build gate. Signing follows that gate; publication also
+requires successful Mac App Store packaging when requested. Store submission
+reuses the verified upload. Direct downloads use one permanent filename per
+package, with version identity supplied by the release tag (ADR 0015). See
+[release documentation](release.md) for the variants and validation gates.

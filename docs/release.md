@@ -17,7 +17,8 @@ Leave **Build Mac App Store package** unchecked (the default) while the app is
 under Apple evaluation. Check it only when a new signed App Store package is
 needed. This option controls package creation; the workflow does not submit the
 package to Apple automatically. Other release packages and GitHub publication
-continue when the App Store job is skipped. The standalone App Store signing
+continue when the App Store job is skipped. When selected, its signing job must
+succeed before GitHub publication, main promotion, or Microsoft Store submission. The standalone App Store signing
 verification workflow remains available for manual checks.
 
 Leave **Submit release to Microsoft Store (GA only)** unchecked (the default)
@@ -25,9 +26,8 @@ to skip Store submission. Check it for a GA release when you want to upload the
 MSIX after GitHub publication succeeds. Alpha and Beta never submit, even when
 checked. Windows installers and MSIX packages are still built normally.
 
-The workflow validates `develop`, commits the version bump to `develop`, checks
-out the trusted `develop` branch for each package build and verifies the exact
-release commit before building, creates and pushes its annotated
+The workflow validates `develop`, commits the version bump to `develop`, pins every subsequent build, packaging, signing, and publication checkout to
+the prepared release commit and verifies it before building, creates and pushes its annotated
 `vX.Y.Z` tag with the GitHub Actions bot identity, then creates or updates the
 GitHub Release with downloadable assets, a channel-aware installation and signing summary, and GitHub-generated change notes. Pull requests with `feature`, `enhancement`, `bug`, `fix`, `maintenance`, `refactor`, or `documentation` labels are grouped in those notes. It never merges branches. After a GA release is published, a separate job opens
 an approval-required PR from a release branch pinned to the validated release
@@ -48,10 +48,10 @@ Repeated runs reuse the release branch and open PR. Divergence caused by previou
 merge produces exactly the validated release tree. Conflicts, extra content, a conflicting
 release branch, or a previously closed PR require manual review.
 
-The current published release is [v0.3.0](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/tag/v0.3.0).
+See the repository Releases page for the current published version.
 
-The release workflow compiles one macOS executable, one Ubuntu Debian package,
-and one Windows executable per version. The protected macOS direct-download job downloads the exact
+The release workflow compiles one macOS ARM64 executable, Ubuntu AMD64 and
+ARM64 Debian packages, and Windows x64 and ARM64 executables per version. The protected macOS direct-download job downloads the exact
 executable produced by the unprivileged build job, imports the Developer ID
 identity into an ephemeral keychain, bundles a sandboxed application, signs it
 with Hardened Runtime, submits it to Apple for notarization, staples the ticket,
@@ -60,8 +60,7 @@ Store job runs only when **Build Mac App Store package** is checked. It
 independently imports its Apple Distribution and Mac Installer
 Distribution identities, embeds the Mac App Store provisioning profile, verifies
 the sandbox entitlements and profile, then produces a signed upload `.pkg`.
-The Windows build job uploads its one
-compiled output for two independent
+Each Windows architecture uploads its compiled output for two independent
 packaging jobs. One produces the clean Microsoft Store MSIX payload while the
 other applies Tauri's NSIS-specific metadata to produce the direct-download
 installer. A packaging failure can therefore be isolated to its installer type
@@ -97,10 +96,10 @@ passwords. Verify install, autostart, tray behavior, upgrade, and uninstall in a
 non-administrator Windows account.
 
 The NSIS installer remains the direct-download artifact. Microsoft Store
-distribution uses a separate x64 MSIX with the reserved Partner Center identity.
+distribution uses x64 and ARM64 MSIX packages with the reserved Partner Center identity.
 Run the `Microsoft Store Package` workflow on `develop`, download the
-`microsoft-store-msix` artifact, and upload its `.msix` file to the draft Store
-submission. The Store signs accepted packages and delivers their updates. The
+`microsoft-store-upload` artifact, and upload its combined `.msixupload` file to
+the draft Store submission. Both architectures are verified inside one bundle. The Store signs accepted packages and delivers their updates. The
 MSIX declares `en-US`, so its upload enables the English Store listing.
 
 After the first Store submission is certified and live, the `Release` workflow
@@ -194,23 +193,24 @@ are not migrated and must be configured again.
   after its GitHub Release and downloads have been verified. Do not add Apple
   credentials to this repository.
 
-### Website download aliases
+### Release download filenames
 
 The GitHub Release publishing job runs `scripts/prepare-release-downloads.sh`
-to add fixed filenames for direct downloads, alongside the versioned installers:
+to rename build outputs to six permanent filenames, with one file per package.
+The release tag identifies the version; duplicate versioned files are not uploaded:
 
 - `sonos-volume-bridge-macos.dmg` (website download)
 - `sonos-volume-bridge-macos.zip` (compatibility archive)
-- `sonos-volume-bridge-windows-unsigned.exe`
-- `sonos-volume-bridge-windows-x64-unsigned.exe`
+- `sonos-volume-bridge-windows-unsigned.exe` (x64, preserving the established URL)
 - `sonos-volume-bridge-windows-arm64-unsigned.exe`
 - `sonos-volume-bridge-linux-amd64.deb`
 - `sonos-volume-bridge-linux-arm64.deb`
 
 The website uses `releases/latest/download/<filename>` so stable downloads follow
 the latest non-prerelease without a website deployment. Missing or empty source
-installers fail preparation before any aliases are created. Store packages are
-not used as direct-download aliases.
+installers fail preparation before any inputs are renamed. Preparation can be
+repeated safely. Store packages remain separate workflow artifacts. Existing
+published releases are not rewritten by this change.
 
 The macOS DMG contains the notarized app and an Applications shortcut. The release
 job also signs the disk image, requires an Accepted notarization response, staples
@@ -227,7 +227,8 @@ publishing build artifacts and before MSIX packaging; a mismatched requested
 architecture fails before packaging. MSIX staging, manifest and filenames use
 the executable architecture. Store submission combines both packages into one
 bundle/upload so one architecture does not replace the other in a later submission.
-The legacy architecture-free direct download remains an x64 compatibility alias.
+The established architecture-free Windows direct-download filename is the sole
+x64 asset; the website labels it AMD64 (x64).
 
 Windows PR validation runs the native tests and builds an NSIS installer on both
 architectures. This exercises the custom installer with the actual Tauri bundler,
@@ -238,10 +239,21 @@ which caused NSIS compilation to fail before producing an installer.
 ## Release build gate
 
 The `all-platform-builds` job requires successful macOS executable, Ubuntu
-AMD64/ARM64 DEB, Windows x64/ARM64 executable, NSIS and MSIX jobs. Default GitHub
+AMD64/ARM64 DEB, Windows x64/ARM64 executable, NSIS and MSIX jobs, plus the
+combined Store upload. Bundle creation and validation run without Store credentials
+for every release channel, before signing and GitHub publication. Submission
+downloads the exact verified upload rather than rebuilding it. Default GitHub
 success semantics block the gate on any failed, cancelled or skipped required
 build. macOS signing/notarization and optional Mac App Store packaging depend
 on this gate; Microsoft Store submission also waits for GitHub publication.
 Mac App Store upload remains manual. Release graph regression tests check all
 required dependencies and reject cycles. Optional Apple packaging is deliberately
-outside the gate so leaving it unchecked cannot skip the entire release.
+outside the unsigned build gate to avoid a dependency cycle. The publication
+gate accepts its skipped result only when the option is unchecked; a selected
+Apple package must succeed. Cancellation and failure in any required dependency
+block publication. Tests cover the success, failure, skipped and cancelled cases.
+
+Windows PR CI builds native MSIX packages on both architectures and runs the
+production combined-upload script. It unbundles the result and verifies both
+original packages are preserved, then checks rejection of a missing architecture,
+a misleading architecture filename, and mismatched package versions.
