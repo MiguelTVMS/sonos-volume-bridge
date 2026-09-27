@@ -74,13 +74,34 @@ def verify(directory, tag):
                         raise ValueError('Embedded package architecture differs from its bundle.')
 
 
+def verify_submission(data, tag):
+    if not re.fullmatch(r'v\d+\.\d+\.\d+', tag):
+        raise ValueError('Invalid release tag.')
+    # Accept the CLI serializer's camelCase or PascalCase property casing.
+    data = {key.lower(): value for key, value in data.items()}
+    status = data.get('status', '')
+    if status not in {'PreProcessing', 'Certification', 'Release', 'Published', 'ReadyForRelease'}:
+        raise ValueError('Store submission is not in an accepted processing state.')
+    packages = [{key.lower(): value for key, value in item.items()}
+                for item in (data.get('applicationpackages') or [])]
+    architectures = {(item.get('architecture') or '').lower() for item in packages
+                     if item.get('version') == tag[1:] + '.0'
+                     and item.get('filestatus') == 'Uploaded'}
+    if not {'x64', 'arm64'} <= architectures:
+        raise ValueError('Store has not confirmed the selected version for both x64 and ARM64.')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--tag', required=True)
     parser.add_argument('--mode', choices=('validate', 'submit'), default='validate')
     parser.add_argument('--verify-directory')
+    parser.add_argument('--verify-submission')
     args = parser.parse_args()
-    if args.verify_directory:
+    if args.verify_submission:
+        verify_submission(json.loads(Path(args.verify_submission).read_text(encoding='utf-8-sig')), args.tag)
+        print('Store package version and both architectures confirmed; certification is separate.')
+    elif args.verify_directory:
         verify(args.verify_directory, args.tag)
         print('Release version and both architecture packages verified.')
     else:
