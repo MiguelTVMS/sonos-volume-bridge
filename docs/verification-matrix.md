@@ -572,3 +572,16 @@ desktop shortcut was created. Desktop shortcut creation remains disabled for
 interactive, passive and silent NSIS installation.
 The legacy WiX migration exception that could recreate a desktop shortcut was
 removed as well; only Start menu shortcuts are created or repaired.
+
+### Installing from a packaged development host
+
+Launching NSIS directly from a packaged terminal/agent can redirect its AppData
+files and uninstall registry writes into that host's private environment. Successful
+installer exit and a registry read from the same host do not prove the app is
+visible in Windows Installed apps. Run the installer through the existing Windows
+Explorer desktop instead, preserving configuration when moving between redirected
+and normal locations. Check the uninstall DisplayName through the independent
+Windows registry provider, then reopen Settings > Apps > Installed apps and search
+for Sonos Volume Bridge. Confirm its uninstall action is available and that no
+desktop shortcut is created. This is an installation-context verification step;
+the NSIS template already writes the normal uninstall metadata.
