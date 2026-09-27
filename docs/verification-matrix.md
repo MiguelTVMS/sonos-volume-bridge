@@ -562,3 +562,13 @@ PNG icon through `IconUri`, before the notifier is created. A regression test
 asserts the display assets exist at sender creation time. On the locally installed
 ARM64 NSIS build, the user confirmed notifications appear; verify the branded
 icon on a new notification after updating (old notifications may keep cached art).
+
+When launched by a packaged development host, also verify that the registered
+PNG and Start menu ICO paths resolve to the actual files outside that host's
+file-system redirection. The shortcut regression checks persisted icon location,
+sender and activation metadata through COM after initial creation and repair.
+Reinstall in place, check the Start menu icon and a fresh toast, and confirm no
+desktop shortcut was created. Desktop shortcut creation remains disabled for
+interactive, passive and silent NSIS installation.
+The legacy WiX migration exception that could recreate a desktop shortcut was
+removed as well; only Start menu shortcuts are created or repaired.

@@ -43,8 +43,13 @@ pub(super) fn install<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
             };
             shortcut::ensure(
                 &programs.join(shortcut_name),
-                &std::env::current_exe()?,
+                &dunce::canonicalize(std::env::current_exe()?)?,
                 &identifier,
+                &display_asset(
+                    &identifier,
+                    "notification-icon.ico",
+                    include_bytes!("../../icons/icon.ico"),
+                )?,
             )
         })();
         if let Err(error) = result {
@@ -200,11 +205,15 @@ pub(super) fn notifier(
             .map(|native| Notifier(Native(native, String::new())));
     }
     activation::register(identifier)?;
-    let icon = notification_icon(identifier)?;
+    let icon = display_asset(
+        identifier,
+        "notification-icon.png",
+        include_bytes!("../../icons/icon.png"),
+    )?;
     open_unpacked(
         identifier,
         name,
-        &std::env::current_exe()?.to_string_lossy(),
+        &dunce::canonicalize(std::env::current_exe()?)?.to_string_lossy(),
         &icon.to_string_lossy(),
         |path, field, value| {
             let (key, _) =
@@ -222,19 +231,24 @@ pub(super) fn notifier(
 }
 
 #[cfg(windows)]
-fn notification_icon(identifier: &str) -> std::io::Result<std::path::PathBuf> {
+fn display_asset(
+    identifier: &str,
+    filename: &str,
+    bytes: &[u8],
+) -> std::io::Result<std::path::PathBuf> {
     let directory = std::path::PathBuf::from(
         std::env::var_os("LOCALAPPDATA")
             .ok_or_else(|| std::io::Error::other("LocalAppData unavailable"))?,
     )
     .join(identifier);
     std::fs::create_dir_all(&directory)?;
-    let path = directory.join("notification-icon.png");
-    let bytes = include_bytes!("../../icons/icon.png");
-    if std::fs::read(&path).ok().as_deref() != Some(bytes.as_slice()) {
+    let path = directory.join(filename);
+    if std::fs::read(&path).ok().as_deref() != Some(bytes) {
         std::fs::write(&path, bytes)?;
     }
-    Ok(path)
+    // Resolve package file-system redirection before sharing a path with Explorer.
+    // Shell processes may not see the same logical LocalAppData path as the app.
+    dunce::canonicalize(path)
 }
 
 #[cfg(windows)]

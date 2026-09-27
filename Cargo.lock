@@ -3716,6 +3716,7 @@ version = "1.5.1"
 dependencies = [
  "async-trait",
  "block2",
+ "dunce",
  "futures-util",
  "jiff",
  "objc2",

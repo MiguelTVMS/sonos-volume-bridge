@@ -9,7 +9,10 @@ use windows::{
             CoUninitialize, IPersistFile, STGM_READWRITE,
             StructuredStorage::{InitPropVariantFromCLSID, PROPVARIANT},
         },
-        UI::Shell::{IShellLinkW, PropertiesSystem::IPropertyStore, ShellLink},
+        UI::Shell::{
+            IShellLinkW, PropertiesSystem::IPropertyStore, SHCNE_UPDATEITEM, SHCNF_PATHW,
+            SHChangeNotify, ShellLink,
+        },
     },
     core::{GUID, HSTRING, Interface},
 };
@@ -39,7 +42,12 @@ fn apartment() -> windows::core::Result<Apartment> {
     Ok(Apartment(result.is_ok()))
 }
 
-pub(super) fn ensure(path: &Path, executable: &Path, id: &str) -> windows::core::Result<()> {
+pub(super) fn ensure(
+    path: &Path,
+    executable: &Path,
+    id: &str,
+    icon: &Path,
+) -> windows::core::Result<()> {
     let _apartment = apartment()?;
     // SAFETY: all interfaces and property variants outlive synchronous COM calls.
     unsafe {
@@ -53,12 +61,19 @@ pub(super) fn ensure(path: &Path, executable: &Path, id: &str) -> windows::core:
             link.SetPath(&HSTRING::from(executable.as_os_str()))?;
         }
         let app_id = PROPVARIANT::from(id);
+        link.SetIconLocation(&HSTRING::from(icon.as_os_str()), 0)?;
         let clsid = super::activation::class_id(id);
         let activator = InitPropVariantFromCLSID(&raw const clsid)?;
         properties.SetValue(std::ptr::from_ref(&APP_ID), &raw const app_id)?;
         properties.SetValue(std::ptr::from_ref(&ACTIVATOR), &raw const activator)?;
         properties.Commit()?;
         file.Save(&path, true)?;
+        SHChangeNotify(
+            SHCNE_UPDATEITEM,
+            SHCNF_PATHW,
+            Some(path.as_ptr().cast()),
+            None,
+        );
     }
     Ok(())
 }
@@ -70,12 +85,13 @@ mod tests {
     fn startup_shortcut_contains_sender_and_activator_and_preserves_existing_target() {
         let path = std::env::temp_dir().join(format!("svb-toast-{}.lnk", std::process::id()));
         let exe = std::env::current_exe().unwrap();
-        ensure(&path, &exe, "normal.app").unwrap();
+        ensure(&path, &exe, "normal.app", &exe).unwrap();
         let before = std::fs::read(&path).unwrap();
         ensure(
             &path,
             Path::new("C:\\not-the-installed-target.exe"),
             "normal.app",
+            &exe,
         )
         .unwrap();
         let _apartment = apartment().unwrap();
@@ -90,6 +106,16 @@ mod tests {
             )
             .unwrap();
             let properties: IPropertyStore = link.cast().unwrap();
+            let mut icon_path = vec![0_u16; 32768];
+            let mut icon_index = -1;
+            link.GetIconLocation(&mut icon_path, &raw mut icon_index)
+                .unwrap();
+            let end = icon_path.iter().position(|unit| *unit == 0).unwrap();
+            assert_eq!(
+                String::from_utf16(&icon_path[..end]).unwrap(),
+                exe.to_string_lossy()
+            );
+            assert_eq!(icon_index, 0);
             assert_eq!(
                 properties.GetValue(std::ptr::from_ref(&APP_ID)).unwrap(),
                 PROPVARIANT::from("normal.app")

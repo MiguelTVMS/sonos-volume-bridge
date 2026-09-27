@@ -270,4 +270,7 @@ after writes already in flight; stale saves cannot restore pre-reset settings.
 Unpackaged Windows notification registration also materializes the bundled app
 icon in the app's local data directory and registers its absolute path as the
 sender `IconUri`. The icon remains available after build-directory cleanup or
-application exit. MSIX notifications continue to use the package manifest assets.
+application exit. Paths are canonicalized to their physical location before
+registration so an app launched from a packaged development host does not give
+Explorer a redirected path it cannot resolve. Start menu shortcuts use an explicit
+bundled ICO asset. MSIX notifications continue to use the package manifest assets.
