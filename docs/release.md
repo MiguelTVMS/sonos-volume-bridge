@@ -259,3 +259,30 @@ Windows PR CI builds native MSIX packages on both architectures and runs the
 production combined-upload script. It unbundles the result and verifies both
 original packages are preserved, then checks rejection of a missing architecture,
 a misleading architecture filename, and mismatched package versions.
+
+## Retry or debug an existing Microsoft Store release
+
+Use **Actions → Microsoft Store Package → Run workflow** with the desired
+`release_tag` and `mode: validate` first. This finds the retained combined upload
+from the original release run, verifies the selected version and both Windows
+architectures, and parses the production publishing command with the pinned
+Store CLI. Validation does not authenticate, upload, or modify Store state.
+It does not rebuild packages, create a release, or bump the version.
+
+For an actual retry, run from `develop` with the same tag and `mode: submit`.
+Only published GA releases are accepted. The existing protected Microsoft Store
+environment still applies. The retry reuses the exact retained artifact even
+when the original run failed at Store submission. Expired artifacts and runs
+without successful package verification and GitHub publication are rejected;
+there is no automatic rebuild fallback. Manual and normal submissions share a
+concurrency group to prevent overlapping Store changes.
+
+Leave `release_tag` empty in validation mode to retain the original standalone
+package-build workflow. Run it from the desired source ref when building fresh
+packages is explicitly intended.
+
+The CLI is pinned to `v0.4.3`, whose publish option is `--inputDirectory`.
+The shared publishing script requires a directory containing exactly one
+`.msixupload`. Native Windows CI invokes that same script with `--help`, using
+the actual pinned CLI, so unsupported publishing arguments fail before release.
+Successful submission is separate from Store certification and availability.

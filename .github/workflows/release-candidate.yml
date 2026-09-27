@@ -896,9 +896,26 @@ jobs:
     needs: [prepare-version, all-platform-builds, windows-msix, publish-release]
     runs-on: windows-latest
     environment: microsoft-store
+    concurrency:
+      group: microsoft-store-submission
+      cancel-in-progress: false
     env:
       MICROSOFT_STORE_PRODUCT_ID: ${{ vars.MICROSOFT_STORE_PRODUCT_ID }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - name: Validate Microsoft Store configuration
         shell: pwsh
         run: |
@@ -911,6 +928,8 @@ jobs:
           path: store-upload
       - name: Configure Microsoft Store Developer CLI
         uses: microsoft/microsoft-store-apppublisher@v1
+        with:
+          version: v0.4.3
       - name: Authenticate with Partner Center
         shell: pwsh
         env:
@@ -929,8 +948,4 @@ jobs:
           }
       - name: Submit the package to Microsoft Store
         shell: pwsh
-        run: |
-          msstore publish . --inputFile store-upload/SonosVolumeBridge.msixupload -id $env:MICROSOFT_STORE_PRODUCT_ID --uploadTimeout 300
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Microsoft Store submission failed.'
-          }
+        run: ./scripts/publish-msstore.ps1 -InputDirectory store-upload

@@ -16,6 +16,8 @@ try {
         }
     } finally { $archive.Dispose() }
 
+    & (Join-Path $PSScriptRoot '../publish-msstore.ps1') -InputDirectory $temporary -ValidateOnly
+
     foreach ($case in @('missing', 'wrong-architecture-name', 'mismatched-version')) {
         $inputs = Join-Path $temporary $case
         New-Item -ItemType Directory -Path $inputs | Out-Null
