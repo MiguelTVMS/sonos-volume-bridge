@@ -132,6 +132,14 @@ class ReleaseWorkflowTests(unittest.TestCase):
                     for failure in ('failure', 'cancelled', 'skipped'):
                         self.assertFalse(permitted(results | {job: failure}, selected))
 
+    def test_macos_publishes_only_the_verified_dmg(self):
+        body = jobs(WORKFLOW.read_text())['macos-direct']
+        self.assertNotIn('macos.zip', body)
+        self.assertNotIn('Archive the notarized app bundle', body)
+        self.assertIn('sonos-volume-bridge-*-macos.dmg', body)
+        self.assertIn('xcrun stapler validate "$image"', body)
+        self.assertIn('hdiutil verify "$image"', body)
+
     def test_windows_artifacts_are_separate_for_both_native_architectures(self):
         graph = jobs(WORKFLOW.read_text(encoding='utf-8'))
         for job in ('windows-app', 'windows-nsis', 'windows-msix'):
