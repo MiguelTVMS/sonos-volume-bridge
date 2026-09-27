@@ -117,3 +117,81 @@ properties, never dispatch input/change events or enqueue writes. Existing audio
 origin/expected-write suppression remains in the synchronization adapters. Sonos
 notifications do not identify the originating controller, so an echoed value is
 not treated as proof of authorship and genuine external changes remain observable.
+
+## Night Mode schedule
+
+Open **Night schedule** to edit one global schedule for the speaker selected on
+Devices. The schedule only acts on compatible speakers. Switching speakers applies
+the same schedule to the new selection without changing the previous speaker.
+An unavailable or unsupported selection pauses scheduling and preserves the grid.
+
+The gray editor shows Monday–Sunday rows and 48 half-hour columns across the full
+day. Labels appear every three hours, through 21:00/9 PM, without repeating
+midnight at the end. Hover tooltips appear after 100 ms. Click or press Space to
+toggle a cell; arrow keys move between cells. Dragging creates a rectangle: starting
+on an empty cell selects the whole rectangle; starting on a selected cell clears
+it. Overlapping cells all take that same state. Dragging back shrinks the rectangle
+and restores cells outside it to their state before the gesture.
+
+**Save schedule** stores the grid and immediately applies its current block: on
+inside a selected block, off outside. This one-shot action works even when recurring
+scheduling is disabled and can be repeated without editing the grid. **Cancel**
+restores the saved grid; **Clear all** edits the draft until saved. Background reads
+and speaker selection changes preserve unsaved drafts.
+
+**Enable schedule** saves immediately. During selected periods, the scheduler keeps
+Night Mode on and rejects manual off. Disable scheduling first to use manual off;
+disabling alone leaves Night Mode unchanged. Outside selected periods, manual
+changes are allowed. Leaving a scheduled period turns Night Mode off once.
+The tray has a checked **Night schedule** item directly above **Night sound**.
+The checkmark represents enabled scheduling; the editor opens through Settings.
+
+**Night schedule notifications** saves immediately and offers **On start**,
+**On end**, **On start and end**, and **Never** (the default). Confirmed boundaries notify
+only when their direction is selected. Applying an edited schedule also notifies
+only if it makes the current time enter or leave the enabled schedule, using the
+matching direction after the speaker state is confirmed. Saving while remaining
+inside or outside the schedule sends no notification. Disabled scheduling is silent. Adjacent selected cells do not notify. Startup,
+wake, recovery, selection changes, manual changes, and enforcement corrections
+remain silent. Permission denial and OS notification suppression never stop
+scheduling or volume synchronization.
+
+Enabling a previously disabled schedule during a selected period applies Night Mode
+immediately and sends a start notification after speaker confirmation when On start or
+On start and end is selected. Enabling outside selected periods, enabling an already
+enabled schedule, and disabling scheduling do not notify. Disabling leaves the speaker
+state unchanged. The worker subsequently reconciles silently to avoid duplicate
+notifications.
+
+Scheduling follows the machine's time zone. Startup, wake, reconnection, selection
+changes, clock changes, and schedule enabling reconcile only the current expected
+state; missed transitions are never replayed. Scheduling runs independently of
+local audio availability and volume fallback polling.
+
+Clock labels follow Foundation preferences on macOS, the regional time format on
+Windows, and GNOME clock-format or LC_TIME on Linux. Preferences are reread when
+Settings regains focus. Other Linux desktop-specific clock overrides may require
+matching LC_TIME. The form omits repetitive disabled/outside-period status text;
+errors, capability guidance, and active-period restrictions remain visible.
+On Linux, a dedicated Schedule status row below notifications shows the current
+state, including disabled and outside-period states. Schedule errors appear in
+that same row instead of beneath the editor. Successful saves show no confirmation.
+
+On Windows, the third Night schedule card is the single Status area. It shows
+disabled/outside-period state as well as active restrictions, the next change,
+notification guidance and action errors. Its label sits on the left and its text
+wraps on the right. Successful saves and other settings actions show no confirmation
+message; a successful retry clears the prior error. Other platform layouts are unchanged.
+Windows local runs register the app as a notification sender, so notifications
+use Sonos Volume Bridge rather than relying on PowerShell. Existing Windows
+notification preferences and Do not disturb still apply.
+
+## UI demo builds
+
+Explicit `ui-demo` debug builds open Settings with a simulated Sonos speaker and
+a demo label. The normal scheduler, tray, settings, notifications and local audio
+operate unchanged, including manual-off locking during active scheduled periods.
+Demo app settings persist separately from normal settings; speaker state resets
+on restart and is reconciled by the runtime. No real Sonos device is contacted.
+Local output volume and mute can change through normal synchronization. See
+[development](development.md#hardware-free-ui-demo) for build commands and styling.

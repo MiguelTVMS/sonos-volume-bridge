@@ -35,15 +35,17 @@ or third-party embeds without reviewing the website privacy notice.
 
 ## Permanent installer links
 
-Download buttons use GitHub's `releases/latest/download/` URLs. Release CI adds
-fixed-name copies of the macOS ZIP, Windows installer, and Ubuntu DEB while
-retaining versioned assets. `scripts/prepare-release-downloads.sh` validates all
-three installers before copying them. Prereleases also receive these assets,
+Download buttons use GitHub's `releases/latest/download/` URLs. Release CI publishes
+one fixed-name file per package: macOS DMG, Windows
+x64/ARM64 installers, and Ubuntu x64/ARM64 DEBs. Versioned build filenames
+are renamed before upload; the release tag supplies the version. `scripts/prepare-release-downloads.sh` validates all
+release assets before renaming them. Windows and Linux filenames explicitly identify x64 and ARM64. The old architecture-free
+Windows URL and macOS ZIP are not published in future releases. Prereleases also receive these assets,
 but the latest stable URLs do not select prereleases.
 
 The website does not need to be rebuilt when a release is published. Before
 first deploying these links, publish a stable release with the updated workflow
-or upload the matching fixed-name copies to the existing latest stable release.
+or upload the matching fixed-name assets to the existing latest stable release.
 Older releases do not gain these files automatically.
 
 ## Search and assistant discovery
@@ -101,3 +103,17 @@ privacy notice and cookie retention details aligned with the actual published ta
 
 Run `node --test scripts/tests/consent.test.cjs` and regenerate Markdown after HTML
 changes. The preference is website-only; the desktop app has no new telemetry.
+
+Night schedule appears alongside the other capabilities in the same feature-card
+grid, with matching illustrations, typography, and spacing. Five cards use two
+columns on desktop (two, two, then one), leaving space for a future feature. Feature copy describes the released
+product because the site publishes with the release. Keep the visible copy and
+llms.txt aligned. The section introduces no tracking or external assets.
+
+The Ubuntu card provides distinct x64 and ARM64 download buttons. The ARM64
+URL targets the next release that includes `sonos-volume-bridge-linux-arm64.deb`;
+it will become available after the first GA release containing that asset.
+
+The Windows card likewise provides x64 and ARM64 buttons. Publish both
+Windows installer assets in a stable release before deploying
+the updated website. Generated Markdown and llms.txt carry the same choices.

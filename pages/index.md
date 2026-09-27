@@ -40,6 +40,12 @@ Set a maximum speaker volume and choose how volume changes feel, including a gen
 
 Follow your current audio output or select a fixed one. Start at login and reconnect automatically after interruptions.
 
+05 / NIGHT SCHEDULE
+
+### Quieter evenings, on time.
+
+Set weekly half-hour blocks for Night Mode on your selected compatible speaker. Drag to select several days at once, and choose native notifications when the schedule starts or ends.
+
 DOWNLOAD SONOS VOLUME BRIDGE
 
 ## At home on your computer.
@@ -50,27 +56,27 @@ Latest stable release · [Check the latest release ↗](https://github.com/Migue
 
 ### macOS
 
-For Macs running macOS 13 or later. Signed with Developer ID and notarized by Apple.
+For Macs running macOS 13 or later. Signed with Developer ID and notarized by Apple. Open the DMG and drag the app into Applications.
 
 Apple Silicon (ARM64) only. Intel Macs are not supported.
 
-[Download for macOS ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-macos.zip)
+[Download for macOS (DMG) ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-macos.dmg)
 
 ### Windows
 
-Install from Microsoft Store or download the installer directly.
+Install from Microsoft Store or choose the direct installer for your processor: x64 or ARM64.
 
 The direct installer is unsigned. Windows SmartScreen may show a warning.
 
-[Microsoft Store ↗](https://apps.microsoft.com/detail/9N7JKGXCMST0) [Windows installer ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-windows-unsigned.exe)
+[Microsoft Store ↗](https://apps.microsoft.com/detail/9N7JKGXCMST0) [Windows x64 ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-windows-x64-unsigned.exe) [Windows ARM64 ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-windows-arm64-unsigned.exe)
 
 ### Ubuntu
 
-For Ubuntu on x86-64, with PulseAudio or PipeWire and `pactl`.
+For Ubuntu on x86-64 or ARM64, with PulseAudio or PipeWire and `pactl`.
 
-DEB package · AMD64.
+DEB packages · x64 and ARM64.
 
-[Download for Ubuntu ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-linux-amd64.deb)
+[Download for Ubuntu (x64) ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-linux-x64.deb)  [Download for Ubuntu (ARM64) ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-linux-arm64.deb)
 
 Need a hand? [Read the installation guide ↗](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Installation)
 

@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$ExecutablePath,
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+    [ValidateSet('x64', 'arm64')][string]$Architecture
 )
 
 $ErrorActionPreference = 'Stop'
@@ -10,6 +11,7 @@ Set-StrictMode -Version Latest
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $targetRoot = Join-Path $repositoryRoot 'target'
 $packageSource = Join-Path $repositoryRoot 'packaging\windows-msix'
+. (Join-Path $PSScriptRoot 'windows-architecture.ps1')
 
 if ([string]::IsNullOrWhiteSpace($ExecutablePath)) {
     $ExecutablePath = Join-Path $targetRoot 'release\sonos-volume-bridge.exe'
@@ -23,6 +25,12 @@ $OutputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
 if (-not (Test-Path -LiteralPath $ExecutablePath -PathType Leaf)) {
     throw "The release executable was not found at $ExecutablePath. Run 'cargo tauri build --no-bundle' first."
 }
+if ([string]::IsNullOrWhiteSpace($Architecture)) {
+    $Architecture = Get-WindowsExecutableArchitecture -Path $ExecutablePath
+}
+# GitHub runner.arch uses uppercase labels; MSIX manifest values are lowercase.
+$Architecture = $Architecture.ToLowerInvariant()
+Assert-WindowsExecutableArchitecture -Path $ExecutablePath -Architecture $Architecture
 
 $cargo = Get-Command cargo.exe -ErrorAction SilentlyContinue
 if ($null -eq $cargo) {
@@ -63,8 +71,8 @@ if ([string]::IsNullOrWhiteSpace($makeAppx)) {
     throw 'MakeAppx.exe was not found. Install the Windows SDK.'
 }
 
-$stagingDirectory = Join-Path $targetRoot 'msix\staging-x64'
-$verificationDirectory = Join-Path $targetRoot 'msix\verified-x64'
+$stagingDirectory = Join-Path $targetRoot "msix\staging-$Architecture"
+$verificationDirectory = Join-Path $targetRoot "msix\verified-$Architecture"
 foreach ($directory in @($stagingDirectory, $verificationDirectory)) {
     $resolvedDirectory = [System.IO.Path]::GetFullPath($directory)
     if (-not $resolvedDirectory.StartsWith([System.IO.Path]::GetFullPath($targetRoot), [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -84,12 +92,12 @@ Copy-Item -LiteralPath (Join-Path $packageSource 'Assets\Square44x44Logo.png') -
 Copy-Item -LiteralPath (Join-Path $packageSource 'Assets\Square150x150Logo.png') -Destination $assetsDirectory
 
 $manifestTemplate = Get-Content -LiteralPath (Join-Path $packageSource 'AppxManifest.xml.template') -Raw
-$manifest = $manifestTemplate.Replace('{{VERSION}}', $msixVersion)
+$manifest = $manifestTemplate.Replace('{{VERSION}}', $msixVersion).Replace('{{ARCHITECTURE}}', $Architecture)
 $manifestPath = Join-Path $stagingDirectory 'AppxManifest.xml'
 Set-Content -LiteralPath $manifestPath -Value $manifest -Encoding utf8NoBOM
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
-$packagePath = Join-Path $OutputDirectory "SonosVolumeBridge_${msixVersion}_x64.msix"
+$packagePath = Join-Path $OutputDirectory "SonosVolumeBridge_${msixVersion}_${Architecture}.msix"
 if (Test-Path -LiteralPath $packagePath) {
     Remove-Item -LiteralPath $packagePath -Force
 }
@@ -112,7 +120,7 @@ $language = $verifiedManifest.SelectSingleNode('/f:Package/f:Resources/f:Resourc
 if ($identity.Name -ne 'Miguel.MS.SonosVolumeBridge' -or
     $identity.Publisher -ne 'CN=7D58CCC9-6311-4A59-95A9-FF7375C0ECDC' -or
     $identity.Version -ne $msixVersion -or
-    $identity.ProcessorArchitecture -ne 'x64' -or
+    $identity.ProcessorArchitecture -ne $Architecture -or
     $language.Language -ne 'en-US') {
     throw 'The generated package identity, version, architecture, or language is invalid.'
 }

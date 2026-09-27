@@ -10,3 +10,6 @@ pub use state::{
     ConfirmedSonosState, ExpectedLocalWrite, LocalAudioState, PendingIntent, SuppressionDecision,
     SyncState,
 };
+
+mod schedule;
+pub use schedule::{NightModeSchedule, ScheduleWindow};

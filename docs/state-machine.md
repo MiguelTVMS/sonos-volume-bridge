@@ -23,3 +23,26 @@ Volume changes are debounced and coalesced; mute changes bypass the debounce.
 The coordinator does not resend a volume or mute value until it differs from
 the last sent value. When GENA delivery is healthy it polls slowly for health;
 on subscription loss it polls once per second until event delivery recovers.
+
+Night Mode scheduling is an independent optional controller. Disabled or unselected
+means no recurring effects. Explicit Save remains a one-shot apply operation even
+while recurring scheduling is disabled. Unsupported/unavailable means paused with configuration retained.
+Reconciliation establishes the expected current value without a notification.
+Scheduled entry enforces on; scheduled exit applies off once and permits subsequent
+manual changes. Transient failures retry with bounded backoff; confirmed normal
+boundaries produce notification intent. Applying a saved schedule produces
+notification intent only when the edit changes whether the current time is inside
+the enabled schedule, after confirming the resulting speaker state. Saves that
+remain inside/outside and saves with recurrence disabled stay silent. On start/On end/On start and end/Never filters
+that intent without changing controller state. Selection or schedule changes discard old
+pending intent. Notification preferences never reset this controller. See ADR 0013.
+
+Enabling a previously disabled schedule during a selected period applies Night Mode
+immediately and sends a start notification after speaker confirmation when On start or
+On start and end is selected. Enabling outside selected periods, enabling an already
+enabled schedule, and disabling scheduling do not notify. Disabling leaves the speaker
+state unchanged. The worker subsequently reconciles silently to avoid duplicate
+notifications.
+
+Opt-in UI demo builds run this state machine and the normal Night Mode scheduler
+against a loopback simulated Sonos speaker. Local audio remains native. See ADR 0014.

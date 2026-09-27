@@ -14,3 +14,7 @@ This folder stores decision records. Keep one record per important design choice
 - [0010-discovery-filters-non-sonos-devices](0010-discovery-filters-non-sonos-devices.md)
 - [0011-ubuntu-pulse-audio-adapter](0011-ubuntu-pulse-audio-adapter.md)
 - [0012-platform-settings-presentation](0012-platform-settings-presentation.md)
+- [0013-global-night-mode-schedule](0013-global-night-mode-schedule.md)
+
+- [0014-ui-demo-build](0014-ui-demo-build.md)
+- [0015-macos-dmg-download](0015-macos-dmg-download.md)

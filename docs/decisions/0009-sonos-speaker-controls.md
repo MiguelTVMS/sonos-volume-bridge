@@ -94,3 +94,9 @@ prevents loops without guessing which controller produced an anonymous GENA even
 Runtime telemetry is pushed immediately; stale fallback reads cannot overwrite a
 newer pushed snapshot. Fixed deadlines provide backup reads even when other events
 keep arriving. Optional settings without events remain refreshed periodically.
+
+Configuration autosaves and Reset settings also use the user-write queue. Reset
+cancels its pending debounce, invalidates stale responses and refreshes the form
+and schedule draft after the serialized reset completes. Browser regressions
+cover reset before the debounce fires and while a configuration write is held
+in flight, checking final settings and write order through production handlers.

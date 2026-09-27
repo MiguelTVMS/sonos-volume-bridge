@@ -10,3 +10,8 @@ test('arrows traverse all settings in sidebar order without wrapping', () => {
     assert.equal(adjacentPage(settingsPages[index + 1], -1), settingsPages[index]);
   }
 });
+
+test('schedule has a dedicated sidebar destination after speaker controls', () => {
+  assert.equal(adjacentPage('speaker', 1), 'schedule');
+  assert.equal(adjacentPage('schedule', 1), 'volume');
+});

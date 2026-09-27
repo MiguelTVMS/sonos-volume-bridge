@@ -1,0 +1,81 @@
+name: Branch desktop check
+
+on:
+  workflow_dispatch:
+    inputs:
+      ui_demo:
+        description: Build a hardware-free UI demo
+        type: boolean
+        default: false
+  push:
+    branches:
+      [feat/night-mode-schedule, feat/arm64-build, fix/windows-schedule-status]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: branch-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUSTUP_TOOLCHAIN: stable
+
+jobs:
+  desktop:
+    name: Desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-11-arm, ubuntu-latest, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@v7
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev dbus-daemon
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - uses: Swatinem/rust-cache@v2
+      - run: pnpm --dir ui install --frozen-lockfile
+      - run: pnpm --dir ui test
+      - run: pnpm --dir ui run lint
+      - run: pnpm --dir ui run format
+      - run: pnpm --dir ui run build
+      - run: pnpm --dir ui exec playwright install --with-deps chromium
+      - run: pnpm --dir ui run test:ui
+      - run: cargo fmt --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - if: inputs.ui_demo
+        run: cargo test -p sonos-volume-bridge --features ui-demo
+      - run: pnpm dlx @tauri-apps/cli@2 build --debug --no-bundle --no-sign ${{ inputs.ui_demo && '--features ui-demo' || '' }}
+      - name: Verify Windows architecture and package the installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          . ./scripts/windows-architecture.ps1
+          Assert-WindowsExecutableArchitecture -Path target/debug/sonos-volume-bridge.exe -Architecture '${{ runner.arch }}'
+          pnpm dlx @tauri-apps/cli@2 bundle --debug --bundles nsis
+      - name: Verify Linux ARM64 executable
+        if: runner.os == 'Linux' && runner.arch == 'ARM64'
+        run: |
+          file target/debug/sonos-volume-bridge
+          readelf -h target/debug/sonos-volume-bridge | grep -Eq 'Machine:.*AArch64'
+      - uses: actions/upload-artifact@v6
+        with:
+          name: desktop-${{ inputs.ui_demo && 'ui-demo' || 'normal' }}-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            target/debug/sonos-volume-bridge.exe
+            target/debug/sonos-volume-bridge
+            target/debug/bundle/nsis/*.exe
+          if-no-files-found: error

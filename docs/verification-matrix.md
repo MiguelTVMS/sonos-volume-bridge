@@ -1,11 +1,44 @@
 # Hardware verification matrix
 
+## Linux ARM64 build
+
+Local validation (2026-09-26): Ubuntu 26.04 ARM64, Rust 1.98.1, Node.js
+24.21.0 LTS and pnpm 12.6.0 passed the standalone debug Tauri build, ELF
+architecture and linked-library checks, Rust formatting, workspace Clippy and
+tests, UI demo Rust tests, and frontend build, tests, lint and formatting.
+Graphical and physical-device scenarios below remain manual verification.
+
+Automated coverage: the Branch desktop check workflow builds on native
+`ubuntu-24.04-arm`, runs frontend and Rust checks, verifies the executable's ELF
+machine is AArch64, and uploads an artifact with the architecture in its name.
+PR Rust quality checks run workspace and UI demo tests on the same architecture.
+Workflow configuration alone is not evidence of a successful build; confirm the
+ARM64 job passes before treating an artifact as verified.
+
+Manual verification on an ARM64 Ubuntu desktop or VM:
+
+1. Follow the native build commands in [development](development.md#linux-arm64).
+2. Confirm `file` and `readelf -h` identify the executable as AArch64.
+3. Start the normal app in a graphical session. Open Settings from the tray,
+   select a local output and Sonos speaker, save, quit, and relaunch.
+4. Verify saved selections, volume/mute synchronization, tray controls, and
+   Night schedule interactions using the existing scenarios below.
+5. Build again with `--debug --features ui-demo`, launch without a physical
+   speaker, and repeat the UI demo scenarios below, including saved startup.
+6. If testing a Debian package, confirm `dpkg-deb -f <package.deb> Architecture`
+   reports `arm64`, install it, and repeat the desktop checks.
+
+Coverage limits: CI compilation and automated tests do not verify a graphical
+session, tray integration, audio service access, physical Sonos hardware, or
+package installation. Building on Ubuntu 24.04 does not establish compatibility
+with older distributions. Windows ARM64 and macOS builds are separate targets.
+
 ## Windows 11 settings presentation
 
 - Automated: the normal frontend suite validates platform selection, native
   window identity, resize bounds, tray-first startup, and retained Windows chrome.
 - Automated browser tests run the production renderer through the isolated preview:
-  all six pages at default/minimum size in light/dark mode, visible sidebar footer,
+  all seven pages at default/minimum size in light/dark mode, visible sidebar footer,
   card nesting, keyboard switch/select/slider changes across rerenders, forced colors,
   reduced motion, visible focus, and macOS/Linux presentation isolation.
 - Regression mutation verified: removing the compact-height rules makes the
@@ -112,3 +145,460 @@ issue before declaring a release candidate ready.
   release; confirm no jump during drag and only the final value applies. Change
   volume externally with Diagnostics open and check prompt updates. Native drag
   timing and physical notification latency are not simulated by the mock suite.
+
+## Global Night Mode schedule
+
+Automated coverage exercises calendar boundaries, DST, week wrapping, read/write
+confirmation, external-off restoration, selected-speaker rebinding, disabled/no-target
+behavior, manual-off rejection, retries and notification intent. Browser tests use
+the production editor through the isolated preview; they do not touch real speakers.
+
+Manual checks for the local candidate (not yet completed on physical hardware):
+
+1. Select a compatible speaker. Open the Night schedule sidebar item. Verify the grid is absent from Speaker. Paint a block containing the current time, save,
+   and enable. Confirm Night Mode on and the locked Settings/tray explanation.
+   Disable it from another controller; it should restore within the backup-read
+   interval plus network latency. Volume synchronization must continue.
+2. Disable scheduling: Night Mode stays unchanged and manual off succeeds. Re-enable
+   outside a selected block, manually turn on, and refresh Settings: it stays on.
+3. Cross a start/end boundary. Confirm one on/off application and, with the matching notification
+   mode and OS permission, one native notification after confirmation. Consecutive
+   selected cells must not notify. Try with Settings open and closed.
+4. Deny notifications, then enable them in system settings. Confirm clear guidance,
+   working synchronization, and subsequent delivery without a background permission
+   prompt. Check OS Do Not Disturb suppression. Windows requires an installed app;
+   development-shell notification branding is not representative.
+5. While selected, disconnect/reconnect the speaker and sleep/wake across a boundary.
+   Confirm the current expected value is applied without replayed transitions or
+   notifications. Repeat with volume fallback polling disabled and audio unavailable.
+6. Switch between compatible, unsupported, and unavailable speakers while writes
+   are pending. Only the backend's current selection may receive new commands;
+   switching sends no cleanup commands to the former speaker. The global grid stays.
+7. Verify light/dark presentation and keyboard painting on each desktop OS. Scroll
+   the grid while a draft is dirty and allow background refreshes: preserve cells,
+   focus, and scroll. Save/Cancel must not alter another speaker's configuration.
+
+Coverage limits: native wake delivery, OS permission prompts/toast presentation,
+physical speaker support, and network timing remain manual checks. Linux without
+logind uses the clock-discontinuity fallback and cannot guarantee immediate native
+wake delivery. Native notification display is controlled by the OS.
+
+8. On Night schedule, confirm there is no repeated selected-speaker label. Leave recurring
+   scheduling disabled, select the current block and Save: Night Mode turns on.
+   Save unchanged again: no notification and no redundant Sonos write. Clear the current block and Save: Night Mode turns off. Permission denial
+   must not prevent application, and failed confirmation must not announce success.
+
+9. Open the native tray menu with a compatible speaker selected. Verify Night schedule is immediately above Night sound and its checkmark reflects whether scheduling is enabled and no editor shortcut remains. Toggle
+   it on and verify the saved schedule takes effect, then uncheck Night schedule and verify Night Mode stays unchanged and manual off is available.
+   Repeat disabling with the speaker unavailable. Native menu placement and click
+   delivery need this local check; CI covers the menu model and shared command policy.
+
+10. On macOS, launch the app, open the tray immediately, hover repeatedly, then
+    click the schedule toggle and Night sound while background speaker reads finish.
+    Verify the process stays running and the controls update in place. Repeat after
+    speaker loss/recovery. CI covers the shared menu-diff sequence; native Cocoa
+    action-target lifetime and menu tracking require this packaged-app check.
+
+11. In the schedule form, verify On start/On end/On start and end/Never at both boundaries and
+    with Save. Confirm Portuguese locale uses 24-hour labels and US English uses
+    AM/PM, including midnight tooltips. Hover a grid cell and verify the tooltip
+    appears promptly and disappears on leaving or painting.
+    On Windows, repeat in light and dark modes: hover a middle-row cell so the
+    tooltip overlaps the grid and verify no cells show through its background.
+    CI exercises the production renderer's hover sequence and checks an opaque
+    computed background in both modes; native WebView rendering remains manual.
+
+12. With macOS language English (US), region Portugal and a 24-hour clock, verify
+    the schedule shows 13:00 rather than 01:00 PM. Change the system clock format,
+    refocus Settings, and verify labels/tooltips update without losing grid edits.
+    CI covers a US WebView locale with a native 24-hour override at startup.
+
+### Windows native notification delivery
+
+Windows delivery verification must distinguish an accepted `Show` request from a
+visible notification. For an unpackaged normal release, trigger a configured state
+transition and verify its entry in Windows Notification Center, then click it to
+open Settings. Close the app and click a retained entry to verify cold activation.
+Repeat after rebuilding at a different location and with the installed build.
+Do not disturb may suppress banners; it must not be used to explain missing entries
+without checking Notification Center. In Parallels, compare with another Windows
+app and record whether the VM is in Coherence or desktop mode. API success or broker
+history alone is insufficient evidence of visible delivery.
+
+Windows CI covers sender/COM launch registration before permission and delivery,
+native class-factory activation, and shortcut creation/repair with both shell identity
+properties read back from disk. Actual shell rendering, retained entries,
+and Parallels presentation require the manual checks above.
+
+### Windows and Linux branch trial
+
+Use `feat/night-mode-schedule` before opening a PR. The Branch desktop check
+workflow builds and tests on Windows and Linux and uploads an unsigned debug
+executable for each platform. Windows requires the WebView2 runtime; Linux needs
+GTK3, WebKitGTK 4.1, and an AppIndicator implementation. Native notifications may
+require an installed/packaged app identity, so the standalone executable does not
+replace packaged-app notification validation.
+
+Run `pnpm --dir ui install --frozen-lockfile` and
+`pnpm dlx @tauri-apps/cli@2 dev` from a local checkout for a source trial.
+Verify rectangular add/clear gestures, the checked tray schedule control, selected
+speaker changes, wake/recovery and all four notification modes. Windows clock
+format comes from the user's regional time format. Linux honors GNOME's explicit
+clock format when available, otherwise LC_TIME; other desktop-specific overrides
+remain dependent on that desktop's locale configuration. No AM/PM preview override
+is enabled in branch builds.
+
+### Night schedule notification dropdown sizing
+
+The macOS Settings window opens at 740 by 700 points. Check Night schedule at
+that default size for unnecessary vertical scrolling; horizontal resizing must
+remain disabled. Browser coverage also checks the page with save feedback shown.
+
+On macOS, open Settings → Night schedule and select On start, then On end.
+After each immediate save, verify the complete selected text remains visible
+beside the dropdown arrow. Leave and reopen Settings to check the restored value;
+repeat at the minimum window width. The browser regression selects all four modes
+through the production form, waits for the save rerender, and checks the sizing
+label and rendered text width. It fails before the mount-order fix. Browser
+coverage does not establish native WebView popup rendering; repeat this check in
+the packaged macOS app before release.
+
+## UI demo builds
+
+Autostart isolation regression: the normal Rust suite builds normal and demo
+mock applications through the shared startup identity configuration and checks
+the package names consumed by the autostart plugin remain distinct. This test
+fails with identifier-only isolation and passes with the demo package suffix.
+It does not write real OS login entries. On Windows and Linux, enable Start at
+login in the normal app, then enable and disable it in the demo. Confirm the
+normal registry Run entry or autostart desktop file is unchanged and still
+launches the normal executable after signing in again.
+
+The Windows presentation browser test uses native select change events for
+portable save/rerender coverage, retaining keyboard checks for switches and
+sliders. Native dropdown popup keyboard behavior must be checked on Windows:
+focus Follow, choose an output by keyboard, and verify it survives navigation.
+
+Build without flags and confirm there is no demo label. Build with `--debug
+--features ui-demo`, start without a speaker, and verify Settings opens with
+Living Room (simulated). Check normal tray controls, speaker settings, local
+output selection, volume/mute synchronization, diagnostics/export and reset.
+Demo saved settings/logs are separate; no real Sonos devices are discovered or
+contacted. Local audio and OS services operate normally.
+
+Regression sequence for Windows Night Sound: start a fresh demo, open Night
+schedule, select the current day's current half-hour cell and Save schedule.
+With recurrence disabled, turn Night sound off on Speaker. Enable schedule and
+return to Speaker: Night sound becomes on, its switch is disabled and the message
+explains that scheduling must be disabled first. Try the tray Night sound action
+as well. Disable the schedule: Night sound stays on but manual off works. Save
+an empty schedule and enable: manual on/off is available outside active periods.
+Repeat after restarting with an enabled active schedule, including opening Speaker
+immediately before the first scheduler tick. Cross a half-hour start/end boundary
+and verify on enforcement, one-time off at exit, and the selected notification mode.
+
+Restart: demo app settings persist and the real runtime reconciles fresh simulated
+speaker state. Repeat with `ui-windows`, `ui-macos`, and `ui-ubuntu`; native window
+constraints and chrome remain host-specific. Check keyboard navigation and resizing
+at default/minimum sizes and across display scaling settings.
+
+Automated routing tests cover the delayed startup handshake and native commands
+in both normal and demo builds (the old desktop mock routing fails these tests).
+Native tests use actual SOAP/GENA clients and production scheduler/command entry
+points to cover enabling, startup timing, enforcement, manual-off rejection,
+disabling and outside-period control. They run in the ordinary CI test suite and
+feature-enabled checks. Browser tests cover presentation only. Native WebView,
+tray interaction, notification delivery, wake/time changes and physical hardware
+still require target-OS checks; simulated firmware cannot establish hardware behavior.
+
+Windows native tests require the Common Controls v6 manifest. The shell build
+script supplies it to library test executables; application binaries retain the
+full Tauri manifest. Without this, the test process fails before running tests.
+Local Windows verification of the revised native demo: startup showed Connected
+with the simulated speaker. Saving the current Saturday half-hour and enabling
+scheduling made Night sound checked and disabled, with the schedule-lock message
+and next transition visible. Left the active demo period enabled for UI testing.
+Rust workspace/demo suites, formatting and Clippy passed; frontend unit tests,
+lint/format/build and all 21 browser tests passed. Native notification delivery,
+clock boundaries and restart persistence were not manually exercised in this pass.
+
+## Schedule notification speaker names
+
+With a speaker whose discovery name contains a Sonos Media Renderer suffix, enable
+start/end notifications and save a schedule once inside and once outside its
+current block. Confirm each notification uses only the human speaker name. Verify
+scheduled start and end notifications likewise. Names with ordinary hyphens must
+remain intact. Automated tests cover the shared production notification formatter
+for all four paths and fail when raw discovery names are used. Native delivery
+and banner layout still require a real notification-capable host.
+
+
+## Ubuntu settings presentation
+
+- Automated browser tests cover every page at 1080 by 800 and 1080 by 460 in
+  light and dark modes, keyboard switch and slider changes, and persisted schedule
+  selection. The rounded-cell regression was reproduced before the CSS fix.
+- On native Ubuntu, start `ui-demo` from a closed app and compare with GNOME
+  Settings: wide window, neutral sidebar, white rounded groups, row separators,
+  trailing dropdowns, orange switches and white slider thumbs. Check text renders
+  in Ubuntu/system sans-serif throughout, with no unexpected serif paragraphs.
+- Confirm horizontal resizing is blocked. At the default height, open Night
+  schedule and Save: the grid, actions and save notice must fit without scrolling.
+  Resize vertically to the minimum; scroll to every setting and action. Switch pages, change a dropdown, drag a slider, and save/reopen a schedule.
+  Schedule cells must stay rectangular before and after updates.
+- Repeat in dark mode, with increased text scaling and keyboard-only input.
+  Confirm select popups, native title bar and tray behavior in WebKitGTK.
+- Browser coverage cannot establish native title-bar appearance or desktop theme
+  integration. HTML controls follow Yaru styling but are not native GTK widgets.
+
+Ubuntu window follow-up: verify width stays at 1080 while height can change.
+At the 800-pixel default height, Night schedule must fit after Save without
+scrolling. On Volume, the Test speaker volume button must be inset from the card
+and usable with Enter. Automated browser regressions cover these cases.
+
+## Ubuntu top-bar icon contrast
+
+Start with Ubuntu in light application mode and the app closed. Launch the UI
+demo: the top-bar glyph must be white immediately, including before connection
+completes. Switch the application theme dark then light; the glyph must remain
+white. In a normal build, disconnect and reconnect the selected speaker and check
+the red disconnected badge appears and clears without changing glyph contrast.
+The CI regression exercises the production image-selection path in this sequence
+and failed before the fix. It cannot verify native AppIndicator rendering or
+custom desktop panels; manually check against Ubuntu's default dark top bar.
+
+## Linux release architectures
+
+Release CI builds native AMD64 and ARM64 Debian packages and checks their
+architecture metadata before upload. Automated release-script tests use real
+Debian package fixtures and reject mismatched, missing, empty or ambiguous
+installers. Alias tests require both Linux packages and check the website URLs.
+After the first release, download each architecture from its website button,
+check `dpkg-deb -f <package.deb> Architecture`, and install on the matching Ubuntu
+machine. The ARM64 stable link is unavailable until that asset reaches a GA release.
+
+## macOS release DMG
+
+After a GA release, download the DMG from the website. Verify its stapled ticket
+and Gatekeeper assessment, open it, drag the app to Applications, eject the image,
+and launch the installed app. Confirm Settings, tray and saved configuration work.
+Repeat on a clean supported Mac to check quarantine handling. Release CI verifies
+signing, notarization acceptance, stapling and image integrity; alias tests cannot
+establish native installation or Apple notarization behavior.
+
+## Reset during autosave
+
+Change a General setting and immediately open Diagnostics and reset. Wait past
+the autosave debounce, return to General, and confirm defaults remain restored
+and no success notice appears. Repeat with a slow
+configuration write. Browser regressions freeze the debounce clock or hold IPC
+completion to exercise both sequences deterministically through the real UI.
+
+## Linux Night schedule status consolidation
+
+- Automated: the Linux browser suite opens Night schedule from startup, checks
+  the third row below notifications, enables scheduling, saves, navigates away
+  and returns. Status and error feedback must stay in that row, with no duplicate
+  status below the card or confirmation below the editor. Successful saves remain
+  silent; a failed save shows an error, cleared on a successful retry. The regression fails
+  before the fix and passes after it; default-window fit is also checked.
+- Manual: launch the normal Linux app, open Settings > Night schedule, enable
+  scheduling, and save a block. Confirm the status updates in the third white row
+  below notifications. Navigate away and back, then test an active period and
+  an unavailable speaker. Confirm current status and errors remain in the row.
+  Browser mocks cover layout and frontend orchestration, not native event delivery
+  or real speaker transitions. Native checks remain to be performed.
+
+## Wayland close button after first show
+
+1. In an Ubuntu Wayland session, launch the normal app with Settings initially hidden.
+2. Open Settings from the tray and click the native close button once, without
+   resizing, maximizing, or double-clicking the title bar first.
+3. Confirm Settings hides and synchronization and the tray continue running.
+4. Reopen from the tray and repeat the immediate close at least three times.
+5. Confirm title-bar dragging, minimize, maximize, and vertical resizing still work.
+
+Before the dependency repair, close could ignore clicks until a resize; repeated
+clicks could maximize instead. The lockfile regression fails on that dependency
+and passes with the upgrade. The normal Rust suite exercises the shared close
+handler through first show and reopen without resize. Native GTK/compositor input
+is outside mock coverage; manual validation is pending.
+
+## Linux schedule notification delivery
+
+- Automated: the normal Rust suite starts a private D-Bus notification service
+  and a subprocess using the production sender inside Tokio. Applied-on, applied-off,
+  scheduled-start, and scheduled-end must all arrive. Before the fix all four were
+  missing because the blocking plugin sender panicked inside the async runtime;
+  the same regression passes with asynchronous delivery. Linux tests require
+  `dbus-daemon`, installed by CI. The test never targets the desktop session bus.
+- Manual: in the normal Ubuntu app, select On start and end. Save once with the
+  schedule enabled and the current half-hour selected, and again with it cleared. Confirm a native banner
+  only when the edit enters or leaves the enabled schedule. Repeat each save and confirm
+  there is no additional notification. Then enable the
+  schedule and verify an actual start and end boundary. Enabling during a selected
+  period also notifies after speaker confirmation; disabling does not notify. Confirm Never suppresses both directions, On start only shows
+  on notifications, and On end only shows off notifications.
+- Coverage limit: the service test verifies delivery and message content, not
+  GNOME banner rendering or desktop suppression. Native edit-triggered banner
+  confirmation is recorded below.
+
+The save-transition regression additionally exercises the shared application and
+notification orchestration with all four preferences, recurring scheduling on
+and off, and the sequence outside → enter → unchanged save → leave → unchanged
+save. Only permitted entry/exit transitions with recurrence enabled reach the private
+service after speaker confirmation. Disabled recurrence stays silent.
+
+Also turn Night Mode on manually while outside the schedule, then save an edit
+that includes the current half-hour. With On start selected, the entry notification
+should appear even though the speaker was already on. Editing another day while
+remaining inside the current period should not notify. Save with recurrence off
+and confirm no notification, even if the one-shot apply changes Night Mode.
+
+### GNOME notification source lifetime
+
+The private-service regression also checks that repeated notifications use the
+same sender and that it still owns its bus name after the production sender
+returns. The previous per-send connection was closed immediately after Ubuntu
+accepted delivery, causing GNOME to remove the app notification source. This
+regression fails before persistent-connection delivery and passes afterward.
+
+Manual reproduction: keep Settings open, enable the schedule and On start and
+end notifications. Clear the current half-hour block and save, then select it
+and save. Confirm both banners appear and remain available in Ubuntu's
+notification list after the send completes. Repeat without closing Settings.
+The mock service checks connection lifetime; actual GNOME presentation still
+requires this native verification.
+
+Native verification (2026-09-27): the user confirmed that both Ubuntu banners
+appeared after clearing the current half-hour and saving, then selecting it and
+saving again with Settings open. This verifies edit-triggered exit and entry
+presentation; timed boundaries and other desktop sessions remain separate checks.
+
+### Enabling during an active period
+
+Automated Linux regression calls the production enable command before the worker's
+first tick with a simulated speaker and private notification service. It covers
+all four notification preferences, selected and unselected current-time periods,
+repeated enable, and disable. It verifies speaker confirmation and exactly two
+start notifications (Start and Both). The regression receives zero notifications
+before the fix and passes afterward. Existing worker tests cover reconciliation.
+
+Native check: with scheduling disabled, select/save the current half-hour, then
+manually turn Night Mode off. Choose On start or On start and end and enable the
+schedule from Settings; confirm Night Mode turns on and one Ubuntu banner appears.
+Repeat using the tray. Repeat outside selected periods and with On end/Never;
+expect no banner. Disable scheduling and confirm Night Mode stays unchanged with
+no end banner. The private service cannot prove GNOME banner presentation or
+desktop suppression settings.
+
+Native verification (2026-09-27): after the enable-notification fix, the user
+reported that everything was working. This confirms the reported active-period
+enable notification in the normal Ubuntu app. The report does not separately
+verify every preference, tray interaction, timed boundary, or first-open close
+sequence listed above.
+
+## Windows Night schedule status and notifications
+
+Open the normal Windows app, navigate to Night schedule, enable scheduling, edit
+blocks and save. The third card must contain current state, next change when
+available, notification guidance and error feedback. Successful saves must show no
+confirmation. The Status label must be on the left with wrapping text on the right
+in the 960-by-820 default Windows window. There must be no second
+status line beneath the card or notice beneath Save. Disable and re-enable the
+schedule, navigate to General, save a setting and return; errors must stay visible
+in the appropriate page while successful actions stay silent. Check light/dark and
+minimum/default window sizes.
+
+On a fresh Windows user profile, launch with `cargo tauri dev` without demo features.
+Choose a compatible speaker, select On start and end, and save a block covering
+the current time. Confirm a Sonos Volume Bridge notification, then save an empty
+grid and confirm the off notification. Enable a schedule spanning the next
+half-hour boundary and verify a single start/end notification at matching
+boundaries. Repeat with On start, On end and Never to check filtering. Repeat
+with an installed desktop build and a packaged build. With app notifications
+disabled, confirm the status guidance and that scheduling still works; restore
+notifications and confirm recovery. Do not disturb may send notifications directly
+to Notification Center instead of showing a banner.
+
+CI browser coverage uses the production form and mocked IPC to check initial
+state, toggling, grid editing, saving, next transition, notification guidance,
+failure feedback and navigation. The layout regression fails before consolidation.
+Error-only notice regressions on all three platforms fail with the old save
+confirmation. They wait for the production form to finish saving, then exercise
+a failed save and successful retry, preserving visible errors and clearing them
+after recovery. Settings autosaves are also verified to remain silent.
+Rust CI exercises shared Windows notification orchestration from an unregistered
+sender through the initial permission check and Save/start/end delivery, and
+preserves denied/unavailable outcomes. Removing first-use preregistration fails
+that regression. Existing integration tests cover schedule boundary/filter policy.
+
+The opt-in `cargo test -p sonos-volume-bridge native_development_notification_smoke
+-- --ignored --nocapture` sends a real Windows test notification and checks native
+API success. It passed locally after the fix. Automated success does not prove a
+visible banner, native WebView layout, hardware timing or packaged delivery;
+complete the manual sequences above before release.
+
+### Windows installer and architecture coverage
+
+CI builds a normal NSIS installer on Windows x64 and ARM64. Packaging the custom
+template with the updated Tauri bundler failed with a missing Restart Manager
+macro before its include was added, and succeeded after the fix. Keep this
+production packaging check in PR CI. The architecture script checks both valid
+PE machine types, rejects malformed files and invokes the MSIX packaging entry
+point with mismatched input to verify it fails before packaging. Local validation
+on ARM64 covers actual MSIX pack/unpack; x64 packaging is verified on its CI runner.
+
+Install the matching normal NSIS package, launch it from its installed location,
+then set notifications to On start and end. Save a change that excludes the current
+half-hour, and another that includes it. Confirm both speaker state changes and
+that Night Mode schedule ended/started appear in Windows Notification Center.
+Save again without crossing a boundary and confirm no additional notification.
+Restore the original grid. Automated delivery acceptance cannot prove that the
+Windows shell displayed a notification; record visible delivery separately.
+
+Windows unpackaged sender registration includes a persistent copy of the bundled
+PNG icon through `IconUri`, before the notifier is created. A regression test
+asserts the display assets exist at sender creation time. On the locally installed
+ARM64 NSIS build, the user confirmed notifications appear; verify the branded
+icon on a new notification after updating (old notifications may keep cached art).
+
+When launched by a packaged development host, also verify that the registered
+PNG and Start menu ICO paths resolve to the actual files outside that host's
+file-system redirection. The shortcut regression checks persisted icon location,
+sender and activation metadata through COM after initial creation and repair.
+Reinstall in place, check the Start menu icon and a fresh toast, and confirm no
+desktop shortcut was created. Desktop shortcut creation remains disabled for
+interactive, passive and silent NSIS installation.
+The legacy WiX migration exception that could recreate a desktop shortcut was
+removed as well; only Start menu shortcuts are created or repaired.
+
+### Installing from a packaged development host
+
+Launching NSIS directly from a packaged terminal/agent can redirect its AppData
+files and uninstall registry writes into that host's private environment. Successful
+installer exit and a registry read from the same host do not prove the app is
+visible in Windows Installed apps. Run the installer through the existing Windows
+Explorer desktop instead, preserving configuration when moving between redirected
+and normal locations. Check the uninstall DisplayName through the independent
+Windows registry provider, then reopen Settings > Apps > Installed apps and search
+for Sonos Volume Bridge. Confirm its uninstall action is available and that no
+desktop shortcut is created. This is an installation-context verification step;
+the NSIS template already writes the normal uninstall metadata.
+
+### Shortcut ownership and notification cleanup
+
+The native shortcut regression creates a development shortcut, starts with an
+installed target, then simulates another development startup and reads the actual
+persisted shell link. The installed target must win both times. Windows CI also
+compiles and executes the production NSIS registry-cleanup block against isolated
+test keys: full uninstall removes sender and activator; update mode retains both.
+The release test suite checks the cleanup remains inside the full-uninstall guard.
+
+Manual coverage: run a normal standalone build before installing, install and
+launch the installed app, run the standalone build again, and check Start still
+launches the installed executable. Uninstall using Windows Installed apps and
+verify both native notification registrations disappear without manual cleanup.
+Repeat an in-place update and verify notification delivery remains available.
+Automated tests isolate installation lookup from real machine registry state and
+do not prove native shell cache refresh or elevation/account behavior.

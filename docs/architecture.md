@@ -137,6 +137,7 @@ unescaping and typed errors. See [ADR 0002](decisions/0002-local-sonos-client.md
 The settings form shares behavior across platforms while selecting separate
 macOS, Windows, and Linux presentation styles in the frontend. See
 [ADR 0012](decisions/0012-platform-settings-presentation.md).
+macOS dropdown sizing runs after saved selections are restored during form mounting.
 
 Windows uses a dedicated, scoped stylesheet and platform window configuration
 for its resizable Windows 11 Settings presentation. OS-specific presentation
@@ -171,3 +172,121 @@ properties, never dispatch input/change events or enqueue writes. Existing audio
 origin/expected-write suppression remains in the synchronization adapters. Sonos
 notifications do not identify the originating controller, so an echoed value is
 not treated as proof of authorship and genuine external changes remain observable.
+
+## Global Night Mode scheduling
+
+A separate shell worker applies one global weekly half-hour schedule exclusively
+to the selected compatible speaker. Pure calendar calculation lives in `domain`;
+read/confirm/enforce policy lives in the integration Night Mode controller. It does
+not enter the volume synchronization state machine. Native wake and notification
+adapters stay in the shell. A shared configuration/Night Mode write gate prevents
+selection races, while volume synchronization continues independently. See
+[ADR 0013](decisions/0013-global-night-mode-schedule.md).
+
+Tray speaker controls retain their native menu objects for the tray lifetime.
+Refreshes update values in place; capability changes only attach or detach cached
+objects, preserving action targets while the OS is dispatching menu clicks.
+
+Desktop clock formatting is read by the shell adapter: Foundation on macOS,
+GetLocaleInfoEx on Windows, and GNOME clock-format/LC_TIME on Linux. The frontend
+applies that preference to both axis labels and interval tooltips. The shared
+rectangular editor and scheduler are used on all three platforms.
+
+Windows schedule tooltips use an opaque platform surface in both color schemes;
+the shared hover interaction remains in the frontend (ADR 0013).
+
+Windows Night schedule presents current state, next change, notification guidance,
+and action errors together in the third settings card. The shared notice output
+moves into this card while the schedule page is active (ADR 0012).
+The Status label sits left of the right-aligned, wrapping text. The Windows default
+height is 820 logical pixels to allow multiline status. Successful settings actions
+clear prior errors without adding confirmation messages on any platform.
+The Windows shell registers an unpackaged notification identity before checking
+permission and uses that same identity for native toast delivery. Unpackaged startup
+registers the sender's COM activator and quoted executable launch command as well
+as its display name. A process-lifetime MTA owns the class factory; notification
+activation opens Settings on the UI thread. Demo and normal activators are separate.
+The Start menu shortcut stores both the same sender ID and toast activator CLSID;
+local startup creates it when absent and repairs its properties without retargeting
+an existing installed shortcut. Recent native toast objects are retained in a bounded
+queue so asynchronous delivery failures can be logged.
+First-use sender
+registration submits a suppressed, expiring toast and removes it before querying
+permission again. Packaged apps use their package identity (ADR 0013).
+
+## Hardware-free UI demo
+
+Demo startup assigns a distinct runtime package name as well as application
+identifier. Windows/Linux login registration uses the package name, preserving
+the normal application's autostart entry when demo login settings change.
+
+The default-off `ui-demo` debug feature runs the normal shell and native commands
+against a loopback Sonos simulator. Discovery and resolution select only this
+simulated device; SOAP and GENA use the production client. The scheduler, tray,
+local audio and synchronization services remain active. Demo configuration and
+logs use a separate app identity. Browser previews alone use the frontend mock.
+See [ADR 0014](decisions/0014-ui-demo-build.md).
+
+Night schedule notifications share the shell's speaker display-name normalization
+with device selection; notification bodies never need the renderer suffix to
+identify a speaker. This applies to both scheduled boundaries and entry/exit caused by applying schedule edits.
+Saving compares the previous and new enabled schedules at the same timestamp.
+Only a membership change produces notification intent after speaker confirmation;
+remaining inside/outside and disabled schedules stay silent.
+Enabling a previously disabled schedule during a selected period applies Night Mode
+immediately and sends a start notification after speaker confirmation when On start or
+On start and end is selected. Enabling outside selected periods, enabling an already
+enabled schedule, and disabling scheduling do not notify. Disabling leaves the speaker
+state unchanged. The worker subsequently reconciles silently to avoid duplicate
+notifications.
+
+Linux delivery uses one persistent asynchronous D-Bus connection with a bounded
+timeout. GNOME removes an app's notifications when their sender disappears, so
+the shell retains that connection after delivery. The blocking plugin path is
+incompatible with the shell's Tokio runtime and is bypassed (ADR 0013).
+
+
+Linux settings use a shared Ubuntu/Yaru-inspired presentation on x86-64 and
+ARM64, with a 1080-pixel fixed-width native window, an 800-pixel default height and
+responsive grouped controls. Vertical resizing remains available.
+The platform stylesheet stays inside the frontend; the shell selects Linux
+window bounds through `tauri.linux.conf.json`. See ADR 0012.
+Linux Night schedule status, notification permission guidance, and schedule error
+feedback share the third settings row below notifications (ADR 0013).
+The shell requires Tauri 2.12 with Tao's repaired Wayland decorations so native
+title-bar buttons receive clicks on first show and after reopening (ADR 0012).
+
+The Linux tray adapter uses a white icon for Ubuntu's dark top bar independently
+of the application color scheme, retaining the disconnected badge (ADR 0012).
+
+The macOS release packages its signed and notarized app into a separately signed
+and notarized DMG as its only direct-download format for drag-to-Applications
+installation; see [ADR 0015](decisions/0015-macos-dmg-download.md).
+
+Settings reset cancels debounced autosaves, invalidates older save responses and
+joins the same user-write queue as configuration saves. A reset therefore runs
+after writes already in flight; stale saves cannot restore pre-reset settings.
+
+Unpackaged Windows notification registration also materializes the bundled app
+icon in the app's local data directory and registers its absolute path as the
+sender `IconUri`. The icon remains available after build-directory cleanup or
+application exit. Paths are canonicalized to their physical location before
+registration so an app launched from a packaged development host does not give
+Explorer a redirected path it cannot resolve. Start menu shortcuts use an explicit
+bundled ICO asset. MSIX notifications continue to use the package manifest assets.
+The registered Windows installation owns the normal Start menu target. Startup
+repairs older development targets while development runs retain a valid installed
+target. Full NSIS uninstall removes the per-user notification sender and COM
+activation registration; in-place updates preserve them (ADR 0013).
+
+## Release artifact flow
+
+Release jobs verify the prepared commit belongs to trusted `develop` history,
+then detach at that exact commit before executing release code. Moving the branch
+forward does not change or invalidate the selected release. Native
+Windows x64/ARM64 MSIX outputs are combined and verified in an unprivileged job
+before the all-platform build gate. Signing follows that gate; publication also
+requires successful Mac App Store packaging when requested. Store submission
+reuses the verified upload. Direct downloads use one permanent filename per
+package, with version identity supplied by the release tag (ADR 0015). See
+[release documentation](release.md) for the variants and validation gates.

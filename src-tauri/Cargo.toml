@@ -7,10 +7,24 @@ license.workspace = true
 repository.workspace = true
 default-run = "sonos-volume-bridge"
 
+[features]
+default = []
+ui-demo = ["dep:reqwest"]
+ui-windows = ["ui-demo"]
+ui-macos = ["ui-demo"]
+ui-ubuntu = ["ui-demo"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[dev-dependencies]
+tauri = { version = "2.12.0", features = ["test"] }
+reqwest.workspace = true
+
 [dependencies]
+reqwest = { workspace = true, optional = true }
+jiff = "0.2.37"
+tauri-plugin-notification = "2"
 async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -19,7 +33,7 @@ sonos-volume-bridge-integration = { path = "../crates/integration" }
 sonos-volume-bridge-platform-audio = { path = "../crates/platform-audio" }
 sonos-volume-bridge-sonos = { path = "../crates/sonos" }
 sonos-volume-bridge-synchronization = { path = "../crates/synchronization" }
-tauri = { version = "2.11.6", features = ["image-png", "tray-icon"] }
+tauri = { version = "2.12.0", features = ["image-png", "tray-icon"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2.4.5"
 thiserror.workspace = true
@@ -30,10 +44,22 @@ tokio.workspace = true
 url.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-windows = { workspace = true, features = ["ApplicationModel"] }
+windows-core = "0.62.2"
+winreg = "0.55"
+dunce = "1"
+windows = { workspace = true, features = ["ApplicationModel", "Data_Xml_Dom", "UI_Notifications", "Win32_System_Power", "Win32_Globalization", "Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_UI_Notifications", "Win32_System_Com", "Win32_Storage_FileSystem", "Win32_UI_Shell_PropertiesSystem", "Win32_System_Com_StructuredStorage", "Win32_System_Variant"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-service-management = "0.3.2"
+objc2 = "0.6"
+block2 = "0.6"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSWorkspace"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSNotification", "NSOperation", "NSDateFormatter", "NSLocale", "NSString", "NSError", "block2"] }
+objc2-user-notifications = { version = "0.3.2", default-features = false, features = ["std", "UNUserNotificationCenter", "UNNotification", "UNNotificationSettings", "UNNotificationContent", "UNNotificationRequest", "UNNotificationTrigger", "block2"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5", default-features = false, features = ["tokio"] }
+futures-util = "0.3"
 
 [lints]
 workspace = true
