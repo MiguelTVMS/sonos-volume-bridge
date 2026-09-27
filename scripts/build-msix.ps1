@@ -28,6 +28,8 @@ if (-not (Test-Path -LiteralPath $ExecutablePath -PathType Leaf)) {
 if ([string]::IsNullOrWhiteSpace($Architecture)) {
     $Architecture = Get-WindowsExecutableArchitecture -Path $ExecutablePath
 }
+# GitHub runner.arch uses uppercase labels; MSIX manifest values are lowercase.
+$Architecture = $Architecture.ToLowerInvariant()
 Assert-WindowsExecutableArchitecture -Path $ExecutablePath -Architecture $Architecture
 
 $cargo = Get-Command cargo.exe -ErrorAction SilentlyContinue
