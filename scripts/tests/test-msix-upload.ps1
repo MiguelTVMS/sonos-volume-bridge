@@ -16,7 +16,17 @@ try {
         }
     } finally { $archive.Dispose() }
 
+    $settings = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Microsoft/MSStore.CLI/settings.json'
+    $hadSettings = Test-Path -LiteralPath $settings
+    $originalSettings = if ($hadSettings) { [System.IO.File]::ReadAllBytes($settings) } else { $null }
     & (Join-Path $PSScriptRoot '../publish-msstore.ps1') -InputDirectory $temporary -ValidateOnly
+    if ($hadSettings) {
+        if ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($settings)) -ne [Convert]::ToBase64String($originalSettings)) {
+            throw 'CLI validation did not restore the original local configuration.'
+        }
+    } elseif (Test-Path -LiteralPath $settings) {
+        throw 'CLI validation left a placeholder configuration behind.'
+    }
 
     foreach ($case in @('missing', 'wrong-architecture-name', 'mismatched-version')) {
         $inputs = Join-Path $temporary $case

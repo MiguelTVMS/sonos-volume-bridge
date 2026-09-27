@@ -266,7 +266,9 @@ Use **Actions → Microsoft Store Package → Run workflow** with the desired
 `release_tag` and `mode: validate` first. This finds the retained combined upload
 from the original release run, verifies the selected version and both Windows
 architectures, and parses the production publishing command with the pinned
-Store CLI. Validation does not authenticate, upload, or modify Store state.
+Store CLI. The CLI requires local configuration even for help; validation temporarily uses
+non-authenticating placeholders and restores the original configuration afterward.
+Validation does not authenticate, upload, or modify Store state.
 It does not rebuild packages, create a release, or bump the version.
 
 For an actual retry, run from `develop` with the same tag and `mode: submit`.
