@@ -28,6 +28,21 @@ try {
         throw 'CLI validation left a placeholder configuration behind.'
     }
 
+    # Execute the production wrapper with an intercepted CLI. The old positional
+    # '.' selects Electron and must fail even though --help accepts it.
+    function global:msstore {
+        if ($args[0] -ne 'publish' -or $args[1] -ne $output -or
+            -not (Test-Path -LiteralPath $args[1] -PathType Leaf) -or
+            [System.IO.Path]::GetExtension($args[1]) -ne '.msixupload') {
+            throw 'Publishing must select the actual MSIX upload file, never the project directory.'
+        }
+        if ($args[-1] -ne '--help') { throw 'Dry run must not publish.' }
+        $global:LASTEXITCODE = 0
+    }
+    try {
+        & (Join-Path $PSScriptRoot '../publish-msstore.ps1') -InputDirectory $temporary -ValidateOnly
+    } finally { Remove-Item Function:\msstore }
+
     foreach ($case in @('missing', 'wrong-architecture-name', 'mismatched-version')) {
         $inputs = Join-Path $temporary $case
         New-Item -ItemType Directory -Path $inputs | Out-Null

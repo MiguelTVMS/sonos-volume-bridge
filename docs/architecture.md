@@ -298,4 +298,5 @@ requires a protected environment; it never rebuilds or increments the version.
 Normal release and manual retry call the same reusable Store publishing workflow
 with a published GA tag. It validates the tag and bundle before protected submission;
 standalone packaging remains separate. Both paths share the pinned CLI publishing
-script and submission concurrency group. See [release recovery](release.md#retry-or-debug-an-existing-microsoft-store-release).
+script and submission concurrency group. Publishing selects the upload file directly
+and verifies Store-reported package versions and architectures after commit. See [release recovery](release.md#retry-or-debug-an-existing-microsoft-store-release).

@@ -19,6 +19,10 @@ Run credential-free preflight before the protected submission job, and
 serialize manual and normal submissions. Keep standalone packaging separate.
 
 Pin the Store CLI version and share the production command between both paths.
+Pass the upload file directly to select the MSIX publisher, bypassing project
+detection. After commit, require Store metadata to confirm uploaded packages
+for the selected version and both architectures. Poll reads only; never resubmit
+automatically when confirmation is delayed or mismatched.
 Exercise its argument parsing against the actual CLI in native CI using --help.
 This prevents a successful packaging test from being mistaken for submission
 validation. Certification remains an independent external result.
