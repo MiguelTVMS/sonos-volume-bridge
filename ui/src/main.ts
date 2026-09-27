@@ -911,7 +911,7 @@ function scheduleNotice(message: string): void {
 
 function refreshScheduleView(): void {
   const feedback = app.querySelector('#schedule-feedback');
-  if (feedback) feedback.textContent = scheduleFeedback;
+  if (feedback && platform === 'linux') feedback.textContent = scheduleFeedback;
   updateScheduleView(
     app,
     scheduleStatus,

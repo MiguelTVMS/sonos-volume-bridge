@@ -200,10 +200,12 @@ pub(super) fn notifier(
             .map(|native| Notifier(Native(native, String::new())));
     }
     activation::register(identifier)?;
+    let icon = notification_icon(identifier)?;
     open_unpacked(
         identifier,
         name,
         &std::env::current_exe()?.to_string_lossy(),
+        &icon.to_string_lossy(),
         |path, field, value| {
             let (key, _) =
                 winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER).create_subkey(path)?;
@@ -220,10 +222,27 @@ pub(super) fn notifier(
 }
 
 #[cfg(windows)]
+fn notification_icon(identifier: &str) -> std::io::Result<std::path::PathBuf> {
+    let directory = std::path::PathBuf::from(
+        std::env::var_os("LOCALAPPDATA")
+            .ok_or_else(|| std::io::Error::other("LocalAppData unavailable"))?,
+    )
+    .join(identifier);
+    std::fs::create_dir_all(&directory)?;
+    let path = directory.join("notification-icon.png");
+    let bytes = include_bytes!("../../icons/icon.png");
+    if std::fs::read(&path).ok().as_deref() != Some(bytes.as_slice()) {
+        std::fs::write(&path, bytes)?;
+    }
+    Ok(path)
+}
+
+#[cfg(windows)]
 fn open_unpacked<T: Transport, E>(
     id: &str,
     name: &str,
     executable: &str,
+    icon: &str,
     mut write: impl FnMut(&str, &str, &str) -> Result<(), E>,
     create: impl FnOnce(&str) -> Result<T, E>,
 ) -> Result<Notifier<T>, E> {
@@ -232,6 +251,8 @@ fn open_unpacked<T: Transport, E>(
         |id| {
             let sender = format!("Software\\Classes\\AppUserModelId\\{id}");
             write(&sender, "DisplayName", name)?;
+            write(&sender, "IconUri", icon)?;
+            write(&sender, "IconBackgroundColor", "00000000")?;
             let clsid = format!("{{{:?}}}", activation::class_id(id));
             write(
                 &format!("Software\\Classes\\CLSID\\{clsid}\\LocalServer32"),
@@ -259,7 +280,7 @@ mod tests {
         for id in ["normal.app", "normal.app.ui-demo"] {
             let entries = RefCell::new(std::collections::HashMap::new());
             let sent = Rc::new(RefCell::new(Vec::new()));
-            let notifier = open_unpacked(id, "Test app", "C:\\Test folder\\app.exe",
+            let notifier = open_unpacked(id, "Test app", "C:\\Test folder\\app.exe", "C:\\Test folder\\notification-icon.png",
                 |path, field, value| {
                     entries.borrow_mut().insert((path.to_owned(), field.to_owned()), value.to_owned());
                     Ok(())
@@ -268,6 +289,8 @@ mod tests {
                     assert_eq!(sender_id, id);
                     let entries = entries.borrow();
                     let sender = format!("Software\\Classes\\AppUserModelId\\{id}");
+                    assert_eq!(entries.get(&(sender.clone(), "IconUri".into())), Some(&"C:\\Test folder\\notification-icon.png".to_owned()),
+                        "The sender icon must be registered before notification delivery");
                     let clsid = format!("{{{:?}}}", activation::class_id(id));
                     assert_eq!(entries.get(&(sender, "CustomActivator".into())), Some(&clsid),
                         "DisplayName alone cannot persist desktop notifications in Notification Center");

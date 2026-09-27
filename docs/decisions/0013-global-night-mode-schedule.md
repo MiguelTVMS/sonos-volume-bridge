@@ -135,7 +135,9 @@ unchanged.
 
 Windows notifications use a shell-owned native adapter for permission and delivery.
 Unpackaged runs register their application identity and display name in the current
-user's AppUserModelId metadata. Packaged runs use the package's notifier. This
+user's AppUserModelId metadata, including the bundled PNG icon in a persistent
+local data location. Register these assets before creating the notifier so Windows
+does not show a generic sender icon. Packaged runs use the package's notifier. This
 removes the mismatch between checking the installed identity and sending under
 Tauri's development PowerShell fallback. No notification preference is rewritten.
 
@@ -145,5 +147,6 @@ sequence](https://github.com/CommunityToolkit/WindowsCommunityToolkit/blob/main/
 submit a suppressed, silent toast with a short expiry, wait briefly for sender
 registration, remove only that tagged toast, and recheck permission. Actual denied
 settings and unrelated errors remain denied. Delivery uses native text nodes and
-reports synchronous failures to the application log. Notifications remain
-informational; clicking them does not add an application activation workflow.
+reports synchronous and asynchronous failures to the application log. A registered
+COM activator opens Settings when the user clicks a notification. The Start menu
+shortcut carries both the sender identity and activator identity.

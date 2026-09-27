@@ -1,7 +1,7 @@
 //! Native notifications. Tauri's desktop permission methods are unconditional,
 //! so macOS uses UserNotifications for both authorization and delivery.
 use tauri::{AppHandle, Runtime};
-#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+#[cfg(not(any(target_os = "macos", windows)))]
 use tauri_plugin_notification::NotificationExt;
 
 #[cfg(any(windows, test))]

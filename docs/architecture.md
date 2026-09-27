@@ -266,3 +266,8 @@ remains available; see [ADR 0015](decisions/0015-macos-dmg-download.md).
 Settings reset cancels debounced autosaves, invalidates older save responses and
 joins the same user-write queue as configuration saves. A reset therefore runs
 after writes already in flight; stale saves cannot restore pre-reset settings.
+
+Unpackaged Windows notification registration also materializes the bundled app
+icon in the app's local data directory and registers its absolute path as the
+sender `IconUri`. The icon remains available after build-directory cleanup or
+application exit. MSIX notifications continue to use the package manifest assets.

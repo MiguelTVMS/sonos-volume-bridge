@@ -6,6 +6,7 @@ for (const platform of ['windows', 'macos', 'linux']) {
   }) => {
     await page.goto(`/preview.html?platform=${platform}`);
     await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
+    const scheduleFeedback = page.locator(platform === 'linux' ? '#schedule-feedback' : '#notice');
     await page.locator('.schedule-cell').first().click();
     const beforeSave = await page.locator('#schedule-save').elementHandle();
     await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
@@ -27,11 +28,11 @@ for (const platform of ['windows', 'macos', 'linux']) {
       };
     });
     await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
-    await expect(page.locator('#notice')).toContainText('Could not save schedule.');
-    await expect(page.locator('#notice')).toBeVisible();
-    await expect(page.locator('#notice')).toHaveAttribute('aria-live', 'polite');
+    await expect(scheduleFeedback).toContainText('Could not save schedule.');
+    await expect(scheduleFeedback).toBeVisible();
+    await expect(scheduleFeedback).toHaveAttribute('aria-live', 'polite');
     await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
-    await expect(page.locator('#notice')).toBeEmpty();
+    await expect(scheduleFeedback).toBeEmpty();
 
     await page.getByRole('button', { name: 'General', exact: true }).click();
     const beforeSetting = await page.locator('[name="startAtLogin"]').elementHandle();
