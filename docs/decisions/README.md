@@ -18,3 +18,5 @@ This folder stores decision records. Keep one record per important design choice
 
 - [0014-ui-demo-build](0014-ui-demo-build.md)
 - [0015-macos-dmg-download](0015-macos-dmg-download.md)
+
+- [0016-store-release-recovery](0016-store-release-recovery.md)

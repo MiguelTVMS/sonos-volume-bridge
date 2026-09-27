@@ -99,7 +99,11 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertNotIn('environment:', package)
         self.assertNotIn('    if:', package)
         submission = graph['publish-microsoft-store']
-        self.assertIn('name: microsoft-store-upload-${{ needs.prepare-version.outputs.tag }}', submission)
+        self.assertIn('uses: ./.github/workflows/microsoft-store-publish.yml', submission)
+        self.assertIn('release_tag: ${{ needs.prepare-version.outputs.tag }}', submission)
+        self.assertIn('actions: read', submission)
+        self.assertIn('dry_run: false', submission)
+        self.assertNotIn('steps:', submission)
         self.assertNotIn('MakeAppx', submission)
         self.assertNotIn('Compress-Archive', submission)
         ci = (WORKFLOW.parent / 'ci.yml').read_text()

@@ -290,3 +290,12 @@ requires successful Mac App Store packaging when requested. Store submission
 reuses the verified upload. Direct downloads use one permanent filename per
 package, with version identity supplied by the release tag (ADR 0015). See
 [release documentation](release.md) for the variants and validation gates.
+
+Microsoft Store retries resolve an existing release tag to the original verified
+upload, then independently validate its version and both embedded architectures.
+Validation runs without Store credentials. Submission reuses that artifact and
+requires a protected environment; it never rebuilds or increments the version.
+Normal release and manual retry call the same reusable Store publishing workflow
+with a published GA tag. It validates the tag and bundle before protected submission;
+standalone packaging remains separate. Both paths share the pinned CLI publishing
+script and submission concurrency group. See [release recovery](release.md#retry-or-debug-an-existing-microsoft-store-release).

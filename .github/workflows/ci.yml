@@ -55,6 +55,9 @@ jobs:
               - '.github/workflows/release-candidate.yml'
               - '.github/workflows/microsoft-store-package.yml'
               - 'scripts/build-msix*.ps1'
+              - 'scripts/publish-msstore.ps1'
+              - 'scripts/resolve-store-upload.py'
+              - 'scripts/tests/test_store_upload.py'
               - 'scripts/tests/test-msix-upload.ps1'
             rust:
               - 'Cargo.toml'
@@ -65,6 +68,9 @@ jobs:
               - 'src-tauri/**'
               - 'scripts/*windows*.ps1'
               - 'scripts/build-msix*.ps1'
+              - 'scripts/publish-msstore.ps1'
+              - 'scripts/resolve-store-upload.py'
+              - 'scripts/tests/test_store_upload.py'
               - 'scripts/tests/test-msix-upload.ps1'
               - 'scripts/tests/test-windows-architecture.ps1'
               - 'scripts/tests/test-windows-uninstall.ps1'
@@ -87,6 +93,7 @@ jobs:
       - run: python3 -m unittest discover -s scripts/tests -p test_release_promotion.py
       - run: python3 -m unittest discover -s scripts/tests -p test_release_downloads.py
       - run: python3 -m unittest discover -s scripts/tests -p test_release_workflow.py
+      - run: python3 -m unittest discover -s scripts/tests -p test_store_upload.py
       - run: python3 -m unittest discover -s scripts/tests -p test_linux_installer.py
 
   rust:
@@ -156,6 +163,9 @@ jobs:
           pattern: ci-msix-*
           merge-multiple: true
           path: microsoft-store-msix
+      - uses: microsoft/microsoft-store-apppublisher@v1
+        with:
+          version: v0.4.3
       - shell: pwsh
         run: ./scripts/tests/test-msix-upload.ps1 -PackageDirectory microsoft-store-msix
 

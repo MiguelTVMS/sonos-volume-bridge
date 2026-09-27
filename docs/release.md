@@ -259,3 +259,38 @@ Windows PR CI builds native MSIX packages on both architectures and runs the
 production combined-upload script. It unbundles the result and verifies both
 original packages are preserved, then checks rejection of a missing architecture,
 a misleading architecture filename, and mismatched package versions.
+
+## Retry or debug an existing Microsoft Store release
+
+Use **Actions → Microsoft Store Publish → Run workflow**, leave the workflow
+source on `develop`, and enter the desired `release_tag`. Leave `dry_run` enabled
+(the default) to validate without authenticating or uploading. Disable it explicitly
+for an actual Store submission. GitHub does not provide a dynamic tag-picker input;
+the tag field is
+validated before submission, rejecting branches, unknown tags, drafts and
+prereleases. Only existing published GA releases are accepted.
+
+The release flow calls this same reusable workflow after successful builds and
+GitHub publication when Store submission is selected, passing `dry_run: false`.
+Both paths find the retained
+combined upload from the original release run, verify the selected version and
+both Windows architectures, and validate the publishing command with the pinned
+Store CLI before entering the protected Microsoft Store environment. Submissions
+share a concurrency group to prevent overlapping Store changes.
+
+The retry reuses the retained artifact even when the original Store submission
+failed. Expired artifacts and runs without successful package verification and
+GitHub publication are rejected; there is no automatic rebuild fallback or
+version bump. **Microsoft Store Package** remains a separate build-only workflow.
+
+CLI preflight uses non-authenticating placeholder configuration for help parsing
+and restores the original configuration afterward. It does not authenticate or
+upload. When `dry_run` is false, the subsequent protected submission job performs
+the actual upload. Dry runs skip that job entirely, including environment approval
+and authentication.
+
+The CLI is pinned to `v0.4.3`, whose publish option is `--inputDirectory`.
+The shared publishing script requires a directory containing exactly one
+`.msixupload`. Native Windows CI invokes that same script with `--help`, using
+the actual pinned CLI, so unsupported publishing arguments fail before release.
+Successful submission is separate from Store certification and availability.
