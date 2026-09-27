@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import urlparse, parse_qs
 
 SCRIPT = Path(__file__).resolve().parents[1] / "prepare-release-downloads.sh"
 SUFFIXES = ("macos.dmg", "windows-x64-unsigned.exe", "windows-arm64-unsigned.exe", "linux-amd64.deb", "linux-arm64.deb")
@@ -20,6 +21,12 @@ class ReleaseDownloadsTests(unittest.TestCase):
                     links.append(dict(attrs).get("href", ""))
 
         Links().feed((SCRIPT.parent.parent / "pages" / "index.html").read_text())
+        store = [link for link in links if urlparse(link).hostname == 'apps.microsoft.com']
+        self.assertEqual(len(store), 1)
+        self.assertEqual(parse_qs(urlparse(store[0]).query), {
+            'cid': ['website'], 'referrer': ['download'], 'source': ['svb.miguel.ms'],
+        })
+        self.assertIn(store[0], (SCRIPT.parent.parent / 'pages/index.md').read_text())
         for suffix in ("macos.dmg", "windows-x64-unsigned.exe", "windows-arm64-unsigned.exe", "linux-x64.deb", "linux-arm64.deb"):
             self.assertIn(suffix, DESTINATIONS)
             self.assertTrue(any(link.endswith(
