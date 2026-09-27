@@ -112,3 +112,16 @@ The disconnected red badge remains intact. Registration, theme notifications and
 connection refreshes share this image selection. Other platforms retain their
 existing theme-based selection. Custom Linux panels with light backgrounds are
 not covered by this Ubuntu-specific contrast policy.
+
+## Wayland title-bar input
+
+Require Tauri 2.12 and its Tao 0.37 dependency, incorporating the upstream
+[Wayland decoration repair](https://github.com/tauri-apps/tao/pull/1218).
+The previous Tao title-bar event overlay swallowed native button clicks after
+showing a hidden window; double-clicking or resizing could make them work again.
+Use GTK's repaired native decoration path rather than synthesizing a resize.
+The shell's shared close handler still hides Settings and prevents destruction,
+keeping synchronization running. A mock runtime test exercises first show,
+immediate close, reopen, and another immediate close with no resize events.
+The dependency regression guard rejects the affected Tao version. Neither test
+can validate compositor hit testing; the native reproduction remains required.

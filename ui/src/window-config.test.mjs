@@ -33,6 +33,18 @@ test('Ubuntu keeps a fixed width with native chrome and vertical resizing', () =
   assert.notEqual(window.decorations, false);
 });
 
+test('native Wayland decorations use Tao with the upstream input propagation fix', () => {
+  // The real GTK hit testing still requires the native reproduction documented
+  // in the verification matrix. Prevent lockfile refreshes from restoring the
+  // old EventBox overlay that swallowed the first close-button clicks.
+  const lock = readFileSync(new URL('../../Cargo.lock', import.meta.url), 'utf8');
+  const versions = [...lock.matchAll(/name = "tao"\nversion = "(\d+)\.(\d+)\.(\d+)"/g)];
+  assert.ok(versions.length > 0);
+  for (const [, major, minor] of versions) {
+    assert.ok(Number(major) > 0 || Number(minor) >= 37, 'Tao must include the Wayland CSD repair');
+  }
+});
+
 test('Windows supports horizontal resizing and keeps native window chrome', () => {
   const window = config('tauri.windows.conf.json').app.windows[0];
   assert.ok(window.minWidth < window.width, 'compact layout must be reachable');

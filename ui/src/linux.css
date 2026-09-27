@@ -92,6 +92,7 @@
   display: none;
 }
 [data-platform='linux'] label,
+[data-platform='linux'] .schedule-status-row > span,
 [data-platform='linux'] .control-field > label {
   font-size: 15px;
   font-weight: 400;
@@ -202,7 +203,22 @@
   height: 24px;
 }
 [data-platform='linux'] .schedule-editor-content {
-  gap: 16px;
+  gap: 10px;
+}
+[data-platform='linux'] .schedule-status-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 16px;
+}
+[data-platform='linux'] .schedule-status-row p {
+  margin: 0;
+  grid-column: 2;
+}
+[data-platform='linux'] #schedule-feedback:empty {
+  display: none;
+}
+[data-platform='linux'] #notice:empty {
+  display: none;
 }
 [data-platform='linux'] .setting-note {
   font-size: 13px;

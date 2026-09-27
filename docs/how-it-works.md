@@ -148,11 +148,20 @@ The checkmark represents enabled scheduling; the editor opens through Settings.
 
 **Night schedule notifications** saves immediately and offers **On start**,
 **On end**, **On start and end**, and **Never** (the default). Confirmed boundaries notify
-only when their direction is selected. Save also tests the matching direction:
-on counts as Start, off as End. Adjacent selected cells do not notify. Startup,
+only when their direction is selected. Applying an edited schedule also notifies
+only if it makes the current time enter or leave the enabled schedule, using the
+matching direction after the speaker state is confirmed. Saving while remaining
+inside or outside the schedule sends no notification. Disabled scheduling is silent. Adjacent selected cells do not notify. Startup,
 wake, recovery, selection changes, manual changes, and enforcement corrections
 remain silent. Permission denial and OS notification suppression never stop
 scheduling or volume synchronization.
+
+Enabling a previously disabled schedule during a selected period applies Night Mode
+immediately and sends a start notification after speaker confirmation when On start or
+On start and end is selected. Enabling outside selected periods, enabling an already
+enabled schedule, and disabling scheduling do not notify. Disabling leaves the speaker
+state unchanged. The worker subsequently reconciles silently to avoid duplicate
+notifications.
 
 Scheduling follows the machine's time zone. Startup, wake, reconnection, selection
 changes, clock changes, and schedule enabling reconcile only the current expected
@@ -164,6 +173,9 @@ Windows, and GNOME clock-format or LC_TIME on Linux. Preferences are reread when
 Settings regains focus. Other Linux desktop-specific clock overrides may require
 matching LC_TIME. The form omits repetitive disabled/outside-period status text;
 errors, capability guidance, and active-period restrictions remain visible.
+On Linux, a dedicated Schedule status row below notifications shows the current
+state, including disabled and outside-period states. Schedule errors appear in
+that same row instead of beneath the editor. Successful saves show no confirmation.
 
 ## UI demo builds
 

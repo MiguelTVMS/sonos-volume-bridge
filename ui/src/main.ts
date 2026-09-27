@@ -132,6 +132,7 @@ let speakerSettings: SpeakerSettings = {
   treble: null,
   bass: null,
 };
+let scheduleFeedback = '';
 let scheduleStatus: ScheduleStatus = {
   active: false,
   supported: false,
@@ -345,7 +346,7 @@ function render(nextSnapshot: Snapshot): void {
         )}
         ${panel(
           'schedule',
-          `<div class="panel-heading"><h2 id="night-schedule-title">Night schedule</h2><p>Set weekly Night Mode hours for the selected speaker. This schedule applies to your selected speaker when it supports Night Mode.</p></div>${scheduleMarkup()}`,
+          `<div class="panel-heading"><h2 id="night-schedule-title">Night schedule</h2><p>Set weekly Night Mode hours for the selected speaker. This schedule applies to your selected speaker when it supports Night Mode.</p></div>${scheduleMarkup(platform === 'linux')}`,
         )}
         ${panel(
           'volume',
@@ -399,16 +400,17 @@ function render(nextSnapshot: Snapshot): void {
     snapshot?.configuration.notifyNightModeScheduleTransitions ?? 'never',
     {
       save: async (blocks) => {
+        if (platform === 'linux') scheduleNotice('');
         const revision = scheduleDraft.revision;
         await writeSchedule('save_night_schedule', { blocks }, (next) => {
           if (revision === scheduleDraft.revision)
             scheduleDraft.reset(next.configuration.nightModeSchedule!.blocks);
         });
-        notice('Schedule saved and applied to the selected speaker.');
+        if (platform !== 'linux') notice('Schedule saved and applied to the selected speaker.');
       },
       enable: async (enabled) => writeSchedule('enable_night_schedule', { enabled }),
       notify: async (mode) => writeSchedule('set_schedule_notifications', { mode }),
-      error: notice,
+      error: scheduleNotice,
     },
   );
   // Mount restores saved selections before their labels determine control width.
@@ -887,7 +889,18 @@ if (isTauri()) {
   });
 }
 
+function scheduleNotice(message: string): void {
+  if (platform !== 'linux') {
+    notice(message);
+    return;
+  }
+  scheduleFeedback = message;
+  refreshScheduleView();
+}
+
 function refreshScheduleView(): void {
+  const feedback = app.querySelector('#schedule-feedback');
+  if (feedback) feedback.textContent = scheduleFeedback;
   updateScheduleView(
     app,
     scheduleStatus,
@@ -902,14 +915,15 @@ if (isTauri()) {
     scheduleStatus = payload;
     refreshScheduleView();
   });
-  void invoke<ScheduleStatus>('get_schedule_status').then((status) => {
-    scheduleStatus = status;
-    refreshScheduleView();
-  });
   void listen('open-night-schedule', () => {
     activatePage('schedule');
   });
 }
+
+void invoke<ScheduleStatus>('get_schedule_status').then((status) => {
+  scheduleStatus = status;
+  refreshScheduleView();
+});
 
 async function writeSchedule(
   command: string,

@@ -210,7 +210,21 @@ See [ADR 0014](decisions/0014-ui-demo-build.md).
 
 Night schedule notifications share the shell's speaker display-name normalization
 with device selection; notification bodies never need the renderer suffix to
-identify a speaker. This applies to both scheduled boundaries and Save confirmations.
+identify a speaker. This applies to both scheduled boundaries and entry/exit caused by applying schedule edits.
+Saving compares the previous and new enabled schedules at the same timestamp.
+Only a membership change produces notification intent after speaker confirmation;
+remaining inside/outside and disabled schedules stay silent.
+Enabling a previously disabled schedule during a selected period applies Night Mode
+immediately and sends a start notification after speaker confirmation when On start or
+On start and end is selected. Enabling outside selected periods, enabling an already
+enabled schedule, and disabling scheduling do not notify. Disabling leaves the speaker
+state unchanged. The worker subsequently reconciles silently to avoid duplicate
+notifications.
+
+Linux delivery uses one persistent asynchronous D-Bus connection with a bounded
+timeout. GNOME removes an app's notifications when their sender disappears, so
+the shell retains that connection after delivery. The blocking plugin path is
+incompatible with the shell's Tokio runtime and is bypassed (ADR 0013).
 
 
 Linux settings use a shared Ubuntu/Yaru-inspired presentation on x86-64 and
@@ -218,6 +232,10 @@ ARM64, with a 1080-pixel fixed-width native window, an 800-pixel default height 
 responsive grouped controls. Vertical resizing remains available.
 The platform stylesheet stays inside the frontend; the shell selects Linux
 window bounds through `tauri.linux.conf.json`. See ADR 0012.
+Linux Night schedule status, notification permission guidance, and schedule error
+feedback share the third settings row below notifications (ADR 0013).
+The shell requires Tauri 2.12 with Tao's repaired Wayland decorations so native
+title-bar buttons receive clicks on first show and after reopening (ADR 0012).
 
 The Linux tray adapter uses a white icon for Ubuntu's dark top bar independently
 of the application color scheme, retaining the disconnected badge (ADR 0012).

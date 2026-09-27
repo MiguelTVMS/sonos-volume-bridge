@@ -49,15 +49,37 @@ notifications off. Invalid grid dimensions fail validation before persistence.
 
 ## Notifications
 
-A separate global On start/On end/On start and end/Never preference filters native entry/exit notifications, including Save tests. Legacy false/true values migrate to Never/On start and end; the existing field and schema version are retained. A notification
+A separate global On start/On end/On start and end/Never preference filters native entry/exit notifications, including entry/exit caused by schedule edits. Legacy false/true values migrate to Never/On start and end; the existing field and schema version are retained. A notification
 requires a confirmed speaker state and an ordinary boundary transition; already
 correct speaker state still qualifies. Startup, recovery, selection changes, manual changes, and enforcement corrections
-are silent. Explicit Save is the exception: each confirmed save can notify, allowing
-repeatable testing without editing the grid or enabling recurring scheduling. The controller consumes
+are silent. Applying a saved schedule compares the previous and new enabled schedules at one
+timestamp. If the edit makes the current time enter or leave the schedule, notify
+after speaker confirmation using the matching direction. This also applies when
+the speaker already has the correct Night Mode value. Remaining inside/outside,
+repeated saves, and saves with recurrence disabled are silent; there is no separate
+save-confirmation notification. The controller consumes
 notification intent once and clears superseded or recovery intent.
 
-The shell uses Tauri desktop notifications on Windows/Linux. Because Tauri's desktop
-permission helpers unconditionally report granted, macOS uses UserNotifications
+Enabling a previously disabled schedule during a selected period applies Night Mode
+immediately and sends a start notification after speaker confirmation when On start or
+On start and end is selected. Enabling outside selected periods, enabling an already
+enabled schedule, and disabling scheduling do not notify. Disabling leaves the speaker
+state unchanged. The worker subsequently reconciles silently to avoid duplicate
+notifications.
+
+The shell uses Tauri desktop notifications on Windows and a persistent async
+D-Bus connection on Linux. The plugin's Linux path calls a blocking sender inside a
+Tokio task, which panics when zbus also uses Tokio. Linux delivery therefore awaits
+the native async API, bounded to two seconds, and retains the same sender connection
+for the process lifetime. GNOME watches app sender names and removes a source when
+its sender disconnects; acknowledging delivery alone does not guarantee a visible
+banner. Failed or timed-out delivery clears the connection for a later reconnect
+and records a generic delivery failure or timeout without interrupting
+synchronization. A private D-Bus regression service
+verifies applied-on/off and boundary-on/off delivery through the production sender
+inside the async runtime and verifies that the sender remains connected after
+multiple sends. It never posts test notifications to the user's desktop.
+Because Tauri's desktop permission helpers unconditionally report granted, macOS uses UserNotifications
 for real authorization, delivery, and foreground presentation; Windows checks the
 native toast setting. OS permission is requested only from the user's opt-in action.
 Linux notification services do not expose a portable permission prompt/status;
@@ -87,7 +109,15 @@ alive during OS menu tracking.
 Windows interval tooltips use the opaque platform surface color in both light
 and dark modes so underlying grid cells cannot show through the time label.
 
-Scheduled start/end notifications and explicit Save confirmations share one body
+Linux groups schedule status in the third boxed settings row, directly below
+notification preferences. Current status and the next transition appear once;
+notification permission guidance and error feedback share that row. Successful
+saves show no confirmation, and a successful retry clears the prior error. Disabled
+and outside-period states remain visible there. The shared initial status read
+also runs in browser previews so startup and subsequent actions use the same UI
+orchestration. Other platforms retain their existing status presentation.
+
+Scheduled start/end notifications and entry/exit caused by schedule edits share one body
 formatter. Speaker names use the same display-name normalization as device
 selection, removing Sonos renderer/model/identifier suffixes while retaining the
 human room name, including hyphens within that name. Stable device identity is

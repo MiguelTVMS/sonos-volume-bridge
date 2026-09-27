@@ -325,6 +325,39 @@ mod tests {
         gena.unsubscribe(&device, &subscription).await.unwrap();
     }
 
+    async fn verify_saved_schedule_transitions(
+        configuration: &AppConfiguration,
+        saved: &AppConfiguration,
+    ) {
+        let (notification, _) =
+            night_schedule::apply_saved(saved, &configuration.night_mode_schedule)
+                .await
+                .unwrap();
+        assert_eq!(
+            notification, None,
+            "disabled scheduling does not notify on Save"
+        );
+        let mut enabled = saved.clone();
+        enabled.night_mode_schedule.enabled = true;
+        let mut outside = enabled.night_mode_schedule.clone();
+        outside.blocks = vec![vec![false; 48]; 7];
+        let (notification, _) = night_schedule::apply_saved(&enabled, &outside)
+            .await
+            .unwrap();
+        assert_eq!(
+            notification,
+            Some(true),
+            "editing into the schedule notifies even when Night Mode is already on"
+        );
+        let (notification, _) = night_schedule::apply_saved(&enabled, &enabled.night_mode_schedule)
+            .await
+            .unwrap();
+        assert_eq!(
+            notification, None,
+            "remaining inside the schedule is silent"
+        );
+    }
+
     #[tokio::test]
     async fn normal_schedule_worker_and_commands_lock_demo_speaker_after_enable() {
         let speaker = speaker().await.unwrap();
@@ -349,11 +382,11 @@ mod tests {
         saved.night_mode_schedule.blocks = vec![vec![true; 48]; 7];
         state.store.save(&saved).unwrap();
         state.replace_configuration(saved.clone());
-        night_schedule::apply_saved(&saved).await.unwrap();
+        verify_saved_schedule_transitions(&configuration, &saved).await;
         commands::set_speaker_setting(runtime::SpeakerSetting::NightSound, false, app.state())
             .await
             .unwrap();
-        commands::enable_night_schedule(true, app.state())
+        commands::enable_night_schedule(true, app.state(), app.handle().clone())
             .await
             .unwrap();
         // Manual off must be rejected even before the worker's first startup tick.
@@ -378,7 +411,7 @@ mod tests {
             runtime::speaker_settings(saved.clone()).await.night_sound,
             Some(true)
         );
-        commands::enable_night_schedule(false, app.state())
+        commands::enable_night_schedule(false, app.state(), app.handle().clone())
             .await
             .unwrap();
         assert_eq!(
@@ -395,7 +428,7 @@ mod tests {
         // An enabled empty schedule must allow manual on and off.
         saved.night_mode_schedule.blocks = vec![vec![false; 48]; 7];
         state.replace_configuration(saved);
-        commands::enable_night_schedule(true, app.state())
+        commands::enable_night_schedule(true, app.state(), app.handle().clone())
             .await
             .unwrap();
         commands::set_speaker_setting(runtime::SpeakerSetting::NightSound, true, app.state())

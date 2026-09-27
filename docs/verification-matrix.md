@@ -185,8 +185,7 @@ wake delivery. Native notification display is controlled by the OS.
 
 8. On Night schedule, confirm there is no repeated selected-speaker label. Leave recurring
    scheduling disabled, select the current block and Save: Night Mode turns on.
-   Save unchanged again: notification repeats if its direction is selected, with no redundant Sonos
-   write. Clear the current block and Save: Night Mode turns off. Permission denial
+   Save unchanged again: no notification and no redundant Sonos write. Clear the current block and Save: Night Mode turns off. Permission denial
    must not prevent application, and failed confirmation must not announce success.
 
 9. Open the native tray menu with a compatible speaker selected. Verify Night schedule is immediately above Night sound and its checkmark reflects whether scheduling is enabled and no editor shortcut remains. Toggle
@@ -377,3 +376,107 @@ the autosave debounce, return to General, and confirm defaults remain restored
 and the reset notice was not replaced by an old save response. Repeat with a slow
 configuration write. Browser regressions freeze the debounce clock or hold IPC
 completion to exercise both sequences deterministically through the real UI.
+
+## Linux Night schedule status consolidation
+
+- Automated: the Linux browser suite opens Night schedule from startup, checks
+  the third row below notifications, enables scheduling, saves, navigates away
+  and returns. Status and error feedback must stay in that row, with no duplicate
+  status below the card or confirmation below the editor. Successful saves remain
+  silent; a failed save shows an error, cleared on a successful retry. The regression fails
+  before the fix and passes after it; default-window fit is also checked.
+- Manual: launch the normal Linux app, open Settings > Night schedule, enable
+  scheduling, and save a block. Confirm the status updates in the third white row
+  below notifications. Navigate away and back, then test an active period and
+  an unavailable speaker. Confirm current status and errors remain in the row.
+  Browser mocks cover layout and frontend orchestration, not native event delivery
+  or real speaker transitions. Native checks remain to be performed.
+
+## Wayland close button after first show
+
+1. In an Ubuntu Wayland session, launch the normal app with Settings initially hidden.
+2. Open Settings from the tray and click the native close button once, without
+   resizing, maximizing, or double-clicking the title bar first.
+3. Confirm Settings hides and synchronization and the tray continue running.
+4. Reopen from the tray and repeat the immediate close at least three times.
+5. Confirm title-bar dragging, minimize, maximize, and vertical resizing still work.
+
+Before the dependency repair, close could ignore clicks until a resize; repeated
+clicks could maximize instead. The lockfile regression fails on that dependency
+and passes with the upgrade. The normal Rust suite exercises the shared close
+handler through first show and reopen without resize. Native GTK/compositor input
+is outside mock coverage; manual validation is pending.
+
+## Linux schedule notification delivery
+
+- Automated: the normal Rust suite starts a private D-Bus notification service
+  and a subprocess using the production sender inside Tokio. Applied-on, applied-off,
+  scheduled-start, and scheduled-end must all arrive. Before the fix all four were
+  missing because the blocking plugin sender panicked inside the async runtime;
+  the same regression passes with asynchronous delivery. Linux tests require
+  `dbus-daemon`, installed by CI. The test never targets the desktop session bus.
+- Manual: in the normal Ubuntu app, select On start and end. Save once with the
+  schedule enabled and the current half-hour selected, and again with it cleared. Confirm a native banner
+  only when the edit enters or leaves the enabled schedule. Repeat each save and confirm
+  there is no additional notification. Then enable the
+  schedule and verify an actual start and end boundary. Enabling during a selected
+  period also notifies after speaker confirmation; disabling does not notify. Confirm Never suppresses both directions, On start only shows
+  on notifications, and On end only shows off notifications.
+- Coverage limit: the service test verifies delivery and message content, not
+  GNOME banner rendering or desktop suppression. Native edit-triggered banner
+  confirmation is recorded below.
+
+The save-transition regression additionally exercises the shared application and
+notification orchestration with all four preferences, recurring scheduling on
+and off, and the sequence outside → enter → unchanged save → leave → unchanged
+save. Only permitted entry/exit transitions with recurrence enabled reach the private
+service after speaker confirmation. Disabled recurrence stays silent.
+
+Also turn Night Mode on manually while outside the schedule, then save an edit
+that includes the current half-hour. With On start selected, the entry notification
+should appear even though the speaker was already on. Editing another day while
+remaining inside the current period should not notify. Save with recurrence off
+and confirm no notification, even if the one-shot apply changes Night Mode.
+
+### GNOME notification source lifetime
+
+The private-service regression also checks that repeated notifications use the
+same sender and that it still owns its bus name after the production sender
+returns. The previous per-send connection was closed immediately after Ubuntu
+accepted delivery, causing GNOME to remove the app notification source. This
+regression fails before persistent-connection delivery and passes afterward.
+
+Manual reproduction: keep Settings open, enable the schedule and On start and
+end notifications. Clear the current half-hour block and save, then select it
+and save. Confirm both banners appear and remain available in Ubuntu's
+notification list after the send completes. Repeat without closing Settings.
+The mock service checks connection lifetime; actual GNOME presentation still
+requires this native verification.
+
+Native verification (2026-09-27): the user confirmed that both Ubuntu banners
+appeared after clearing the current half-hour and saving, then selecting it and
+saving again with Settings open. This verifies edit-triggered exit and entry
+presentation; timed boundaries and other desktop sessions remain separate checks.
+
+### Enabling during an active period
+
+Automated Linux regression calls the production enable command before the worker's
+first tick with a simulated speaker and private notification service. It covers
+all four notification preferences, selected and unselected current-time periods,
+repeated enable, and disable. It verifies speaker confirmation and exactly two
+start notifications (Start and Both). The regression receives zero notifications
+before the fix and passes afterward. Existing worker tests cover reconciliation.
+
+Native check: with scheduling disabled, select/save the current half-hour, then
+manually turn Night Mode off. Choose On start or On start and end and enable the
+schedule from Settings; confirm Night Mode turns on and one Ubuntu banner appears.
+Repeat using the tray. Repeat outside selected periods and with On end/Never;
+expect no banner. Disable scheduling and confirm Night Mode stays unchanged with
+no end banner. The private service cannot prove GNOME banner presentation or
+desktop suppression settings.
+
+Native verification (2026-09-27): after the enable-notification fix, the user
+reported that everything was working. This confirms the reported active-period
+enable notification in the normal Ubuntu app. The report does not separately
+verify every preference, tray interaction, timed boundary, or first-open close
+sequence listed above.
