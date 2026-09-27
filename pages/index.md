@@ -64,19 +64,19 @@ Apple Silicon (ARM64) only. Intel Macs are not supported.
 
 ### Windows
 
-Install from Microsoft Store or choose the direct installer for your processor: AMD64 (x64) or ARM64.
+Install from Microsoft Store or choose the direct installer for your processor: x64 or ARM64.
 
 The direct installer is unsigned. Windows SmartScreen may show a warning.
 
-[Microsoft Store ↗](https://apps.microsoft.com/detail/9N7JKGXCMST0) [Windows AMD64 (x64) ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-windows-unsigned.exe) [Windows ARM64 ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-windows-arm64-unsigned.exe)
+[Microsoft Store ↗](https://apps.microsoft.com/detail/9N7JKGXCMST0) [Windows x64 ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-windows-x64-unsigned.exe) [Windows ARM64 ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-windows-arm64-unsigned.exe)
 
 ### Ubuntu
 
 For Ubuntu on x86-64 or ARM64, with PulseAudio or PipeWire and `pactl`.
 
-DEB packages · AMD64 and ARM64.
+DEB packages · x64 and ARM64.
 
-[Download for Ubuntu (AMD64) ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-linux-amd64.deb)  [Download for Ubuntu (ARM64) ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-linux-arm64.deb)
+[Download for Ubuntu (x64) ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-linux-x64.deb)  [Download for Ubuntu (ARM64) ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-linux-arm64.deb)
 
 Need a hand? [Read the installation guide ↗](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki/Installation)
 

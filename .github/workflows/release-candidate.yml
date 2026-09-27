@@ -398,19 +398,10 @@ jobs:
           codesign --verify --verbose=2 "$image"
           hdiutil verify "$image"
           spctl --assess --type open --context context:primary-signature --verbose=4 "$image"
-      - name: Archive the notarized app bundle
-        env:
-          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
-        run: |
-          ditto -c -k --sequesterRsrc --keepParent \
-            'target/release/bundle/macos/Sonos Volume Bridge.app' \
-            "sonos-volume-bridge-${RELEASE_TAG}-macos.zip"
       - uses: actions/upload-artifact@v7
         with:
           name: macos-release
-          path: |
-            sonos-volume-bridge-*-macos.zip
-            sonos-volume-bridge-*-macos.dmg
+          path: sonos-volume-bridge-*-macos.dmg
           if-no-files-found: error
       - name: Remove temporary Apple credentials
         if: always()

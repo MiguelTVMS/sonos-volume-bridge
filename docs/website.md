@@ -36,11 +36,11 @@ or third-party embeds without reviewing the website privacy notice.
 ## Permanent installer links
 
 Download buttons use GitHub's `releases/latest/download/` URLs. Release CI publishes
-one fixed-name file per package: macOS DMG and compatibility ZIP, Windows
-x64/ARM64 installers, and Ubuntu AMD64/ARM64 DEBs. Versioned build filenames
+one fixed-name file per package: macOS DMG, Windows
+x64/ARM64 installers, and Ubuntu x64/ARM64 DEBs. Versioned build filenames
 are renamed before upload; the release tag supplies the version. `scripts/prepare-release-downloads.sh` validates all
-release assets before renaming them. The original architecture-free Windows URL
-remains the sole x64 download, avoiding an extra compatibility copy. Prereleases also receive these assets,
+release assets before renaming them. Windows and Linux filenames explicitly identify x64 and ARM64. The old architecture-free
+Windows URL and macOS ZIP are not published in future releases. Prereleases also receive these assets,
 but the latest stable URLs do not select prereleases.
 
 The website does not need to be rebuilt when a release is published. Before
@@ -110,10 +110,10 @@ columns on desktop (two, two, then one), leaving space for a future feature. Fea
 product because the site publishes with the release. Keep the visible copy and
 llms.txt aligned. The section introduces no tracking or external assets.
 
-The Ubuntu card provides distinct AMD64 and ARM64 download buttons. The ARM64
+The Ubuntu card provides distinct x64 and ARM64 download buttons. The ARM64
 URL targets the next release that includes `sonos-volume-bridge-linux-arm64.deb`;
 it will become available after the first GA release containing that asset.
 
-The Windows card likewise provides AMD64 (x64) and ARM64 buttons. Publish both
+The Windows card likewise provides x64 and ARM64 buttons. Publish both
 Windows installer assets in a stable release before deploying
 the updated website. Generated Markdown and llms.txt carry the same choices.

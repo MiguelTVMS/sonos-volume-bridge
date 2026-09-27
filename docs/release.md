@@ -134,7 +134,7 @@ package version is derived from the workspace semantic version as
 Build on Apple Silicon at minimum. macOS 13 or later is required because the
 sandboxed app uses Apple's `SMAppService` login-item API instead of a
 filesystem LaunchAgent. The release workflow packages the notarized
-direct-download app as a drag-to-Applications DMG and a compatibility ZIP preserving the `.app` bundle and creates a signed
+direct-download app as a drag-to-Applications DMG and creates a signed
 `.pkg` for Mac App Store upload. The sandbox entitlement set grants only App
 Sandbox plus incoming and outgoing network access. This is required for Sonos
 discovery, control, and event callbacks. Core Audio, local configuration,
@@ -197,14 +197,13 @@ are not migrated and must be configured again.
 ### Release download filenames
 
 The GitHub Release publishing job runs `scripts/prepare-release-downloads.sh`
-to rename build outputs to six permanent filenames, with one file per package.
+to rename build outputs to five permanent filenames, with one file per package.
 The release tag identifies the version; duplicate versioned files are not uploaded:
 
 - `sonos-volume-bridge-macos.dmg` (website download)
-- `sonos-volume-bridge-macos.zip` (compatibility archive)
-- `sonos-volume-bridge-windows-unsigned.exe` (x64, preserving the established URL)
+- `sonos-volume-bridge-windows-x64-unsigned.exe`
 - `sonos-volume-bridge-windows-arm64-unsigned.exe`
-- `sonos-volume-bridge-linux-amd64.deb`
+- `sonos-volume-bridge-linux-x64.deb`
 - `sonos-volume-bridge-linux-arm64.deb`
 
 The website uses `releases/latest/download/<filename>` so stable downloads follow
@@ -228,8 +227,10 @@ publishing build artifacts and before MSIX packaging; a mismatched requested
 architecture fails before packaging. MSIX staging, manifest and filenames use
 the executable architecture. Store submission combines both packages into one
 bundle/upload so one architecture does not replace the other in a later submission.
-The established architecture-free Windows direct-download filename is the sole
-x64 asset; the website labels it AMD64 (x64).
+Windows and Linux direct-download filenames consistently use x64 and arm64.
+Debian package metadata and native build validation retain the required amd64 name.
+Future releases omit the old architecture-free Windows filename and macOS ZIP;
+links to those filenames on a specific older release remain valid.
 
 Windows PR validation runs the native tests and builds an NSIS installer on both
 architectures. This exercises the custom installer with the actual Tauri bundler,

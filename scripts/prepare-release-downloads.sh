@@ -3,7 +3,7 @@
 set -euo pipefail
 assets_dir="${1:?Usage: prepare-release-downloads.sh ASSETS_DIR RELEASE_TAG}"
 release_tag="${2:?Release tag is required}"
-suffixes=(macos.zip macos.dmg windows-x64-unsigned.exe windows-arm64-unsigned.exe linux-amd64.deb linux-arm64.deb)
+suffixes=(macos.dmg windows-x64-unsigned.exe windows-arm64-unsigned.exe linux-amd64.deb linux-arm64.deb)
 sources=()
 destinations=()
 
@@ -11,9 +11,9 @@ destinations=()
 for suffix in "${suffixes[@]}"; do
   source_path="$assets_dir/sonos-volume-bridge-$release_tag-$suffix"
   destination_suffix="$suffix"
-  if [[ "$suffix" == windows-x64-unsigned.exe ]]; then
-    # Retain the established x64 URL without publishing a second copy.
-    destination_suffix=windows-unsigned.exe
+  if [[ "$suffix" == linux-amd64.deb ]]; then
+    # Debian metadata uses amd64; public downloads consistently use x64.
+    destination_suffix=linux-x64.deb
   fi
   destination_path="$assets_dir/sonos-volume-bridge-$destination_suffix"
   if [[ ! -e "$source_path" ]]; then
