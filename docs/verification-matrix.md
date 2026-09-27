@@ -585,3 +585,20 @@ Windows registry provider, then reopen Settings > Apps > Installed apps and sear
 for Sonos Volume Bridge. Confirm its uninstall action is available and that no
 desktop shortcut is created. This is an installation-context verification step;
 the NSIS template already writes the normal uninstall metadata.
+
+### Shortcut ownership and notification cleanup
+
+The native shortcut regression creates a development shortcut, starts with an
+installed target, then simulates another development startup and reads the actual
+persisted shell link. The installed target must win both times. Windows CI also
+compiles and executes the production NSIS registry-cleanup block against isolated
+test keys: full uninstall removes sender and activator; update mode retains both.
+The release test suite checks the cleanup remains inside the full-uninstall guard.
+
+Manual coverage: run a normal standalone build before installing, install and
+launch the installed app, run the standalone build again, and check Start still
+launches the installed executable. Uninstall using Windows Installed apps and
+verify both native notification registrations disappear without manual cleanup.
+Repeat an in-place update and verify notification delivery remains available.
+Automated tests isolate installation lookup from real machine registry state and
+do not prove native shell cache refresh or elevation/account behavior.

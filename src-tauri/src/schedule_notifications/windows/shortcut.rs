@@ -48,6 +48,43 @@ pub(super) fn ensure(
     id: &str,
     icon: &Path,
 ) -> windows::core::Result<()> {
+    let installed = installed_executable(id);
+    ensure_target(path, executable, id, icon, installed.as_deref())
+}
+
+fn installed_executable(id: &str) -> Option<std::path::PathBuf> {
+    use winreg::{
+        RegKey,
+        enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_WOW64_64KEY},
+    };
+    if id != "ms.miguel.sonosvolumebridge.desktop" {
+        return None;
+    }
+    [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE]
+        .into_iter()
+        .find_map(|hive| {
+            let key = RegKey::predef(hive)
+                .open_subkey_with_flags(
+                    "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Sonos Volume Bridge",
+                    KEY_READ | KEY_WOW64_64KEY,
+                )
+                .ok()?;
+            let directory: String = key.get_value("InstallLocation").ok()?;
+            let executable = Path::new(directory.trim_matches('"')).join("sonos-volume-bridge.exe");
+            executable
+                .is_file()
+                .then(|| dunce::canonicalize(executable).ok())
+                .flatten()
+        })
+}
+
+fn ensure_target(
+    path: &Path,
+    executable: &Path,
+    id: &str,
+    icon: &Path,
+    installed: Option<&Path>,
+) -> windows::core::Result<()> {
     let _apartment = apartment()?;
     // SAFETY: all interfaces and property variants outlive synchronous COM calls.
     unsafe {
@@ -57,9 +94,10 @@ pub(super) fn ensure(
         let path = HSTRING::from(path.as_os_str());
         if Path::new(&path.to_os_string()).exists() {
             file.Load(&path, STGM_READWRITE)?;
-        } else {
-            link.SetPath(&HSTRING::from(executable.as_os_str()))?;
         }
+        // A registered installation owns the shortcut even when a development
+        // build starts later. Otherwise repair it to this standalone executable.
+        link.SetPath(&HSTRING::from(installed.unwrap_or(executable).as_os_str()))?;
         let app_id = PROPVARIANT::from(id);
         link.SetIconLocation(&HSTRING::from(icon.as_os_str()), 0)?;
         let clsid = super::activation::class_id(id);
@@ -82,16 +120,61 @@ pub(super) fn ensure(
 mod tests {
     use super::*;
     #[test]
+    fn startup_repairs_development_shortcut_and_keeps_installation_owner() {
+        let path = std::env::temp_dir().join(format!("svb-upgrade-{}.lnk", std::process::id()));
+        let development = Path::new("C:\\development\\sonos-volume-bridge.exe");
+        let installed = std::env::current_exe().unwrap();
+        ensure_target(&path, development, "normal.app", &installed, None).unwrap();
+        ensure_target(
+            &path,
+            &installed,
+            "normal.app",
+            &installed,
+            Some(&installed),
+        )
+        .unwrap();
+        ensure_target(
+            &path,
+            development,
+            "normal.app",
+            &installed,
+            Some(&installed),
+        )
+        .unwrap();
+        let _apartment = apartment().unwrap();
+        // SAFETY: load the real persisted shell link into owned buffers.
+        unsafe {
+            let link: IShellLinkW =
+                CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER).unwrap();
+            let file: IPersistFile = link.cast().unwrap();
+            file.Load(
+                &HSTRING::from(path.as_os_str()),
+                windows::Win32::System::Com::STGM_READ,
+            )
+            .unwrap();
+            let mut target = vec![0_u16; 32768];
+            link.GetPath(&mut target, std::ptr::null_mut(), 0).unwrap();
+            let end = target.iter().position(|unit| *unit == 0).unwrap();
+            assert_eq!(
+                String::from_utf16(&target[..end]).unwrap(),
+                installed.to_string_lossy()
+            );
+        }
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn startup_shortcut_contains_sender_and_activator_and_preserves_existing_target() {
         let path = std::env::temp_dir().join(format!("svb-toast-{}.lnk", std::process::id()));
         let exe = std::env::current_exe().unwrap();
-        ensure(&path, &exe, "normal.app", &exe).unwrap();
+        ensure_target(&path, &exe, "normal.app", &exe, Some(&exe)).unwrap();
         let before = std::fs::read(&path).unwrap();
-        ensure(
+        ensure_target(
             &path,
             Path::new("C:\\not-the-installed-target.exe"),
             "normal.app",
             &exe,
+            Some(&exe),
         )
         .unwrap();
         let _apartment = apartment().unwrap();

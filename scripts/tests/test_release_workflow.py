@@ -16,6 +16,16 @@ def dependencies(body):
 
 
 class ReleaseWorkflowTests(unittest.TestCase):
+    def test_full_uninstall_cleans_native_toast_registration_but_updates_preserve_it(self):
+        root = WORKFLOW.parents[2]
+        template = (root / 'src-tauri/windows/installer.nsi').read_text(encoding='utf-8')
+        uninstall = template.split('Section Uninstall', 1)[1]
+        cleanup = uninstall.split('${If} $UpdateMode <> 1', 1)[1].split('${EndIf}', 1)[0]
+        for key in ('AppUserModelId\\${BUNDLEID}', 'CLSID\\{a607018c-48b4-45c8-b0b2-46c243fde206}'):
+            command = 'DeleteRegKey HKCU "Software\\Classes\\' + key + '"'
+            self.assertIn(command, cleanup)
+            self.assertEqual(template.count(command), 1)
+
     def test_all_platform_builds_gate_signing_and_store_submission(self):
         graph = jobs(WORKFLOW.read_text(encoding='utf-8'))
         builds = {'macos-app', 'linux-deb', 'windows-app', 'windows-nsis', 'windows-msix'}

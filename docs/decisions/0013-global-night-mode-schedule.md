@@ -150,3 +150,8 @@ settings and unrelated errors remain denied. Delivery uses native text nodes and
 reports synchronous and asynchronous failures to the application log. A registered
 COM activator opens Settings when the user clicks a notification. The Start menu
 shortcut carries both the sender identity and activator identity.
+Resolve its target from the Windows uninstall registration when a valid installed
+executable exists, otherwise use the current standalone executable. Do not retain
+an arbitrary previous shortcut target: it may point to an obsolete development
+build. Full NSIS uninstall removes both per-user registration keys, while updates
+preserve them. These registrations belong to the shell adapter, not the domain.

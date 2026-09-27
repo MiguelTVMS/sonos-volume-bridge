@@ -828,6 +828,9 @@ Section Uninstall
   ; Remove shortcuts if not updating
   ${If} $UpdateMode <> 1
     !insertmacro DeleteAppUserModelId
+    ; Native toast registration is per-user and is not removed by jump-list cleanup.
+    DeleteRegKey HKCU "Software\Classes\AppUserModelId\${BUNDLEID}"
+    DeleteRegKey HKCU "Software\Classes\CLSID\{a607018c-48b4-45c8-b0b2-46c243fde206}"
 
     ; Remove start menu shortcut
     !insertmacro MUI_STARTMENU_GETFOLDER Application $AppStartMenuFolder

@@ -274,3 +274,7 @@ application exit. Paths are canonicalized to their physical location before
 registration so an app launched from a packaged development host does not give
 Explorer a redirected path it cannot resolve. Start menu shortcuts use an explicit
 bundled ICO asset. MSIX notifications continue to use the package manifest assets.
+The registered Windows installation owns the normal Start menu target. Startup
+repairs older development targets while development runs retain a valid installed
+target. Full NSIS uninstall removes the per-user notification sender and COM
+activation registration; in-place updates preserve them (ADR 0013).

@@ -63,6 +63,7 @@ jobs:
               - 'scripts/*windows*.ps1'
               - 'scripts/build-msix.ps1'
               - 'scripts/tests/test-windows-architecture.ps1'
+              - 'scripts/tests/test-windows-uninstall.ps1'
               - 'packaging/windows-msix/**'
             ui:
               - 'ui/**'
@@ -124,6 +125,10 @@ jobs:
       - name: Windows installer regression
         if: runner.os == 'Windows'
         run: pnpm dlx @tauri-apps/cli@2 build --debug --bundles nsis
+      - name: Windows uninstall registration regression
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/tests/test-windows-uninstall.ps1
 
   rust-quality:
     name: Rust quality (${{ matrix.os }})
