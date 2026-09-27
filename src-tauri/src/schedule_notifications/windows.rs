@@ -2,6 +2,8 @@
 
 #[cfg(windows)]
 mod activation;
+#[cfg(windows)]
+mod shortcut;
 
 #[cfg(windows)]
 pub(super) fn install<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
@@ -26,6 +28,28 @@ pub(super) fn install<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     // connect to the COM server and a rebuilt executable repairs its launch path.
     if let Err(error) = notifier(&identifier, &name) {
         tracing::warn!(%error, "Windows notification registration failed");
+    }
+    if windows::ApplicationModel::Package::Current().is_err() {
+        let result = (|| -> Result<(), windows::core::Error> {
+            let programs = std::path::PathBuf::from(
+                std::env::var_os("APPDATA")
+                    .ok_or_else(|| std::io::Error::other("AppData unavailable"))?,
+            )
+            .join("Microsoft/Windows/Start Menu/Programs");
+            let shortcut_name = if identifier.ends_with(".ui-demo") {
+                format!("{name} - UI demo.lnk")
+            } else {
+                format!("{name}.lnk")
+            };
+            shortcut::ensure(
+                &programs.join(shortcut_name),
+                &std::env::current_exe()?,
+                &identifier,
+            )
+        })();
+        if let Err(error) = result {
+            tracing::warn!(%error, "Windows notification shortcut registration failed");
+        }
     }
 }
 
@@ -127,8 +151,15 @@ impl Transport for Native {
 
     fn send(&self, title: &str, body: &str) -> Result<(), Self::Error> {
         use windows::{
-            Data::Xml::Dom::XmlDocument, UI::Notifications::ToastNotification, core::HSTRING,
+            Data::Xml::Dom::XmlDocument,
+            Foundation::TypedEventHandler,
+            UI::Notifications::{ToastFailedEventArgs, ToastNotification},
+            core::HSTRING,
         };
+        // WinRT events are tied to the toast object's lifetime, not Show's result.
+        static RECENT: std::sync::OnceLock<
+            std::sync::Mutex<std::collections::VecDeque<ToastNotification>>,
+        > = std::sync::OnceLock::new();
         let xml = XmlDocument::new()?;
         xml.LoadXml(&HSTRING::from("<toast><visual><binding template=\"ToastGeneric\"><text/><text/></binding></visual></toast>"))?;
         let nodes = xml.GetElementsByTagName(&HSTRING::from("text"))?;
@@ -138,8 +169,23 @@ impl Transport for Native {
                 .Item(index)?
                 .AppendChild(&xml.CreateTextNode(&HSTRING::from(value))?)?;
         }
-        self.0
-            .Show(&ToastNotification::CreateToastNotification(&xml)?)
+        let toast = ToastNotification::CreateToastNotification(&xml)?;
+        toast.Failed(&TypedEventHandler::<ToastNotification, ToastFailedEventArgs>::new(|_, args| {
+            if let Some(args) = args.as_ref() {
+                tracing::warn!(error = ?args.ErrorCode(), "Windows rejected toast asynchronously");
+                #[cfg(test)]
+                eprintln!("Windows toast failure: {:?}", args.ErrorCode());
+            }
+            Ok(())
+        }))?;
+        self.0.Show(&toast)?;
+        if let Ok(mut recent) = RECENT.get_or_init(Default::default).lock() {
+            recent.push_back(toast);
+            while recent.len() > 8 {
+                recent.pop_front();
+            }
+        }
+        Ok(())
     }
 }
 
@@ -237,6 +283,24 @@ mod tests {
             activation::class_id("normal.app"),
             activation::class_id("normal.app.ui-demo")
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "Interactive Windows shell diagnostic"]
+    fn fresh_identity_notification_probe() {
+        let notifier = notifier(
+            "ms.miguel.sonosvolumebridge.desktop.activation-test",
+            "Sonos notification diagnostic",
+        )
+        .unwrap();
+        notifier
+            .send(
+                "Sonos notification diagnostic",
+                "Fresh sender test without silent preregistration.",
+            )
+            .unwrap();
+        std::thread::sleep(std::time::Duration::from_secs(20));
     }
 
     #[cfg(windows)]

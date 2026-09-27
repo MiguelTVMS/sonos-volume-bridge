@@ -226,7 +226,8 @@ app and record whether the VM is in Coherence or desktop mode. API success or br
 history alone is insufficient evidence of visible delivery.
 
 Windows CI covers sender/COM launch registration before permission and delivery,
-plus native class-factory activation. Actual shell rendering, retained entries,
+native class-factory activation, and shortcut creation/repair with both shell identity
+properties read back from disk. Actual shell rendering, retained entries,
 and Parallels presentation require the manual checks above.
 
 ### Windows and Linux branch trial

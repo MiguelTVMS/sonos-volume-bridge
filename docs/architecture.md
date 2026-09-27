@@ -206,6 +206,10 @@ permission and uses that same identity for native toast delivery. Unpackaged sta
 registers the sender's COM activator and quoted executable launch command as well
 as its display name. A process-lifetime MTA owns the class factory; notification
 activation opens Settings on the UI thread. Demo and normal activators are separate.
+The Start menu shortcut stores both the same sender ID and toast activator CLSID;
+local startup creates it when absent and repairs its properties without retargeting
+an existing installed shortcut. Recent native toast objects are retained in a bounded
+queue so asynchronous delivery failures can be logged.
 First-use sender
 registration submits a suppressed, expiring toast and removes it before querying
 permission again. Packaged apps use their package identity (ADR 0013).

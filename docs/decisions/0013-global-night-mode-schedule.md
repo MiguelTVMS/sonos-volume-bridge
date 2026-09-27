@@ -87,6 +87,10 @@ The activator has a quoted executable launch command and opens Settings, ignorin
 notification arguments. A dedicated MTA retains the COM factory for process lifetime.
 Startup repairs the executable path after a rebuild or installation change.
 Normal and demo activators are distinct. Native macOS and Linux delivery is unchanged.
+Unpackaged Windows startup also creates or repairs the Start menu shortcut's sender
+ID and toast activator CLSID. Existing shortcut targets are preserved; demo uses a
+separate shortcut. Native failure events are observed while retaining at most eight
+recent toast objects. This diagnostic retention does not change notification policy.
 OS permission is requested only from the user's opt-in action.
 Linux notification services do not expose a portable permission prompt/status;
 delivery follows desktop settings. OS suppression and notification delivery failures
