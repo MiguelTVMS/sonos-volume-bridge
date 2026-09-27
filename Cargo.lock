@@ -3716,6 +3716,7 @@ version = "1.5.1"
 dependencies = [
  "async-trait",
  "block2",
+ "dunce",
  "futures-util",
  "jiff",
  "objc2",
@@ -3743,6 +3744,8 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "windows 0.62.2",
+ "windows-core 0.62.2",
+ "winreg 0.55.0",
  "zbus",
 ]
 

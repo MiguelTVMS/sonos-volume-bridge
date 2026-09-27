@@ -17,11 +17,24 @@ outlined setting cards, trailing controls, and 40-by-20 switches. Windows-only
 cards include decorative outline icons and secondary descriptions. Caption text
 is escaped, and the shared controls retain their labels and keyboard operation.
 Windows-only rules live in `ui/src/windows.css`; the form and command handlers remain shared.
-The native Windows window starts at 960 by 760 logical pixels and can resize down
+The native Windows window starts at 960 by 820 logical pixels and can resize down
 to 760 by 460. Below 800 pixels, selectors and sliders move below their labels.
 Native title-bar controls remain in place. Light, dark, increased-contrast,
 forced-colors, and reduced-motion preferences are handled in the presentation.
 The background approximates the reference material with CSS; it is not native Mica.
+
+Windows Night schedule uses its third card for schedule state, next transition,
+notification guidance and action errors. The Status label uses the same normal
+weight as adjacent fields, with wrapping status text aligned to the right. The
+additional default height accommodates multiline status. Move the existing live notice output
+into that card on navigation and rerender, then return it to the form on other
+pages. This avoids duplicate notices and retains error announcements. Disabled
+and outside-period messages remain visible in this Windows status card; macOS
+and Linux retain their previous placement and suppression of routine state text.
+Across platforms, successful saves, resets, speaker setting changes and test actions
+clear prior errors without displaying confirmation messages. Errors retain the
+accessible live notice output. Native schedule notifications are independent of
+these window messages and keep their selected notification mode.
 
 Platform styling stays in the frontend; domain and synchronization behavior is
 unchanged. Color-scheme, increased-contrast, reduced-motion, and keyboard-focus

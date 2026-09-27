@@ -113,7 +113,7 @@ test('Ubuntu volume test action is inset inside its card and works by keyboard',
   await expect(button).toHaveCSS('height', '34px');
   await button.focus();
   await page.keyboard.press('Enter');
-  await expect(page.locator('#notice')).toHaveText('Volume control test requested.');
+  await expect(page.locator('#notice')).toBeEmpty();
 });
 
 test('Ubuntu schedule keeps square cells through navigation, selection and save', async ({

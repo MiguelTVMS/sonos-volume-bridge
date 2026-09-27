@@ -82,16 +82,16 @@ export function captureScheduleView(scope: ParentNode): void {
     : null;
 }
 
-export function scheduleMarkup(linux = false): string {
+export function scheduleMarkup(linux = false, windows = false): string {
   const status = '<p id="schedule-status" class="setting-note" aria-live="polite"></p>';
   const permission = '<p id="notification-permission" class="setting-note" aria-live="polite"></p>';
   return `<section id="night-schedule" data-schedule class="night-schedule" aria-labelledby="night-schedule-title">
     <div class="settings-group">
     <label class="toggle"><span>Enable schedule</span><input id="schedule-enabled" type="checkbox" role="switch"></label>
     <div class="control-field"><label for="schedule-notifications">Night schedule notifications</label><select id="schedule-notifications"><option value="start">On start</option><option value="end">On end</option><option value="both">On start and end</option><option value="never">Never</option></select></div>
-    ${linux ? `<div class="schedule-status-row"><span>Status</span>${status}${permission}<p id="schedule-feedback" class="setting-note" aria-live="polite"></p></div>` : permission}
+    ${linux ? `<div class="schedule-status-row"><span>Status</span>${status}${permission}<p id="schedule-feedback" class="setting-note" aria-live="polite"></p></div>` : windows ? `<div class="schedule-status-card"><span class="schedule-status-label">Status</span><div class="schedule-status-content">${status}${permission}<div id="schedule-feedback"></div></div></div>` : permission}
     </div>
-    ${linux ? '' : status}
+    ${linux || windows ? '' : status}
     <div class="settings-group schedule-editor"><div class="schedule-editor-content">
     <p class="schedule-legend"><span>■ Scheduled on</span> □ Manual control</p>
     <div class="schedule-scroll"><div class="schedule-grid" role="grid" aria-label="Weekly Night Mode schedule"></div></div>
@@ -270,7 +270,7 @@ export function updateScheduleView(
   const panel = scope.querySelector<HTMLElement>('#night-schedule');
   if (!panel) return;
   panel.querySelector('#schedule-status')!.textContent = [
-    !panel.querySelector('.schedule-status-row') &&
+    !panel.querySelector('.schedule-status-row, .schedule-status-card') &&
     ['Schedule disabled.', 'Outside scheduled hours. Manual control is available.'].includes(
       status.message,
     )

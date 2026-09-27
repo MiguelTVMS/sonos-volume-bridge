@@ -177,6 +177,15 @@ On Linux, a dedicated Schedule status row below notifications shows the current
 state, including disabled and outside-period states. Schedule errors appear in
 that same row instead of beneath the editor. Successful saves show no confirmation.
 
+On Windows, the third Night schedule card is the single Status area. It shows
+disabled/outside-period state as well as active restrictions, the next change,
+notification guidance and action errors. Its label sits on the left and its text
+wraps on the right. Successful saves and other settings actions show no confirmation
+message; a successful retry clears the prior error. Other platform layouts are unchanged.
+Windows local runs register the app as a notification sender, so notifications
+use Sonos Volume Bridge rather than relying on PowerShell. Existing Windows
+notification preferences and Do not disturb still apply.
+
 ## UI demo builds
 
 Explicit `ui-demo` debug builds open Settings with a simulated Sonos speaker and

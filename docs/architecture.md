@@ -195,6 +195,25 @@ rectangular editor and scheduler are used on all three platforms.
 Windows schedule tooltips use an opaque platform surface in both color schemes;
 the shared hover interaction remains in the frontend (ADR 0013).
 
+Windows Night schedule presents current state, next change, notification guidance,
+and action errors together in the third settings card. The shared notice output
+moves into this card while the schedule page is active (ADR 0012).
+The Status label sits left of the right-aligned, wrapping text. The Windows default
+height is 820 logical pixels to allow multiline status. Successful settings actions
+clear prior errors without adding confirmation messages on any platform.
+The Windows shell registers an unpackaged notification identity before checking
+permission and uses that same identity for native toast delivery. Unpackaged startup
+registers the sender's COM activator and quoted executable launch command as well
+as its display name. A process-lifetime MTA owns the class factory; notification
+activation opens Settings on the UI thread. Demo and normal activators are separate.
+The Start menu shortcut stores both the same sender ID and toast activator CLSID;
+local startup creates it when absent and repairs its properties without retargeting
+an existing installed shortcut. Recent native toast objects are retained in a bounded
+queue so asynchronous delivery failures can be logged.
+First-use sender
+registration submits a suppressed, expiring toast and removes it before querying
+permission again. Packaged apps use their package identity (ADR 0013).
+
 ## Hardware-free UI demo
 
 Demo startup assigns a distinct runtime package name as well as application
@@ -247,3 +266,27 @@ remains available; see [ADR 0015](decisions/0015-macos-dmg-download.md).
 Settings reset cancels debounced autosaves, invalidates older save responses and
 joins the same user-write queue as configuration saves. A reset therefore runs
 after writes already in flight; stale saves cannot restore pre-reset settings.
+
+Unpackaged Windows notification registration also materializes the bundled app
+icon in the app's local data directory and registers its absolute path as the
+sender `IconUri`. The icon remains available after build-directory cleanup or
+application exit. Paths are canonicalized to their physical location before
+registration so an app launched from a packaged development host does not give
+Explorer a redirected path it cannot resolve. Start menu shortcuts use an explicit
+bundled ICO asset. MSIX notifications continue to use the package manifest assets.
+The registered Windows installation owns the normal Start menu target. Startup
+repairs older development targets while development runs retain a valid installed
+target. Full NSIS uninstall removes the per-user notification sender and COM
+activation registration; in-place updates preserve them (ADR 0013).
+
+## Release artifact flow
+
+Release jobs verify the prepared commit belongs to trusted `develop` history,
+then detach at that exact commit before executing release code. Moving the branch
+forward does not change or invalidate the selected release. Native
+Windows x64/ARM64 MSIX outputs are combined and verified in an unprivileged job
+before the all-platform build gate. Signing follows that gate; publication also
+requires successful Mac App Store packaging when requested. Store submission
+reuses the verified upload. Direct downloads use one permanent filename per
+package, with version identity supplied by the release tag (ADR 0015). See
+[release documentation](release.md) for the variants and validation gates.

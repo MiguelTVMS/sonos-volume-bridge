@@ -2,9 +2,71 @@ import { expect, test } from '@playwright/test';
 
 const pages = ['Devices', 'Speaker', 'Night schedule', 'Volume', 'General', 'Diagnostics', 'About'];
 
+test('Windows keeps night schedule status and errors in the third card', async ({ page }) => {
+  await page.goto('/preview.html?platform=windows');
+  await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
+  const card = page
+    .locator('#night-schedule > .settings-group')
+    .first()
+    .locator(':scope > *')
+    .nth(2);
+  await expect(card.locator('#schedule-status')).toHaveText('Schedule disabled.');
+  await expect(card.locator('.schedule-status-label')).toHaveText('Status');
+  await expect(card.locator('.schedule-status-content')).toHaveCSS('text-align', 'right');
+  const labelBounds = (await card.locator('.schedule-status-label').boundingBox())!;
+  const statusBounds = (await card.locator('.schedule-status-content').boundingBox())!;
+  expect(labelBounds.x + labelBounds.width).toBeLessThan(statusBounds.x);
+  await expect(card.locator('#schedule-status')).toHaveAttribute('aria-live', 'polite');
+  await page.locator('#schedule-enabled').check();
+  await expect(card.locator('#schedule-status')).toHaveText(
+    'Outside scheduled hours. Manual control is available.',
+  );
+  await page.locator('.schedule-cell').first().click();
+  await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
+  await expect(card.locator('#notice')).toBeEmpty();
+  await expect(page.locator('.schedule-cell').first()).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#settings > #notice')).toHaveCount(0);
+  await expect(page.locator('#night-schedule > #schedule-status')).toHaveCount(0);
+  await page.locator('#schedule-enabled').uncheck();
+  await expect(card.locator('#schedule-status')).toHaveText('Schedule disabled.');
+  await page.getByRole('button', { name: 'General', exact: true }).click();
+  await page.locator('[name="startAtLogin"]').check();
+  await expect(page.locator('#settings > #notice')).toBeEmpty();
+  await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
+  await expect(card.locator('#notice')).toBeEmpty();
+  await page.evaluate(() => {
+    const host = window as unknown as {
+      __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> };
+    };
+    const invoke = host.__TAURI_INTERNALS__.invoke;
+    host.__TAURI_INTERNALS__.invoke = async (command, args) => {
+      if (command === 'get_schedule_status')
+        return {
+          active: true,
+          supported: true,
+          message: 'Night Mode is on because of your schedule.',
+          nextTransition: 'Mon 07:00',
+          timeZone: '',
+          notificationsBlocked: true,
+        };
+      if (command === 'save_night_schedule') throw new Error('Could not save schedule.');
+      return invoke(command, args);
+    };
+  });
+  await page.locator('#schedule-notifications').selectOption('both');
+  await expect(card.locator('#schedule-status')).toContainText('Next change: Mon 07:00');
+  await expect(card.locator('#notification-permission')).toContainText(
+    'Notifications are blocked.',
+  );
+  await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
+  await expect(card.locator('#notice')).toContainText('Could not save schedule.');
+  await expect(page.locator('#settings > #notice')).toHaveCount(0);
+  await expect(card.locator('#notice')).toHaveAttribute('aria-live', 'polite');
+});
+
 for (const colorScheme of ['light', 'dark'] as const) {
   for (const viewport of [
-    { width: 960, height: 760 },
+    { width: 960, height: 820 },
     { width: 760, height: 460 },
   ]) {
     test(`all Windows pages fit ${viewport.width}x${viewport.height} in ${colorScheme}`, async ({
@@ -58,7 +120,7 @@ test('Windows captions preserve keyboard switches and sliders, and select change
   await mute.focus();
   await page.keyboard.press('Space');
   await expect(mute).not.toBeChecked();
-  await expect(page.locator('#notice')).toHaveText('Saved.');
+  await expect(page.locator('#notice')).toBeEmpty();
   const output = page.getByRole('combobox', { name: /^Follow/ });
   // Native popup keyboard behavior belongs to the host OS, even in Windows styling.
   // Exercise the select's change/save path portably; verify popup keys on Windows.

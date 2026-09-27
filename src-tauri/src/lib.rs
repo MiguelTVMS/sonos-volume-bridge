@@ -124,6 +124,8 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
             state.start_runtime(app.handle().clone());
             schedule_wake::install(app.handle());
             schedule_notifications::install();
+            #[cfg(windows)]
+            schedule_notifications::install_windows(app.handle());
             night_schedule::start(app.handle().clone());
             if ui_demo_enabled()
                 && let Some(window) = app.get_webview_window("main")

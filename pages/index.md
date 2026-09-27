@@ -64,11 +64,11 @@ Apple Silicon (ARM64) only. Intel Macs are not supported.
 
 ### Windows
 
-Install from Microsoft Store or download the installer directly.
+Install from Microsoft Store or choose the direct installer for your processor: AMD64 (x64) or ARM64.
 
 The direct installer is unsigned. Windows SmartScreen may show a warning.
 
-[Microsoft Store ↗](https://apps.microsoft.com/detail/9N7JKGXCMST0) [Windows installer ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-windows-unsigned.exe)
+[Microsoft Store ↗](https://apps.microsoft.com/detail/9N7JKGXCMST0) [Windows AMD64 (x64) ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-windows-unsigned.exe) [Windows ARM64 ↓](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest/download/sonos-volume-bridge-windows-arm64-unsigned.exe)
 
 ### Ubuntu
 

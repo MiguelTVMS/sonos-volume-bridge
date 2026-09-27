@@ -346,7 +346,7 @@ function render(nextSnapshot: Snapshot): void {
         )}
         ${panel(
           'schedule',
-          `<div class="panel-heading"><h2 id="night-schedule-title">Night schedule</h2><p>Set weekly Night Mode hours for the selected speaker. This schedule applies to your selected speaker when it supports Night Mode.</p></div>${scheduleMarkup(platform === 'linux')}`,
+          `<div class="panel-heading"><h2 id="night-schedule-title">Night schedule</h2><p>Set weekly Night Mode hours for the selected speaker. This schedule applies to your selected speaker when it supports Night Mode.</p></div>${scheduleMarkup(platform === 'linux', platform === 'windows')}`,
         )}
         ${panel(
           'volume',
@@ -383,6 +383,7 @@ function render(nextSnapshot: Snapshot): void {
         <output id="notice" aria-live="polite">${escapeHtml(currentNotice)}</output>
       </form>
     </div>`;
+  placeNotice();
   applySpeakerControls(app, speakerSettings, document.activeElement);
   app.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(updateRangeFill);
   refreshScheduleView();
@@ -406,7 +407,7 @@ function render(nextSnapshot: Snapshot): void {
           if (revision === scheduleDraft.revision)
             scheduleDraft.reset(next.configuration.nightModeSchedule!.blocks);
         });
-        if (platform !== 'linux') notice('Schedule saved and applied to the selected speaker.');
+        notice('');
       },
       enable: async (enabled) => writeSchedule('enable_night_schedule', { enabled }),
       notify: async (mode) => writeSchedule('set_schedule_notifications', { mode }),
@@ -475,6 +476,7 @@ function render(nextSnapshot: Snapshot): void {
 
 function activatePage(page: SettingsPage): void {
   activePage = page;
+  placeNotice();
   const title = document.querySelector('#toolbar-section-title');
   if (title)
     title.textContent =
@@ -617,7 +619,7 @@ function schedulePushRefresh(): void {
 async function useTvAudio(): Promise<void> {
   try {
     await invoke('use_tv_audio');
-    notice('TV audio selected.');
+    notice('');
     void refreshAudioInputFormat();
   } catch (error) {
     notice(String(error));
@@ -630,7 +632,7 @@ async function updateSpeakerSetting(input: HTMLInputElement): Promise<void> {
     const setting = input.dataset.speakerSetting;
     const enabled = input.checked;
     await userWrites.run(() => invoke('set_speaker_setting', { setting, enabled }));
-    notice('Saved.');
+    notice('');
   } catch (error) {
     notice(String(error));
   } finally {
@@ -647,7 +649,7 @@ async function updateSpeakerLevel(input: HTMLInputElement): Promise<void> {
     const value = Number(input.value);
     await userWrites.run(() => invoke('set_speaker_level', { setting, value }));
     speakerSettings[setting] = value;
-    notice('Saved.');
+    notice('');
   } catch (error) {
     notice(String(error));
   } finally {
@@ -655,6 +657,15 @@ async function updateSpeakerLevel(input: HTMLInputElement): Promise<void> {
     void refreshAllSettings();
   }
 }
+function placeNotice(): void {
+  if (platform !== 'windows') return;
+  const output = document.querySelector('#notice');
+  const target = document.querySelector(
+    activePage === 'schedule' ? '#schedule-feedback' : '#settings',
+  );
+  if (output && target) target.append(output);
+}
+
 function notice(value: string): void {
   currentNotice = value;
   const output = document.querySelector<HTMLOutputElement>('#notice');
@@ -722,7 +733,7 @@ async function saveConfiguration(configuration: Configuration, revision: number)
     );
     if (revision !== saveRevision) return;
     render(nextSnapshot);
-    notice('Saved.');
+    notice('');
     saved = true;
   } catch (error) {
     if (revision === saveRevision) notice(`Could not save: ${String(error)}`);
@@ -735,7 +746,7 @@ async function saveConfiguration(configuration: Configuration, revision: number)
 async function testVolume(): Promise<void> {
   try {
     await invoke('test_volume');
-    notice('Volume control test requested.');
+    notice('');
   } catch (error) {
     notice(String(error));
   }
@@ -779,7 +790,7 @@ async function reset(): Promise<void> {
     const next = await userWrites.run(() => invoke<Snapshot>('reset_configuration'));
     scheduleDraft.reset(next.configuration.nightModeSchedule!.blocks);
     render(next);
-    notice('Settings reset.');
+    notice('');
   } catch (error) {
     notice(`Could not reset: ${String(error)}`);
   } finally {
@@ -900,7 +911,7 @@ function scheduleNotice(message: string): void {
 
 function refreshScheduleView(): void {
   const feedback = app.querySelector('#schedule-feedback');
-  if (feedback) feedback.textContent = scheduleFeedback;
+  if (feedback && platform === 'linux') feedback.textContent = scheduleFeedback;
   updateScheduleView(
     app,
     scheduleStatus,
@@ -937,6 +948,7 @@ async function writeSchedule(
     accepted?.(next);
     scheduleStatus = await invoke<ScheduleStatus>('get_schedule_status');
     render(next);
+    notice('');
   } finally {
     pendingWrites--;
     void refreshAllSettings();

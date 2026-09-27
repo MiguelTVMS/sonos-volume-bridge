@@ -153,10 +153,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: develop
-      - name: Verify the checked-out release commit
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
-        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -211,10 +218,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: develop
-      - name: Verify the checked-out release commit
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
-        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - name: Cache Linux desktop package archives
         uses: actions/cache@v6
         with:
@@ -259,7 +273,7 @@ jobs:
           if-no-files-found: error
   macos-direct:
     name: Sign and notarize macOS direct-download app
-    needs: [prepare-version, macos-app]
+    needs: [prepare-version, all-platform-builds]
     runs-on: macos-latest
     environment: apple-signing
     env:
@@ -271,10 +285,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: develop
-      - name: Verify the checked-out release commit
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
-        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -403,7 +424,7 @@ jobs:
   macos-app-store:
     name: Sign macOS App Store package
     if: ${{ inputs.build_app_store }}
-    needs: [prepare-version, macos-app]
+    needs: [prepare-version, all-platform-builds]
     runs-on: macos-latest
     environment: apple-app-store
     env:
@@ -413,10 +434,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: develop
-      - name: Verify the checked-out release commit
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
-        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -555,25 +583,36 @@ jobs:
   windows-app:
     name: Build Windows executable
     needs: prepare-version
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+          - os: windows-11-arm
+            arch: arm64
     steps:
       - uses: actions/checkout@v7
         with:
           ref: develop
-      - name: Verify the checked-out release commit
-        shell: pwsh
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
         run: |
-          if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
-            throw 'The checked-out revision does not match the release commit.'
-          }
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: workspace
+          shared-key: workspace-Windows-${{ matrix.arch }}
       - uses: pnpm/action-setup@v6
         with:
           version: 12
@@ -591,12 +630,14 @@ jobs:
           if (-not (Test-Path -LiteralPath 'target/release/sonos-volume-bridge.exe' -PathType Leaf)) {
             throw 'The Windows release executable was not generated.'
           }
+          . ./scripts/windows-architecture.ps1
+          Assert-WindowsExecutableArchitecture -Path target/release/sonos-volume-bridge.exe -Architecture '${{ matrix.arch }}'
           if (-not (Test-Path -LiteralPath 'ui/dist' -PathType Container)) {
             throw 'The frontend distribution was not generated.'
           }
       - uses: actions/upload-artifact@v7
         with:
-          name: windows-build-${{ needs.prepare-version.outputs.tag }}
+          name: windows-build-${{ matrix.arch }}-${{ needs.prepare-version.outputs.tag }}
           path: |
             target/release/sonos-volume-bridge.exe
             ui/dist
@@ -606,29 +647,40 @@ jobs:
   windows-nsis:
     name: Package Windows NSIS installer
     needs: [prepare-version, windows-app]
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+          - os: windows-11-arm
+            arch: arm64
     steps:
       - uses: actions/checkout@v7
         with:
           ref: develop
-      - name: Verify the checked-out release commit
-        shell: pwsh
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
         run: |
-          if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
-            throw 'The checked-out revision does not match the release commit.'
-          }
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: workspace
+          shared-key: workspace-Windows-${{ matrix.arch }}
       - run: cargo install tauri-cli --version '^2' --locked
       - uses: actions/download-artifact@v8
         with:
-          name: windows-build-${{ needs.prepare-version.outputs.tag }}
+          name: windows-build-${{ matrix.arch }}-${{ needs.prepare-version.outputs.tag }}
           path: .
       - name: Bundle NSIS from the compiled executable
         run: cargo tauri bundle --bundles nsis
@@ -639,48 +691,105 @@ jobs:
         run: |
           $installer = Get-ChildItem target/release/bundle -Recurse -Filter '*.exe' | Select-Object -First 1
           if ($null -eq $installer) { throw 'No NSIS installer was generated.' }
-          Copy-Item $installer.FullName "sonos-volume-bridge-$env:RELEASE_TAG-windows-unsigned.exe"
+          Copy-Item $installer.FullName "sonos-volume-bridge-$env:RELEASE_TAG-windows-${{ matrix.arch }}-unsigned.exe"
       - uses: actions/upload-artifact@v7
         with:
-          name: windows-release
-          path: sonos-volume-bridge-*-windows-unsigned.exe
+          name: windows-${{ matrix.arch }}-release
+          path: sonos-volume-bridge-*-windows-${{ matrix.arch }}-unsigned.exe
           if-no-files-found: error
 
   windows-msix:
     name: Package Microsoft Store MSIX
     needs: [prepare-version, windows-app]
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+          - os: windows-11-arm
+            arch: arm64
     steps:
       - uses: actions/checkout@v7
         with:
           ref: develop
-      - name: Verify the checked-out release commit
-        shell: pwsh
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
         env:
           RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
         run: |
-          if ((git rev-parse HEAD) -ne $env:RELEASE_COMMIT) {
-            throw 'The checked-out revision does not match the release commit.'
-          }
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
       - uses: actions/download-artifact@v8
         with:
-          name: windows-build-${{ needs.prepare-version.outputs.tag }}
+          name: windows-build-${{ matrix.arch }}-${{ needs.prepare-version.outputs.tag }}
           path: .
       - name: Build and validate the MSIX from the compiled executable
         shell: pwsh
-        run: ./scripts/build-msix.ps1
+        run: ./scripts/build-msix.ps1 -Architecture ${{ matrix.arch }}
       - uses: actions/upload-artifact@v7
         with:
-          name: microsoft-store-msix-${{ needs.prepare-version.outputs.tag }}
+          name: microsoft-store-msix-${{ matrix.arch }}-${{ needs.prepare-version.outputs.tag }}
           path: target/release/bundle/msix/*.msix
           if-no-files-found: error
+  windows-store-upload:
+    name: Build and verify combined Microsoft Store upload
+    needs: [prepare-version, windows-msix]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: microsoft-store-msix-*-${{ needs.prepare-version.outputs.tag }}
+          merge-multiple: true
+          path: microsoft-store-msix
+      - name: Build and verify both architecture packages in one upload
+        shell: pwsh
+        run: ./scripts/build-msix-upload.ps1 -PackageDirectory microsoft-store-msix -OutputPath store-upload/SonosVolumeBridge.msixupload
+      - uses: actions/upload-artifact@v7
+        with:
+          name: microsoft-store-upload-${{ needs.prepare-version.outputs.tag }}
+          path: store-upload/*.msixupload
+          if-no-files-found: error
+
+  all-platform-builds:
+    name: All platform builds and packages succeeded
+    needs: [macos-app, linux-deb, windows-app, windows-nsis, windows-msix, windows-store-upload]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'All platform and architecture builds succeeded.'
+
   publish-release:
     name: Publish GitHub Release
-    needs:
-      [prepare-version, macos-direct, linux-deb, windows-nsis, windows-msix]
+    needs: [prepare-version, all-platform-builds, macos-direct, macos-app-store]
+    if: >-
+      ${{ !cancelled() &&
+          needs.prepare-version.result == 'success' &&
+          needs.all-platform-builds.result == 'success' &&
+          needs.macos-direct.result == 'success' &&
+          (needs.macos-app-store.result == 'success' ||
+           (!inputs.build_app_store && needs.macos-app-store.result == 'skipped')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -689,7 +798,16 @@ jobs:
         with:
           ref: develop
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: actions/download-artifact@v8
         with:
           pattern: "*-release"
@@ -731,7 +849,7 @@ jobs:
 
           ### Downloads
 
-          - **Windows:** Download and run the Windows installer.
+          - **Windows:** Download and run the Windows installer for your processor: x64 (AMD64) or ARM64.
           - **macOS:** Open the macOS DMG, then drag the app into Applications.
           - **Ubuntu:** Download and install the Debian package for your architecture (AMD64 or ARM64).
 
@@ -753,7 +871,7 @@ jobs:
 
   propose-main-promotion:
     name: Open stable release PR into main
-    if: ${{ inputs.channel == 'GA' }}
+    if: ${{ !cancelled() && inputs.channel == 'GA' && needs.prepare-version.result == 'success' && needs.publish-release.result == 'success' }}
     needs: [prepare-version, publish-release]
     runs-on: ubuntu-latest
     permissions:
@@ -762,9 +880,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-version.outputs.commit }}
+          ref: develop
           fetch-depth: 0
           persist-credentials: false
+      - name: Pin the trusted release commit
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare-version.outputs.commit }}
+        run: |
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/develop
+          git checkout --detach "$RELEASE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - name: Propose the exact published release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -774,8 +901,8 @@ jobs:
 
   publish-microsoft-store:
     name: Submit GA release to Microsoft Store
-    if: ${{ inputs.channel == 'GA' && inputs.publish_microsoft_store }}
-    needs: [prepare-version, windows-msix, publish-release]
+    if: ${{ !cancelled() && inputs.channel == 'GA' && inputs.publish_microsoft_store && needs.prepare-version.result == 'success' && needs.all-platform-builds.result == 'success' && needs.windows-msix.result == 'success' && needs.publish-release.result == 'success' }}
+    needs: [prepare-version, all-platform-builds, windows-msix, publish-release]
     runs-on: windows-latest
     environment: microsoft-store
     env:
@@ -789,8 +916,8 @@ jobs:
           }
       - uses: actions/download-artifact@v8
         with:
-          name: microsoft-store-msix-${{ needs.prepare-version.outputs.tag }}
-          path: microsoft-store-msix
+          name: microsoft-store-upload-${{ needs.prepare-version.outputs.tag }}
+          path: store-upload
       - name: Configure Microsoft Store Developer CLI
         uses: microsoft/microsoft-store-apppublisher@v1
       - name: Authenticate with Partner Center
@@ -812,11 +939,7 @@ jobs:
       - name: Submit the package to Microsoft Store
         shell: pwsh
         run: |
-          $packages = @(Get-ChildItem 'microsoft-store-msix' -Filter '*.msix')
-          if ($packages.Count -ne 1) {
-            throw "Expected exactly one MSIX package, found $($packages.Count)."
-          }
-          msstore publish $packages[0].FullName -id $env:MICROSOFT_STORE_PRODUCT_ID --uploadTimeout 300
+          msstore publish . --inputFile store-upload/SonosVolumeBridge.msixupload -id $env:MICROSOFT_STORE_PRODUCT_ID --uploadTimeout 300
           if ($LASTEXITCODE -ne 0) {
             throw 'Microsoft Store submission failed.'
           }

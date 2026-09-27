@@ -81,7 +81,17 @@ inside the async runtime and verifies that the sender remains connected after
 multiple sends. It never posts test notifications to the user's desktop.
 Because Tauri's desktop permission helpers unconditionally report granted, macOS uses UserNotifications
 for real authorization, delivery, and foreground presentation; Windows checks the
-native toast setting. OS permission is requested only from the user's opt-in action.
+native toast setting. Unpackaged Windows runs register both presentation metadata
+and a COM activator before first use; display-name-only registration is incomplete.
+The activator has a quoted executable launch command and opens Settings, ignoring
+notification arguments. A dedicated MTA retains the COM factory for process lifetime.
+Startup repairs the executable path after a rebuild or installation change.
+Normal and demo activators are distinct. Native macOS and Linux delivery is unchanged.
+Unpackaged Windows startup also creates or repairs the Start menu shortcut's sender
+ID and toast activator CLSID. Existing shortcut targets are preserved; demo uses a
+separate shortcut. Native failure events are observed while retaining at most eight
+recent toast objects. This diagnostic retention does not change notification policy.
+OS permission is requested only from the user's opt-in action.
 Linux notification services do not expose a portable permission prompt/status;
 delivery follows desktop settings. OS suppression and notification delivery failures
 never affect volume synchronization. Native permission waits run outside the speaker
@@ -122,3 +132,26 @@ formatter. Speaker names use the same display-name normalization as device
 selection, removing Sonos renderer/model/identifier suffixes while retaining the
 human room name, including hyphens within that name. Stable device identity is
 unchanged.
+
+Windows notifications use a shell-owned native adapter for permission and delivery.
+Unpackaged runs register their application identity and display name in the current
+user's AppUserModelId metadata, including the bundled PNG icon in a persistent
+local data location. Register these assets before creating the notifier so Windows
+does not show a generic sender icon. Packaged runs use the package's notifier. This
+removes the mismatch between checking the installed identity and sending under
+Tauri's development PowerShell fallback. No notification preference is rewritten.
+
+Before a sender's first notification, Windows can return Element not found for
+the permission query. Follow the [Windows Community Toolkit preregistration
+sequence](https://github.com/CommunityToolkit/WindowsCommunityToolkit/blob/main/Microsoft.Toolkit.Uwp.Notifications/Toasts/Compat/ToastNotificationManagerCompat.cs):
+submit a suppressed, silent toast with a short expiry, wait briefly for sender
+registration, remove only that tagged toast, and recheck permission. Actual denied
+settings and unrelated errors remain denied. Delivery uses native text nodes and
+reports synchronous and asynchronous failures to the application log. A registered
+COM activator opens Settings when the user clicks a notification. The Start menu
+shortcut carries both the sender identity and activator identity.
+Resolve its target from the Windows uninstall registration when a valid installed
+executable exists, otherwise use the current standalone executable. Do not retain
+an arbitrary previous shortcut target: it may point to an obsolete development
+build. Full NSIS uninstall removes both per-user registration keys, while updates
+preserve them. These registrations belong to the shell adapter, not the domain.

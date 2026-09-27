@@ -47,6 +47,7 @@ test('native Wayland decorations use Tao with the upstream input propagation fix
 
 test('Windows supports horizontal resizing and keeps native window chrome', () => {
   const window = config('tauri.windows.conf.json').app.windows[0];
+  assert.equal(window.height, 820, 'allow room for multiline schedule status');
   assert.ok(window.minWidth < window.width, 'compact layout must be reachable');
   assert.ok(window.maxWidth == null, 'Windows Settings layout can expand with the window');
   assert.notEqual(window.decorations, false);

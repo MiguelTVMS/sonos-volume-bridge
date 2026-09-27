@@ -48,10 +48,14 @@ jobs:
               - 'scripts/prepare-release-downloads.sh'
               - 'scripts/collect-linux-installer.sh'
               - 'scripts/tests/test_release_downloads.py'
+              - 'scripts/tests/test_release_workflow.py'
               - 'scripts/tests/test_linux_installer.py'
               - 'pages/index.html'
               - '.github/workflows/ci.yml'
               - '.github/workflows/release-candidate.yml'
+              - '.github/workflows/microsoft-store-package.yml'
+              - 'scripts/build-msix*.ps1'
+              - 'scripts/tests/test-msix-upload.ps1'
             rust:
               - 'Cargo.toml'
               - 'Cargo.lock'
@@ -59,6 +63,12 @@ jobs:
               - '.github/workflows/**'
               - 'crates/**'
               - 'src-tauri/**'
+              - 'scripts/*windows*.ps1'
+              - 'scripts/build-msix*.ps1'
+              - 'scripts/tests/test-msix-upload.ps1'
+              - 'scripts/tests/test-windows-architecture.ps1'
+              - 'scripts/tests/test-windows-uninstall.ps1'
+              - 'packaging/windows-msix/**'
             ui:
               - 'ui/**'
               - 'ui/pnpm-lock.yaml'
@@ -76,6 +86,7 @@ jobs:
           persist-credentials: false
       - run: python3 -m unittest discover -s scripts/tests -p test_release_promotion.py
       - run: python3 -m unittest discover -s scripts/tests -p test_release_downloads.py
+      - run: python3 -m unittest discover -s scripts/tests -p test_release_workflow.py
       - run: python3 -m unittest discover -s scripts/tests -p test_linux_installer.py
 
   rust:
@@ -86,7 +97,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, windows-11-arm, macos-latest]
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@v1
@@ -94,12 +105,59 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: workspace-${{ runner.os }}
+          shared-key: workspace-${{ runner.os }}-${{ runner.arch }}
       - run: cargo check --workspace
+      - if: runner.os == 'Windows'
+        run: cargo test --workspace
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/tests/test-windows-architecture.ps1
       - run: cargo check -p sonos-volume-bridge --features ui-demo
       - run: cargo check -p sonos-volume-bridge --features ui-windows
       - run: cargo check -p sonos-volume-bridge --features ui-macos
       - run: cargo check -p sonos-volume-bridge --features ui-ubuntu
+      - uses: pnpm/action-setup@v6
+        if: runner.os == 'Windows'
+        with:
+          version: 12
+      - uses: actions/setup-node@v7
+        if: runner.os == 'Windows'
+        with:
+          node-version: "lts/*"
+      - if: runner.os == 'Windows'
+        run: pnpm --dir ui install --frozen-lockfile
+      - name: Windows installer regression
+        if: runner.os == 'Windows'
+        run: pnpm dlx @tauri-apps/cli@2 build --debug --bundles nsis
+      - name: Package native Store MSIX for combined upload verification
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/build-msix.ps1 -ExecutablePath target/debug/sonos-volume-bridge.exe -Architecture '${{ runner.arch }}'
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Windows'
+        with:
+          name: ci-msix-${{ runner.arch }}
+          path: target/release/bundle/msix/*.msix
+          if-no-files-found: error
+      - name: Windows uninstall registration regression
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/tests/test-windows-uninstall.ps1
+
+  windows-store-upload:
+    name: Combined Microsoft Store upload regression
+    needs: [changes, rust]
+    if: github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.rust == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: ci-msix-*
+          merge-multiple: true
+          path: microsoft-store-msix
+      - shell: pwsh
+        run: ./scripts/tests/test-msix-upload.ps1 -PackageDirectory microsoft-store-msix
 
   rust-quality:
     name: Rust quality (${{ matrix.os }})
@@ -133,7 +191,7 @@ jobs:
           cache-dependency-path: ui/pnpm-lock.yaml
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: workspace-${{ runner.os }}-${{ runner.arch }}
+          shared-key: workspace-${{ runner.os }}-${{ runner.arch }}-${{ runner.arch }}
       - run: pnpm run ci:rustfmt
       - run: pnpm run ci:clippy
       - run: pnpm run ci:test

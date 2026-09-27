@@ -213,6 +213,23 @@ wake delivery. Native notification display is controlled by the OS.
     refocus Settings, and verify labels/tooltips update without losing grid edits.
     CI covers a US WebView locale with a native 24-hour override at startup.
 
+### Windows native notification delivery
+
+Windows delivery verification must distinguish an accepted `Show` request from a
+visible notification. For an unpackaged normal release, trigger a configured state
+transition and verify its entry in Windows Notification Center, then click it to
+open Settings. Close the app and click a retained entry to verify cold activation.
+Repeat after rebuilding at a different location and with the installed build.
+Do not disturb may suppress banners; it must not be used to explain missing entries
+without checking Notification Center. In Parallels, compare with another Windows
+app and record whether the VM is in Coherence or desktop mode. API success or broker
+history alone is insufficient evidence of visible delivery.
+
+Windows CI covers sender/COM launch registration before permission and delivery,
+native class-factory activation, and shortcut creation/repair with both shell identity
+properties read back from disk. Actual shell rendering, retained entries,
+and Parallels presentation require the manual checks above.
+
 ### Windows and Linux branch trial
 
 Use `feat/night-mode-schedule` before opening a PR. The Branch desktop check
@@ -373,7 +390,7 @@ establish native installation or Apple notarization behavior.
 
 Change a General setting and immediately open Diagnostics and reset. Wait past
 the autosave debounce, return to General, and confirm defaults remain restored
-and the reset notice was not replaced by an old save response. Repeat with a slow
+and no success notice appears. Repeat with a slow
 configuration write. Browser regressions freeze the debounce clock or hold IPC
 completion to exercise both sequences deterministically through the real UI.
 
@@ -480,3 +497,108 @@ reported that everything was working. This confirms the reported active-period
 enable notification in the normal Ubuntu app. The report does not separately
 verify every preference, tray interaction, timed boundary, or first-open close
 sequence listed above.
+
+## Windows Night schedule status and notifications
+
+Open the normal Windows app, navigate to Night schedule, enable scheduling, edit
+blocks and save. The third card must contain current state, next change when
+available, notification guidance and error feedback. Successful saves must show no
+confirmation. The Status label must be on the left with wrapping text on the right
+in the 960-by-820 default Windows window. There must be no second
+status line beneath the card or notice beneath Save. Disable and re-enable the
+schedule, navigate to General, save a setting and return; errors must stay visible
+in the appropriate page while successful actions stay silent. Check light/dark and
+minimum/default window sizes.
+
+On a fresh Windows user profile, launch with `cargo tauri dev` without demo features.
+Choose a compatible speaker, select On start and end, and save a block covering
+the current time. Confirm a Sonos Volume Bridge notification, then save an empty
+grid and confirm the off notification. Enable a schedule spanning the next
+half-hour boundary and verify a single start/end notification at matching
+boundaries. Repeat with On start, On end and Never to check filtering. Repeat
+with an installed desktop build and a packaged build. With app notifications
+disabled, confirm the status guidance and that scheduling still works; restore
+notifications and confirm recovery. Do not disturb may send notifications directly
+to Notification Center instead of showing a banner.
+
+CI browser coverage uses the production form and mocked IPC to check initial
+state, toggling, grid editing, saving, next transition, notification guidance,
+failure feedback and navigation. The layout regression fails before consolidation.
+Error-only notice regressions on all three platforms fail with the old save
+confirmation. They wait for the production form to finish saving, then exercise
+a failed save and successful retry, preserving visible errors and clearing them
+after recovery. Settings autosaves are also verified to remain silent.
+Rust CI exercises shared Windows notification orchestration from an unregistered
+sender through the initial permission check and Save/start/end delivery, and
+preserves denied/unavailable outcomes. Removing first-use preregistration fails
+that regression. Existing integration tests cover schedule boundary/filter policy.
+
+The opt-in `cargo test -p sonos-volume-bridge native_development_notification_smoke
+-- --ignored --nocapture` sends a real Windows test notification and checks native
+API success. It passed locally after the fix. Automated success does not prove a
+visible banner, native WebView layout, hardware timing or packaged delivery;
+complete the manual sequences above before release.
+
+### Windows installer and architecture coverage
+
+CI builds a normal NSIS installer on Windows x64 and ARM64. Packaging the custom
+template with the updated Tauri bundler failed with a missing Restart Manager
+macro before its include was added, and succeeded after the fix. Keep this
+production packaging check in PR CI. The architecture script checks both valid
+PE machine types, rejects malformed files and invokes the MSIX packaging entry
+point with mismatched input to verify it fails before packaging. Local validation
+on ARM64 covers actual MSIX pack/unpack; x64 packaging is verified on its CI runner.
+
+Install the matching normal NSIS package, launch it from its installed location,
+then set notifications to On start and end. Save a change that excludes the current
+half-hour, and another that includes it. Confirm both speaker state changes and
+that Night Mode schedule ended/started appear in Windows Notification Center.
+Save again without crossing a boundary and confirm no additional notification.
+Restore the original grid. Automated delivery acceptance cannot prove that the
+Windows shell displayed a notification; record visible delivery separately.
+
+Windows unpackaged sender registration includes a persistent copy of the bundled
+PNG icon through `IconUri`, before the notifier is created. A regression test
+asserts the display assets exist at sender creation time. On the locally installed
+ARM64 NSIS build, the user confirmed notifications appear; verify the branded
+icon on a new notification after updating (old notifications may keep cached art).
+
+When launched by a packaged development host, also verify that the registered
+PNG and Start menu ICO paths resolve to the actual files outside that host's
+file-system redirection. The shortcut regression checks persisted icon location,
+sender and activation metadata through COM after initial creation and repair.
+Reinstall in place, check the Start menu icon and a fresh toast, and confirm no
+desktop shortcut was created. Desktop shortcut creation remains disabled for
+interactive, passive and silent NSIS installation.
+The legacy WiX migration exception that could recreate a desktop shortcut was
+removed as well; only Start menu shortcuts are created or repaired.
+
+### Installing from a packaged development host
+
+Launching NSIS directly from a packaged terminal/agent can redirect its AppData
+files and uninstall registry writes into that host's private environment. Successful
+installer exit and a registry read from the same host do not prove the app is
+visible in Windows Installed apps. Run the installer through the existing Windows
+Explorer desktop instead, preserving configuration when moving between redirected
+and normal locations. Check the uninstall DisplayName through the independent
+Windows registry provider, then reopen Settings > Apps > Installed apps and search
+for Sonos Volume Bridge. Confirm its uninstall action is available and that no
+desktop shortcut is created. This is an installation-context verification step;
+the NSIS template already writes the normal uninstall metadata.
+
+### Shortcut ownership and notification cleanup
+
+The native shortcut regression creates a development shortcut, starts with an
+installed target, then simulates another development startup and reads the actual
+persisted shell link. The installed target must win both times. Windows CI also
+compiles and executes the production NSIS registry-cleanup block against isolated
+test keys: full uninstall removes sender and activator; update mode retains both.
+The release test suite checks the cleanup remains inside the full-uninstall guard.
+
+Manual coverage: run a normal standalone build before installing, install and
+launch the installed app, run the standalone build again, and check Start still
+launches the installed executable. Uninstall using Windows Installed apps and
+verify both native notification registrations disappear without manual cleanup.
+Repeat an in-place update and verify notification delivery remains available.
+Automated tests isolate installation lookup from real machine registry state and
+do not prove native shell cache refresh or elevation/account behavior.
