@@ -48,9 +48,9 @@ if ($ValidateOnly) {
             $json = & msstore submission get $AppId
             if ($LASTEXITCODE -ne 0) { throw 'Cannot retrieve Store submission for verification; do not republish automatically.' }
             $json | Set-Content -LiteralPath $response -Encoding utf8NoBOM
-            & python (Join-Path $PSScriptRoot 'resolve-store-upload.py') --tag $ReleaseTag --verify-submission $response
+            & python (Join-Path $PSScriptRoot 'resolve-store-upload.py') --tag $ReleaseTag --verify-submission $response --verify-directory $InputDirectory
             if ($LASTEXITCODE -eq 0) {
-                Write-Output 'Store reports the selected release for x64 and ARM64. Certification is separate.'
+                Write-Output 'Store confirms the selected upload version; x64 and ARM64 coverage verified. Certification is separate.'
                 return
             }
             if ($attempt -lt 9) { Start-Sleep -Seconds 30 }

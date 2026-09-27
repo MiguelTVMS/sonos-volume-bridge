@@ -32,3 +32,9 @@ validation. Certification remains an independent external result.
 Tests cover failed-submission recovery, rejection of incomplete artifacts,
 version and architecture mismatches, and publication restrictions. Windows CI
 validates the production arguments against the pinned CLI without uploading.
+
+Store submission metadata may represent the combined upload as one Neutral
+package. Accept that representation only when its uploaded filename and version
+match the retained artifact and local verification confirms both embedded x64
+and ARM64 packages. Neutral alone does not prove architecture coverage. This
+submission check does not establish certification or public availability.
