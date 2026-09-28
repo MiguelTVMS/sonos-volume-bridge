@@ -20,3 +20,5 @@ This folder stores decision records. Keep one record per important design choice
 - [0015-macos-dmg-download](0015-macos-dmg-download.md)
 
 - [0016-store-release-recovery](0016-store-release-recovery.md)
+
+- [0017-volume-feedback-suppression](0017-volume-feedback-suppression.md)

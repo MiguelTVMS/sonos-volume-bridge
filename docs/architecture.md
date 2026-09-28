@@ -306,3 +306,8 @@ package. Accept that representation only when its uploaded filename and version
 match the retained artifact and local verification confirms both embedded x64
 and ARM64 packages. Neutral alone does not prove architecture coverage. This
 submission check does not establish certification or public availability.
+
+Audio echo suppression retains repeated and overlapping expected local states for
+500 ms without pausing listening. Unchanged local properties are not rewritten.
+See [ADR 0017](decisions/0017-volume-feedback-suppression.md) for platform behavior,
+regression coverage, and the limitations of value-based origin detection.

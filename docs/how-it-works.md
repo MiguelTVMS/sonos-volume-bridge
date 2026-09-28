@@ -195,3 +195,8 @@ Demo app settings persist separately from normal settings; speaker state resets
 on restart and is reconciled by the runtime. No real Sonos device is contacted.
 Local output volume and mute can change through normal synchronization. See
 [development](development.md#hardware-free-ui-demo) for build commands and styling.
+
+Audio echo suppression retains repeated and overlapping expected local states for
+500 ms without pausing listening. Unchanged local properties are not rewritten.
+See [ADR 0017](decisions/0017-volume-feedback-suppression.md) for platform behavior,
+regression coverage, and the limitations of value-based origin detection.

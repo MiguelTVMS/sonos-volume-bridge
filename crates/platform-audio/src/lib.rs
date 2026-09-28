@@ -60,6 +60,9 @@ pub trait SystemAudioController: Send + Sync {
     fn subscribe(&self) -> broadcast::Receiver<SystemAudioEvent>;
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux", test))]
+mod expected_writes;
+
 #[cfg(windows)]
 pub mod windows;
 
@@ -76,10 +79,10 @@ pub mod macos {
     //! The macOS adapter is only compiled on macOS targets.
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", test))]
 pub mod linux;
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", test)))]
 pub mod linux {
     //! The Linux adapter is only compiled on Linux targets.
 }
