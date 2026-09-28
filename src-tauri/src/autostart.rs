@@ -1,3 +1,12 @@
+#[cfg(any(not(target_os = "macos"), test))]
+pub const fn registration_name(demo: bool) -> &'static str {
+    if demo {
+        "sonos-volume-bridge-ui-demo"
+    } else {
+        "sonos-volume-bridge"
+    }
+}
+
 use tauri::AppHandle;
 #[cfg(not(target_os = "macos"))]
 use tauri_plugin_autostart::ManagerExt;
@@ -28,7 +37,12 @@ fn update_macos(start_at_login: bool) -> Result<(), String> {
 #[cfg(not(target_os = "macos"))]
 fn update_unpacked(app: &AppHandle, start_at_login: bool) -> Result<(), String> {
     if start_at_login {
-        app.autolaunch().enable().map_err(|error| error.to_string())
+        app.autolaunch()
+            .enable()
+            .map_err(|error| error.to_string())?;
+        #[cfg(target_os = "linux")]
+        refresh_linux_label(app)?;
+        Ok(())
     } else {
         match app.autolaunch().disable() {
             Ok(()) => Ok(()),
@@ -110,5 +124,55 @@ mod tests {
     #[test]
     fn preserves_other_unpacked_autostart_errors() {
         assert!(!is_missing_entry("access denied"));
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn refresh_linux_label(app: &AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    // auto-launch uses this same home-relative location, independently of XDG_CONFIG_HOME.
+    let path = app
+        .path()
+        .home_dir()
+        .map_err(|e| e.to_string())?
+        .join(".config/autostart")
+        .join(format!(
+            "{}.desktop",
+            registration_name(crate::ui_demo_enabled())
+        ));
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let display_name = if crate::ui_demo_enabled() {
+        "Speaker Volume Bridge — UI demo"
+    } else {
+        "Speaker Volume Bridge"
+    };
+    std::fs::write(path, branded_desktop_entry(&content, display_name)).map_err(|e| e.to_string())
+}
+#[cfg(any(target_os = "linux", test))]
+fn branded_desktop_entry(content: &str, name: &str) -> String {
+    content
+        .lines()
+        .map(|line| {
+            if line.starts_with("Name=") {
+                format!("Name={name}")
+            } else if line.starts_with("Comment=") {
+                format!("Comment={name} startup")
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n"
+}
+#[cfg(test)]
+mod rebrand_tests {
+    #[test]
+    fn display_name_changes_without_changing_startup_target() {
+        let entry = "[Desktop Entry]\nName=sonos-volume-bridge\nExec=/usr/bin/speaker-volume-bridge\nTerminal=false\n";
+        let renamed = super::branded_desktop_entry(entry, "Speaker Volume Bridge");
+        assert!(renamed.contains("Name=Speaker Volume Bridge\n"));
+        assert!(renamed.contains("Exec=/usr/bin/speaker-volume-bridge\n"));
+        assert!(renamed.contains("Terminal=false\n"));
     }
 }

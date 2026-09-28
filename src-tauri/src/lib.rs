@@ -51,10 +51,9 @@ pub fn run() {
 }
 
 fn configure_identity<R: tauri::Runtime>(context: &mut tauri::Context<R>, demo: bool) {
-    context.package_info_mut().name = "sonos-volume-bridge".into();
     if demo {
         context.config_mut().identifier.push_str(".ui-demo");
-        // Windows/Linux autostart keys use the package name, not the identifier.
+        // Keep the demo package distinct from normal development builds.
         context.package_info_mut().name.push_str("-ui-demo");
     }
 }
@@ -252,9 +251,17 @@ mod identity_tests {
         };
         let normal = build(false);
         let demo = build(true);
-        // The autostart plugin uses package_info().name as its registration key.
-        assert_eq!(normal.package_info().name, "sonos-volume-bridge");
-        assert_eq!(demo.package_info().name, "sonos-volume-bridge-ui-demo");
+        // Source package renaming must not rename the explicit OS registration key.
+        assert_eq!(normal.package_info().name, "speaker-volume-bridge");
+        assert_eq!(demo.package_info().name, "speaker-volume-bridge-ui-demo");
+        assert_eq!(
+            super::autostart::registration_name(false),
+            "sonos-volume-bridge"
+        );
+        assert_eq!(
+            super::autostart::registration_name(true),
+            "sonos-volume-bridge-ui-demo"
+        );
         assert_ne!(normal.config().identifier, demo.config().identifier);
     }
 }
