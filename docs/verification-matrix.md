@@ -512,7 +512,7 @@ minimum/default window sizes.
 
 On a fresh Windows user profile, launch with `cargo tauri dev` without demo features.
 Choose a compatible speaker, select On start and end, and save a block covering
-the current time. Confirm a Sonos Volume Bridge notification, then save an empty
+the current time. Confirm a Speaker Volume Bridge notification, then save an empty
 grid and confirm the off notification. Enable a schedule spanning the next
 half-hour boundary and verify a single start/end notification at matching
 boundaries. Repeat with On start, On end and Never to check filtering. Repeat
@@ -533,7 +533,7 @@ sender through the initial permission check and Save/start/end delivery, and
 preserves denied/unavailable outcomes. Removing first-use preregistration fails
 that regression. Existing integration tests cover schedule boundary/filter policy.
 
-The opt-in `cargo test -p sonos-volume-bridge native_development_notification_smoke
+The opt-in `cargo test -p speaker-volume-bridge native_development_notification_smoke
 -- --ignored --nocapture` sends a real Windows test notification and checks native
 API success. It passed locally after the fix. Automated success does not prove a
 visible banner, native WebView layout, hardware timing or packaged delivery;
@@ -582,7 +582,7 @@ visible in Windows Installed apps. Run the installer through the existing Window
 Explorer desktop instead, preserving configuration when moving between redirected
 and normal locations. Check the uninstall DisplayName through the independent
 Windows registry provider, then reopen Settings > Apps > Installed apps and search
-for Sonos Volume Bridge. Confirm its uninstall action is available and that no
+for Speaker Volume Bridge. Confirm its uninstall action is available and that no
 desktop shortcut is created. This is an installation-context verification step;
 the NSIS template already writes the normal uninstall metadata.
 

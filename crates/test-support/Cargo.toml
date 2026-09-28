@@ -1,5 +1,5 @@
 [package]
-name = "sonos-volume-bridge-test-support"
+name = "speaker-volume-bridge-test-support"
 description = "Test-only Sonos protocol fixtures and mock server"
 version.workspace = true
 edition.workspace = true
@@ -8,7 +8,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-sonos-volume-bridge-domain = { path = "../domain" }
+speaker-volume-bridge-domain = { path = "../domain" }
 tokio.workspace = true
 
 [lints]

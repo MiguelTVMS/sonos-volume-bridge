@@ -11,6 +11,7 @@ use tracing_appender::non_blocking::WorkerGuard;
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum UiStatus {
+    LegacyAppRunning,
     Discovering,
     Connecting,
     Synchronized,
@@ -88,15 +89,33 @@ impl AppState {
         }
         if let Ok(mut snapshot) = self.snapshot.lock() {
             snapshot.configuration = configuration;
-            snapshot.status = UiStatus::Connecting;
+            snapshot.status = if crate::legacy_app::paused() {
+                UiStatus::LegacyAppRunning
+            } else {
+                UiStatus::Connecting
+            };
         }
     }
     pub fn start_runtime(&self, app: AppHandle) {
+        if crate::legacy_app::paused()
+            || self
+                .schedule_stopped
+                .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            return;
+        }
         let Ok(configuration) = self.configuration.lock().map(|value| value.clone()) else {
             return;
         };
         self.runtime
             .restart(configuration, Arc::clone(&self.snapshot), app);
+    }
+    pub fn pause_for_legacy(&self) {
+        self.runtime.stop();
+        if let Ok(mut snapshot) = self.snapshot.lock() {
+            snapshot.runtime_generation += 1;
+            snapshot.status = UiStatus::LegacyAppRunning;
+        }
     }
     pub fn stop_runtime(&self) {
         self.schedule_stopped

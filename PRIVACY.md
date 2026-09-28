@@ -1,21 +1,21 @@
-# Privacy Policy for Sonos Volume Bridge
+# Privacy Policy for Speaker Volume Bridge
 
 **Effective date:** August 6, 2026
 
-Sonos Volume Bridge is an independent, community-developed desktop application
+Speaker Volume Bridge is an independent, community-developed desktop application
 published by Miguel.MS. This policy explains what information the application
 accesses and how that information is handled.
 
 ## Summary
 
-Sonos Volume Bridge does not require an account, include advertising or
+Speaker Volume Bridge does not require an account, include advertising or
 analytics, or send telemetry to the publisher. It communicates directly with
 Sonos speakers on the user's local network and stores its settings and
 diagnostic logs locally on the user's computer.
 
 ## Information the application accesses
 
-To provide volume synchronization, Sonos Volume Bridge accesses:
+To provide volume synchronization, Speaker Volume Bridge accesses:
 
 - information exposed by compatible Sonos devices on the local network, such
   as device identifiers, names, local network addresses, volume, and mute state;
@@ -56,7 +56,7 @@ normal file-management behavior.
 
 ## Personal information and third parties
 
-Sonos Volume Bridge does not ask for or intentionally collect names, email
+Speaker Volume Bridge does not ask for or intentionally collect names, email
 addresses, precise location, contacts, financial information, authentication
 credentials, audio content, or other personal content. It does not sell user
 information or disclose application data to advertisers or data brokers.
@@ -87,4 +87,8 @@ effective date above will be updated when a material revision is published.
 Questions about this policy or requests concerning application data can be
 submitted through the project's public issue tracker:
 
-<https://github.com/MiguelTVMS/sonos-volume-bridge/issues>
+<https://github.com/MiguelTVMS/speaker-volume-bridge/issues>
+
+## Legacy application checks
+
+The desktop app inspects local process identity to detect a running older version and prevent competing speaker commands. This information remains on your device and is not stored as telemetry or transmitted to a server. Native conflict notifications are generated locally.

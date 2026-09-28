@@ -3,7 +3,7 @@ set -euo pipefail
 
 profile_path='src-tauri/macos-app-store.provisionprofile'
 entitlements_path='src-tauri/Entitlements.appstore.plist'
-package_path="${APP_STORE_PACKAGE_PATH:-target/release/bundle/macos/sonos-volume-bridge-macos-app-store.pkg}"
+package_path="${APP_STORE_PACKAGE_PATH:-target/release/bundle/macos/speaker-volume-bridge-macos-app-store.pkg}"
 unsigned_package_path="${package_path}.unsigned"
 
 required_variables=(
@@ -140,8 +140,8 @@ unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD
 unset APPLE_API_KEY APPLE_API_ISSUER APPLE_API_PRIVATE_KEY APPLE_API_KEY_PATH
 
 cargo tauri build --bundles app --config src-tauri/tauri.appstore.conf.json --no-sign
-app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
-app_executable="$app_path/Contents/MacOS/sonos-volume-bridge"
+app_path='target/release/bundle/macos/Speaker Volume Bridge.app'
+app_executable="$app_path/Contents/MacOS/speaker-volume-bridge"
 xattr -cr "$app_path"
 codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$keychain_path" --options runtime --entitlements "$entitlements_path" "$app_executable"
 codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$keychain_path" --options runtime --entitlements "$entitlements_path" "$app_path"

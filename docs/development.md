@@ -87,8 +87,8 @@ cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 pnpm dlx @tauri-apps/cli@2 build --debug --no-bundle --no-sign
-file target/debug/sonos-volume-bridge
-readelf -h target/debug/sonos-volume-bridge
+file target/debug/speaker-volume-bridge
+readelf -h target/debug/speaker-volume-bridge
 ```
 
 On small VMs, set `export CARGO_BUILD_JOBS=1` before the Cargo and Tauri
@@ -96,9 +96,9 @@ commands to limit concurrent compiler memory use. If a non-interactive shell
 cannot find tools installed in your account, load `~/.cargo/env` and
 `~/.nvm/nvm.sh` first, then run `nvm use --lts`.
 
-The executable must report `AArch64`. Launch `target/debug/sonos-volume-bridge`
+The executable must report `AArch64`. Launch `target/debug/speaker-volume-bridge`
 from the desktop session. For the hardware-free demo, add `--features ui-demo`
-to the build command and run `cargo test -p sonos-volume-bridge --features ui-demo`.
+to the build command and run `cargo test -p speaker-volume-bridge --features ui-demo`.
 For a normal release Debian package, use
 `pnpm dlx @tauri-apps/cli@2 build --bundles deb`; output is under
 `target/release/bundle/deb`. Demo features require debug builds.
@@ -132,8 +132,8 @@ UI production build, and the Windows Core Audio probe.
 Exercise the native adapters on their respective platforms:
 
 ```sh
-cargo run -p sonos-volume-bridge-platform-audio --example windows_audio_probe
-cargo run -p sonos-volume-bridge-platform-audio --example macos_audio_probe
+cargo run -p speaker-volume-bridge-platform-audio --example windows_audio_probe
+cargo run -p speaker-volume-bridge-platform-audio --example macos_audio_probe
 ```
 
 ## Microsoft Store package

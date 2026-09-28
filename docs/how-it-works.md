@@ -1,6 +1,6 @@
-# How SonosVolumeBridge works
+# How SpeakerVolumeBridge works
 
-SonosVolumeBridge keeps one speaker and one local audio endpoint synchronized.
+SpeakerVolumeBridge keeps one speaker and one local audio endpoint synchronized.
 
 ## End-to-end flow
 
@@ -183,7 +183,7 @@ notification guidance and action errors. Its label sits on the left and its text
 wraps on the right. Successful saves and other settings actions show no confirmation
 message; a successful retry clears the prior error. Other platform layouts are unchanged.
 Windows local runs register the app as a notification sender, so notifications
-use Sonos Volume Bridge rather than relying on PowerShell. Existing Windows
+use Speaker Volume Bridge rather than relying on PowerShell. Existing Windows
 notification preferences and Do not disturb still apply.
 
 ## UI demo builds
@@ -200,3 +200,7 @@ Audio echo suppression retains repeated and overlapping expected local states fo
 500 ms without pausing listening. Unchanged local properties are not rewritten.
 See [ADR 0017](decisions/0017-volume-feedback-suppression.md) for platform behavior,
 regression coverage, and the limitations of value-based origin detection.
+
+## Legacy application protection
+
+The desktop shell pauses synchronization and scheduled speaker writes while the old executable is running. Unknown inspection retains an existing pause. Confirmed absence reconciles current configuration without replaying queued commands or restarting user-stopped synchronization. See [decision 0018](decisions/0018-rebrand-and-legacy-protection.md) and [upgrade guidance](rebrand-upgrade.md).

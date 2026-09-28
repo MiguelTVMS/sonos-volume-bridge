@@ -281,7 +281,7 @@ export function updateScheduleView(
     .filter(Boolean)
     .join(' · ');
   panel.querySelector('#notification-permission')!.textContent = status.notificationsBlocked
-    ? 'Notifications are blocked. Allow Sonos Volume Bridge notifications in system settings.'
+    ? 'Notifications are blocked. Allow Speaker Volume Bridge notifications in system settings.'
     : '';
   panel.querySelector<HTMLElement>('.schedule-grid')!.dataset.supported = String(supported);
   panel.querySelectorAll<HTMLButtonElement>('.schedule-cell, #schedule-clear').forEach((cell) => {

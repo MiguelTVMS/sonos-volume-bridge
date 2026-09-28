@@ -111,7 +111,7 @@ product because the site publishes with the release. Keep the visible copy and
 llms.txt aligned. The section introduces no tracking or external assets.
 
 The Ubuntu card provides distinct x64 and ARM64 download buttons. The ARM64
-URL targets the next release that includes `sonos-volume-bridge-linux-arm64.deb`;
+URL targets the next release that includes `speaker-volume-bridge-linux-arm64.deb`;
 it will become available after the first GA release containing that asset.
 
 The Windows card likewise provides x64 and ARM64 buttons. Publish both

@@ -200,11 +200,11 @@ The GitHub Release publishing job runs `scripts/prepare-release-downloads.sh`
 to rename build outputs to five permanent filenames, with one file per package.
 The release tag identifies the version; duplicate versioned files are not uploaded:
 
-- `sonos-volume-bridge-macos.dmg` (website download)
-- `sonos-volume-bridge-windows-x64-unsigned.exe`
-- `sonos-volume-bridge-windows-arm64-unsigned.exe`
-- `sonos-volume-bridge-linux-x64.deb`
-- `sonos-volume-bridge-linux-arm64.deb`
+- `speaker-volume-bridge-macos.dmg` (website download)
+- `speaker-volume-bridge-windows-x64-unsigned.exe`
+- `speaker-volume-bridge-windows-arm64-unsigned.exe`
+- `speaker-volume-bridge-linux-x64.deb`
+- `speaker-volume-bridge-linux-arm64.deb`
 
 The website uses `releases/latest/download/<filename>` so stable downloads follow
 the latest non-prerelease without a website deployment. Missing or empty source

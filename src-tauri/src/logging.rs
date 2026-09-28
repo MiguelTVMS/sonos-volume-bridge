@@ -5,7 +5,7 @@ use tracing_subscriber::{filter::LevelFilter, fmt, prelude::*};
 
 pub fn initialize(log_directory: &Path, level: LogLevel) -> Result<WorkerGuard, std::io::Error> {
     fs::create_dir_all(log_directory)?;
-    let appender = tracing_appender::rolling::daily(log_directory, "sonos-volume-bridge.log");
+    let appender = tracing_appender::rolling::daily(log_directory, "speaker-volume-bridge.log");
     let (writer, guard) = tracing_appender::non_blocking(appender);
     let filter = match level {
         LogLevel::Error => LevelFilter::ERROR,

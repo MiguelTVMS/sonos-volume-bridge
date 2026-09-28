@@ -19,4 +19,4 @@ if [[ "$(dpkg-deb -f "$installer" Architecture)" != "$release_arch" ]]; then
   echo 'Debian installer architecture does not match release architecture' >&2
   exit 1
 fi
-cp "$installer" "sonos-volume-bridge-${release_tag}-linux-${release_arch}.deb"
+cp "$installer" "speaker-volume-bridge-${release_tag}-linux-${release_arch}.deb"

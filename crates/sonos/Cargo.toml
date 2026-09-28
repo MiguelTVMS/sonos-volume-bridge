@@ -1,6 +1,6 @@
 [package]
-name = "sonos-volume-bridge-sonos"
-description = "Local-network Sonos UPnP client for SonosVolumeBridge"
+name = "speaker-volume-bridge-sonos"
+description = "Local-network Sonos UPnP client for SpeakerVolumeBridge"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,14 +12,14 @@ quick-xml.workspace = true
 reqwest.workspace = true
 rand.workspace = true
 serde.workspace = true
-sonos-volume-bridge-domain = { path = "../domain" }
+speaker-volume-bridge-domain = { path = "../domain" }
 thiserror.workspace = true
 tokio.workspace = true
 url.workspace = true
 if-addrs = "0.15"
 
 [dev-dependencies]
-sonos-volume-bridge-test-support = { path = "../test-support" }
+speaker-volume-bridge-test-support = { path = "../test-support" }
 
 [lints]
 workspace = true

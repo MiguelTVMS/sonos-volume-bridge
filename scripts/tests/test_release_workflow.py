@@ -140,7 +140,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         body = jobs(WORKFLOW.read_text())['macos-direct']
         self.assertNotIn('macos.zip', body)
         self.assertNotIn('Archive the notarized app bundle', body)
-        self.assertIn('sonos-volume-bridge-*-macos.dmg', body)
+        self.assertIn('speaker-volume-bridge-*-macos.dmg', body)
         self.assertIn('xcrun stapler validate "$image"', body)
         self.assertIn('hdiutil verify "$image"', body)
 

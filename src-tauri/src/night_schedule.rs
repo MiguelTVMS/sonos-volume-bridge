@@ -4,14 +4,14 @@ use crate::{config::AppConfiguration, runtime, state::AppState, tray};
 use async_trait::async_trait;
 use jiff::{Timestamp, tz::TimeZone};
 use serde::Serialize;
-use sonos_volume_bridge_integration::night_mode::{
+use speaker_volume_bridge_integration::night_mode::{
     NightModeController, NightModePort, NightModeReading,
 };
-use sonos_volume_bridge_sonos::{FeatureAvailability, SonosClient, SonosDevice};
+use speaker_volume_bridge_sonos::{FeatureAvailability, SonosClient, SonosDevice};
 use std::{sync::atomic::Ordering, time::Duration};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
-pub use sonos_volume_bridge_integration::night_mode::LOCK_MESSAGE;
+pub use speaker_volume_bridge_integration::night_mode::LOCK_MESSAGE;
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScheduleStatus {
@@ -23,6 +23,7 @@ pub struct ScheduleStatus {
     pub notifications_blocked: bool,
 }
 struct Port {
+    intent: crate::legacy_app::WriteIntent,
     client: SonosClient,
     device: SonosDevice,
 }
@@ -37,6 +38,7 @@ impl NightModePort for Port {
         }
     }
     async fn write(&self, value: bool) -> Result<(), String> {
+        let _permit = self.intent.permit().await?;
         self.client
             .set_eq(&self.device, "NightMode", value)
             .await
@@ -44,12 +46,17 @@ impl NightModePort for Port {
     }
 }
 async fn port(configuration: &AppConfiguration) -> Option<Port> {
+    let intent = crate::legacy_app::write_intent();
     let client = SonosClient::builder()
         .timeout(Duration::from_secs(3))
         .build()
         .ok()?;
     let device = runtime::resolve_device(&client, configuration).await.ok()?;
-    Some(Port { client, device })
+    Some(Port {
+        intent,
+        client,
+        device,
+    })
 }
 pub async fn supported(configuration: &AppConfiguration) -> bool {
     if let Some(port) = port(configuration).await {
@@ -85,6 +92,16 @@ pub fn start<R: Runtime>(app: AppHandle<R>) {
             let state = app.state::<AppState>();
             if state.schedule_stopped.load(Ordering::Relaxed) {
                 return;
+            }
+            if crate::legacy_app::paused() {
+                publish(
+                    &app,
+                    ScheduleStatus {
+                        message: crate::legacy_app::MESSAGE.into(),
+                        ..Default::default()
+                    },
+                );
+                continue;
             }
             let gate = state.speaker_gate.lock().await;
             let Ok(configuration) = state.configuration.lock().map(|c| c.clone()) else {
@@ -255,14 +272,18 @@ pub async fn set_manual(configuration: &AppConfiguration, enabled: bool) -> Resu
     let port = port(configuration)
         .await
         .ok_or("Selected speaker is unavailable.")?;
-    sonos_volume_bridge_integration::night_mode::apply_manual(&port, enabled, locked(configuration))
-        .await
+    speaker_volume_bridge_integration::night_mode::apply_manual(
+        &port,
+        enabled,
+        locked(configuration),
+    )
+    .await
 }
 
 /// Called with the same write gate as persistence and manual speaker operations.
 pub async fn apply_saved(
     configuration: &AppConfiguration,
-    previous: &sonos_volume_bridge_domain::NightModeSchedule,
+    previous: &speaker_volume_bridge_domain::NightModeSchedule,
 ) -> Result<(Option<bool>, String), String> {
     let zone = TimeZone::try_system().map_err(|_| "Computer time zone unavailable.")?;
     let now = Timestamp::now();
@@ -288,7 +309,7 @@ pub async fn apply_saved(
     let port = port(configuration)
         .await
         .ok_or("Selected speaker is unavailable.")?;
-    let result = sonos_volume_bridge_integration::night_mode::apply_saved(
+    let result = speaker_volume_bridge_integration::night_mode::apply_saved(
         &port,
         window.active,
         was_scheduled,

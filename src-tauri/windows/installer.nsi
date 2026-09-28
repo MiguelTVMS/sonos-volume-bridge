@@ -41,6 +41,7 @@ ${StrLoc}
 
 !define MANUFACTURER "{{manufacturer}}"
 !define PRODUCTNAME "{{product_name}}"
+!define LEGACYPRODUCTNAME "Sonos Volume Bridge"
 !define VERSION "{{version}}"
 !define VERSIONWITHBUILD "{{version_with_build}}"
 !define HOMEPAGE "{{homepage}}"
@@ -65,9 +66,9 @@ ${StrLoc}
 !define WEBVIEW2BOOTSTRAPPERPATH "{{webview2_bootstrapper_path}}"
 !define WEBVIEW2INSTALLERPATH "{{webview2_installer_path}}"
 !define MINIMUMWEBVIEW2VERSION "{{minimum_webview2_version}}"
-!define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCTNAME}"
+!define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${LEGACYPRODUCTNAME}"
 !define MANUKEY "Software\${MANUFACTURER}"
-!define MANUPRODUCTKEY "${MANUKEY}\${PRODUCTNAME}"
+!define MANUPRODUCTKEY "${MANUKEY}\${LEGACYPRODUCTNAME}"
 !define UNINSTALLERSIGNCOMMAND "{{uninstaller_sign_cmd}}"
 !define ESTIMATEDSIZE "{{estimated_size}}"
 !define STARTMENUFOLDER "{{start_menu_folder}}"
@@ -416,7 +417,7 @@ Var AppStartMenuFolder
 ; because the installation page has useful info that can be used debug any issues with the installer.
 !define MUI_FINISHPAGE_NOAUTOCLOSE
 ; Use show readme button in the finish page as a button create a desktop shortcut
-; Sonos Volume Bridge uses the notification area instead of a desktop shortcut.
+; Speaker Volume Bridge uses the notification area instead of a desktop shortcut.
 ; The finish page therefore does not offer desktop shortcut creation.
 ; Show run app after installation.
 !define MUI_FINISHPAGE_RUN
@@ -654,6 +655,8 @@ Section Install
 
   !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
 
+  !insertmacro CheckIfAppIsRunning "sonos-volume-bridge.exe" "${LEGACYPRODUCTNAME}"
+
   ; Copy main executable
   File "${MAINBINARYSRCPATH}"
 
@@ -702,6 +705,28 @@ Section Install
   ${If} $OldMainBinaryName != ""
   ${AndIf} $OldMainBinaryName != "${MAINBINARYNAME}.exe"
     Delete "$INSTDIR\$OldMainBinaryName"
+  ${EndIf}
+
+  ; Migrate owned legacy shortcuts without touching unrelated links.
+  !insertmacro IsShortcutTarget "$SMPROGRAMS\${LEGACYPRODUCTNAME}.lnk" "$INSTDIR\sonos-volume-bridge.exe"
+  Pop $0
+  ${If} $0 = 1
+    Delete "$SMPROGRAMS\${LEGACYPRODUCTNAME}.lnk"
+  ${EndIf}
+  !insertmacro IsShortcutTarget "$DESKTOP\${LEGACYPRODUCTNAME}.lnk" "$INSTDIR\sonos-volume-bridge.exe"
+  Pop $0
+  ${If} $0 = 1
+    Delete "$DESKTOP\${LEGACYPRODUCTNAME}.lnk"
+  ${EndIf}
+  !insertmacro IsShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${LEGACYPRODUCTNAME}.lnk" "$INSTDIR\sonos-volume-bridge.exe"
+  Pop $0
+  ${If} $0 = 1
+    Delete "$SMPROGRAMS\$AppStartMenuFolder\${LEGACYPRODUCTNAME}.lnk"
+  ${EndIf}
+  ; Keep the existing autostart registration key, update only its executable.
+  ReadRegStr $0 HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "sonos-volume-bridge"
+  ${If} $0 != ""
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "sonos-volume-bridge" '$\"$INSTDIR\${MAINBINARYNAME}.exe$\"'
   ${EndIf}
 
   ; Save current MAINBINARYNAME for future updates
@@ -871,7 +896,7 @@ Section Uninstall
   ; If it doesn't exist, it does nothing.
   ; We do this when not updating (to preserve the registry value on updates)
   ${If} $UpdateMode <> 1
-    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCTNAME}"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "sonos-volume-bridge"
   ${EndIf}
 
   ; Delete app data if the checkbox is selected

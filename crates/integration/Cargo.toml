@@ -1,6 +1,6 @@
 [package]
-name = "sonos-volume-bridge-integration"
-description = "Async synchronization orchestration for SonosVolumeBridge"
+name = "speaker-volume-bridge-integration"
+description = "Async synchronization orchestration for SpeakerVolumeBridge"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,8 +9,8 @@ repository.workspace = true
 
 [dependencies]
 async-trait.workspace = true
-sonos-volume-bridge-domain = { path = "../domain" }
-sonos-volume-bridge-synchronization = { path = "../synchronization" }
+speaker-volume-bridge-domain = { path = "../domain" }
+speaker-volume-bridge-synchronization = { path = "../synchronization" }
 thiserror.workspace = true
 tokio.workspace = true
 

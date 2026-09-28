@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+case "$1" in remove|purge)
+  if [ -L /usr/bin/sonos-volume-bridge ] && [ "$(readlink /usr/bin/sonos-volume-bridge)" = speaker-volume-bridge ]; then
+    rm /usr/bin/sonos-volume-bridge
+  fi
+esac

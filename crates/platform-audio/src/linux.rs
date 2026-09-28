@@ -11,7 +11,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use serde_json::Value;
-use sonos_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, NormalizedVolume};
+use speaker_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, NormalizedVolume};
 use std::{
     io::{BufRead, BufReader},
     process::{Child, Command, Stdio},
@@ -92,7 +92,7 @@ impl LinuxAudioController {
 
         let controller = self.clone();
         thread::Builder::new()
-            .name("sonos-volume-bridge-pulse-events".to_owned())
+            .name("speaker-volume-bridge-pulse-events".to_owned())
             .spawn(move || controller.monitor(BufReader::new(stdout)))
             .map_err(|error| PlatformAudioError::Platform(error.to_string()))?;
         Ok(())

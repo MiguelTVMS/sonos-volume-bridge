@@ -113,18 +113,52 @@ pub async fn send<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
     // GNOME watches the application's sender name and removes its notification
     // source when that name vanishes. Reuse one asynchronous connection for the
     // process lifetime instead of dropping a per-notification handle on return.
+    static IDS: std::sync::Mutex<std::collections::VecDeque<u32>> =
+        std::sync::Mutex::new(std::collections::VecDeque::new());
     static CONNECTION: tokio::sync::Mutex<Option<zbus::Connection>> =
         tokio::sync::Mutex::const_new(None);
     let mut connection = CONNECTION.lock().await;
     let delivery = async {
         if connection.is_none() {
-            *connection = Some(zbus::Connection::session().await?);
+            let bus = zbus::Connection::session().await?;
+            let listening = bus.clone();
+            let handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                use futures_util::StreamExt;
+                use tauri::Manager;
+                let Ok(proxy) = zbus::Proxy::new_owned(
+                    listening,
+                    "org.freedesktop.Notifications",
+                    "/org/freedesktop/Notifications",
+                    "org.freedesktop.Notifications",
+                )
+                .await
+                else {
+                    return;
+                };
+                let Ok(mut actions) = proxy.receive_signal("ActionInvoked").await else {
+                    return;
+                };
+                while let Some(message) = actions.next().await {
+                    if let Ok((id, action)) = message.body().deserialize::<(u32, String)>() {
+                        let ours = IDS.lock().is_ok_and(|ids| ids.contains(&id));
+                        if ours
+                            && action == "default"
+                            && let Some(window) = handle.get_webview_window("main")
+                        {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                }
+            });
+            *connection = Some(bus);
         }
         let app_name = app
             .config()
             .product_name
             .as_deref()
-            .unwrap_or("Sonos Volume Bridge");
+            .unwrap_or("Speaker Volume Bridge");
         let response = connection
             .as_ref()
             .unwrap()
@@ -139,13 +173,19 @@ pub async fn send<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
                     "",
                     title,
                     body,
-                    Vec::<String>::new(),
+                    vec!["default".to_owned(), "Open Settings".to_owned()],
                     std::collections::HashMap::<String, zbus::zvariant::Value<'_>>::new(),
                     -1_i32,
                 ),
             )
             .await?;
-        let _: u32 = response.body().deserialize()?;
+        let id: u32 = response.body().deserialize()?;
+        if let Ok(mut ids) = IDS.lock() {
+            ids.push_back(id);
+            if ids.len() > 32 {
+                ids.pop_front();
+            }
+        }
         Ok::<(), zbus::Error>(())
     };
     match tokio::time::timeout(std::time::Duration::from_secs(2), delivery).await {
@@ -169,7 +209,7 @@ pub async fn permitted<R: Runtime>(app: &AppHandle<R>, _: bool) -> bool {
         app.config()
             .product_name
             .as_deref()
-            .unwrap_or("Sonos Volume Bridge"),
+            .unwrap_or("Speaker Volume Bridge"),
     )
     .is_ok_and(|notifier| notifier.permitted())
 }
@@ -182,7 +222,7 @@ pub async fn send<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
         app.config()
             .product_name
             .as_deref()
-            .unwrap_or("Sonos Volume Bridge"),
+            .unwrap_or("Speaker Volume Bridge"),
     )
     .and_then(|notifier| notifier.send(title, body))
     {
@@ -196,9 +236,10 @@ mod foreground {
     use objc2::{ClassType, define_class, msg_send, rc::Retained, runtime::ProtocolObject};
     use objc2_foundation::{NSObject, NSObjectProtocol};
     use objc2_user_notifications::{
-        UNNotification, UNNotificationPresentationOptions, UNUserNotificationCenter,
-        UNUserNotificationCenterDelegate,
+        UNNotification, UNNotificationPresentationOptions, UNNotificationResponse,
+        UNUserNotificationCenter, UNUserNotificationCenterDelegate,
     };
+    static APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
     define_class!(
         #[unsafe(super = NSObject)]
         #[name = "SVBNightScheduleNotificationDelegate"]
@@ -207,6 +248,25 @@ mod foreground {
         unsafe impl NSObjectProtocol for Delegate {}
         // SAFETY: matches the native delegate signature and always completes once.
         unsafe impl UNUserNotificationCenterDelegate for Delegate {
+            #[unsafe(method(userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:))]
+            fn response(
+                &self,
+                _: &UNUserNotificationCenter,
+                _: &UNNotificationResponse,
+                completion: &block2::DynBlock<dyn Fn()>,
+            ) {
+                use tauri::Manager;
+                if let Some(app) = APP.get() {
+                    let handle = app.clone();
+                    let _ = app.run_on_main_thread(move || {
+                        if let Some(window) = handle.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    });
+                }
+                completion.call(());
+            }
             #[unsafe(method(userNotificationCenter:willPresentNotification:withCompletionHandler:))]
             fn present(
                 &self,
@@ -219,7 +279,8 @@ mod foreground {
             }
         }
     );
-    pub fn install() {
+    pub fn install(app: &tauri::AppHandle) {
+        let _ = APP.set(app.clone());
         // SAFETY: NSObject's new initializes the stateless delegate.
         let delegate: Retained<Delegate> = unsafe { msg_send![Delegate::class(), new] };
         UNUserNotificationCenter::currentNotificationCenter()
@@ -228,9 +289,10 @@ mod foreground {
         std::mem::forget(delegate);
     }
 }
-pub fn install() {
+#[allow(unused_variables)] // Only macOS uses a delegate.
+pub fn install(app: &tauri::AppHandle) {
     #[cfg(target_os = "macos")]
-    foreground::install();
+    foreground::install(app);
 }
 
 #[cfg(windows)]
@@ -360,7 +422,7 @@ mod tests {
             config::{AppConfiguration, ConfigStore, ScheduleNotifications},
             state::AppState,
         };
-        use sonos_volume_bridge_integration::night_mode::{
+        use speaker_volume_bridge_integration::night_mode::{
             NightModePort, NightModeReading, apply_saved,
         };
         use tauri::Manager;

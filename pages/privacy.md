@@ -1,18 +1,18 @@
 <!-- Generated from privacy.html; edit the HTML source. -->
 
-# Privacy Policy for Sonos Volume Bridge
+# Privacy Policy for Speaker Volume Bridge
 
 **Effective date:**  August 6, 2026
 
-Sonos Volume Bridge is an independent, community-developed desktop application published by Miguel.MS. This policy explains what information the application accesses and how that information is handled.
+Speaker Volume Bridge is an independent, community-developed desktop application published by Miguel.MS. This policy explains what information the application accesses and how that information is handled.
 
 ## Summary
 
-Sonos Volume Bridge does not require an account, include advertising or analytics, or send telemetry to the publisher. It communicates directly with Sonos speakers on the user's local network and stores its settings and diagnostic logs locally on the user's computer.
+Speaker Volume Bridge does not require an account, include advertising or analytics, or send telemetry to the publisher. It communicates directly with Sonos speakers on the user's local network and stores its settings and diagnostic logs locally on the user's computer.
 
 ## Information the application accesses
 
-To provide volume synchronization, Sonos Volume Bridge accesses:
+To provide volume synchronization, Speaker Volume Bridge accesses:
 
 - information exposed by compatible Sonos devices on the local network, such as device identifiers, names, local network addresses, volume, and mute state;
 
@@ -36,7 +36,7 @@ Users can reset application preferences from within the application. They can re
 
 ## Personal information and third parties
 
-Sonos Volume Bridge does not ask for or intentionally collect names, email addresses, precise location, contacts, financial information, authentication credentials, audio content, or other personal content. It does not sell user information or disclose application data to advertisers or data brokers.
+Speaker Volume Bridge does not ask for or intentionally collect names, email addresses, precise location, contacts, financial information, authentication credentials, audio content, or other personal content. It does not sell user information or disclose application data to advertisers or data brokers.
 
 The application is not affiliated with, sponsored by, endorsed by, or supported by Sonos, Inc. Sonos devices and software are governed by Sonos's own terms and privacy practices.
 
@@ -56,7 +56,7 @@ This policy may be updated when the application's data practices change. The eff
 
 Questions about this policy or requests concerning application data can be submitted through the project's public issue tracker:
 
-[Project issue tracker ↗](https://github.com/MiguelTVMS/sonos-volume-bridge/issues)
+[Project issue tracker ↗](https://github.com/MiguelTVMS/speaker-volume-bridge/issues)
 
 ## Website privacy and tracking
 
@@ -76,11 +76,15 @@ Your choice is saved in this browser’s local storage under `svb-consent-v1` fo
 
 When you withdraw a category, the site attempts to remove accessible Google Analytics or advertising cookies for that category. It cannot delete third-party or HTTP-only cookies. Other service retention periods depend on the tags and Google service settings; the 180-day period applies only to your consent preference.
 
-Download, wiki, and support links lead to GitHub; the Microsoft Store link leads to Microsoft. Those services apply their own privacy terms. Questions about this website’s data practices can be raised through the [project issue tracker](https://github.com/MiguelTVMS/sonos-volume-bridge/issues) . Do not post private data in a public issue.
+Download, wiki, and support links lead to GitHub; the Microsoft Store link leads to Microsoft. Those services apply their own privacy terms. Questions about this website’s data practices can be raised through the [project issue tracker](https://github.com/MiguelTVMS/speaker-volume-bridge/issues) . Do not post private data in a public issue.
 
-[Sonos Volume Bridge](https://svb.miguel.ms/)
+## Legacy application checks
 
-[Privacy policy](https://svb.miguel.ms/privacy.html) [MIT license](https://svb.miguel.ms/license.txt) [Source code ↗](https://github.com/MiguelTVMS/sonos-volume-bridge)
+The app inspects local process identity to detect a running older version and prevent competing speaker commands. This information stays on your device and is not stored as telemetry or sent to a server. Conflict notifications are local desktop notifications.
+
+[Speaker Volume Bridge](https://svb.miguel.ms/)
+
+[Privacy policy](https://svb.miguel.ms/privacy.html) [MIT license](https://svb.miguel.ms/license.txt) [Source code ↗](https://github.com/MiguelTVMS/speaker-volume-bridge)
 
 Independent software. Not affiliated with, sponsored by, endorsed by, or supported by Sonos. Sonos and related product names are trademarks of their respective owners and are used only to identify compatibility. This project contains no Sonos source code.
 

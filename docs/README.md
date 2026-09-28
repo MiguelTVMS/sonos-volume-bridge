@@ -1,6 +1,6 @@
 # Documentation index
 
-This folder describes how SonosVolumeBridge works from protocol, runtime, and
+This folder describes how SpeakerVolumeBridge works from protocol, runtime, and
 operational perspectives.
 
 - [`architecture.md`](architecture.md): architecture boundaries, components, and

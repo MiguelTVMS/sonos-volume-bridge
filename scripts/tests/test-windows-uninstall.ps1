@@ -8,7 +8,7 @@ $cleanup = [regex]::Match($section, '(?s)\$\{If\} \$UpdateMode <> 1.*?\$\{EndIf\
 $cleanup = $cleanup.Replace('!insertmacro DeleteAppUserModelId', '')
 # The first nested guard follows the cleanup; omit shortcut handling from this harness.
 $cleanup = ($cleanup -split '; Remove start menu shortcut', 2)[0] + '${EndIf}'
-$testKey = "Software\SonosVolumeBridgeUninstallTest-$PID"
+$testKey = "Software\SpeakerVolumeBridgeUninstallTest-$PID"
 $cleanup = $cleanup.Replace('Software\Classes', $testKey)
 $directory = Join-Path $root 'target/uninstall-regression'
 New-Item -ItemType Directory -Force $directory | Out-Null

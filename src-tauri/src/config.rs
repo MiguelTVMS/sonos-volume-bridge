@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sonos_volume_bridge_domain::{MappingPoint, SonosVolume, VolumeMapping};
+use speaker_volume_bridge_domain::{MappingPoint, SonosVolume, VolumeMapping};
 use std::{
     fs, io,
     path::{Path, PathBuf},
@@ -57,7 +57,7 @@ impl ScheduleNotifications {
 pub struct AppConfiguration {
     pub schema_version: u32,
     #[serde(default)]
-    pub night_mode_schedule: sonos_volume_bridge_domain::NightModeSchedule,
+    pub night_mode_schedule: speaker_volume_bridge_domain::NightModeSchedule,
     #[serde(default)]
     pub notify_night_mode_schedule_transitions: ScheduleNotifications,
     pub selected_sonos_id: Option<String>,
@@ -92,7 +92,7 @@ impl Default for AppConfiguration {
     fn default() -> Self {
         Self {
             schema_version: SCHEMA_VERSION,
-            night_mode_schedule: sonos_volume_bridge_domain::NightModeSchedule::default(),
+            night_mode_schedule: speaker_volume_bridge_domain::NightModeSchedule::default(),
             notify_night_mode_schedule_transitions: ScheduleNotifications::Never,
             selected_sonos_id: None,
             last_known_sonos_address: None,
@@ -138,7 +138,7 @@ fn default_points() -> Vec<MappingPoint> {
         .into_iter()
         .filter_map(|(local, sonos)| {
             Some(MappingPoint {
-                local: sonos_volume_bridge_domain::NormalizedVolume::new(local).ok()?,
+                local: speaker_volume_bridge_domain::NormalizedVolume::new(local).ok()?,
                 sonos: SonosVolume::new(sonos).ok()?,
             })
         })

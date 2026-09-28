@@ -1,7 +1,7 @@
-use sonos_volume_bridge_sonos::{
+use speaker_volume_bridge_sonos::{
     FeatureAvailability as Availability, SonosClient, SonosDevice, parse_device_description,
 };
-use sonos_volume_bridge_test_support::{MockSoapServer, SoapReply};
+use speaker_volume_bridge_test_support::{MockSoapServer, SoapReply};
 use std::time::Duration;
 use url::Url;
 
@@ -147,7 +147,7 @@ async fn new_speaker_has_its_own_features_and_model_specific_speech_probe() {
 
 #[tokio::test]
 async fn partial_push_followed_by_probe_preserves_omitted_capabilities() {
-    use sonos_volume_bridge_sonos::{CallbackListener, Subscription};
+    use speaker_volume_bridge_sonos::{CallbackListener, Subscription};
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     let server = MockSoapServer::start().await.unwrap();
     server
@@ -229,7 +229,7 @@ async fn invalid_or_denied_responses_are_neither_unsupported_nor_off() {
 
 #[tokio::test]
 async fn partial_volume_event_reads_missing_mute_without_a_feedback_write() {
-    use sonos_volume_bridge_sonos::parse_rendering_control_notification;
+    use speaker_volume_bridge_sonos::parse_rendering_control_notification;
     let server = MockSoapServer::start().await.unwrap();
     server
         .reply("GetVolume", SoapReply::value("CurrentVolume", "37"))

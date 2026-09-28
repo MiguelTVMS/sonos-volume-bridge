@@ -1,6 +1,6 @@
 [package]
-name = "sonos-volume-bridge-platform-audio"
-description = "Platform system-audio adapters for SonosVolumeBridge"
+name = "speaker-volume-bridge-platform-audio"
+description = "Platform system-audio adapters for SpeakerVolumeBridge"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,7 +10,7 @@ repository.workspace = true
 [dependencies]
 async-trait.workspace = true
 serde_json.workspace = true
-sonos-volume-bridge-domain = { path = "../domain" }
+speaker-volume-bridge-domain = { path = "../domain" }
 thiserror.workspace = true
 tokio.workspace = true
 

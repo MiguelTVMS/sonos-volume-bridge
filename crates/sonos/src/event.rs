@@ -1,6 +1,6 @@
 use crate::SonosError;
 use quick_xml::{Reader, escape::unescape, events::Event};
-use sonos_volume_bridge_domain::{MuteState, SonosVolume};
+use speaker_volume_bridge_domain::{MuteState, SonosVolume};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GenaState {

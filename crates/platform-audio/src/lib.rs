@@ -7,7 +7,7 @@
 #![allow(unsafe_code)]
 
 use async_trait::async_trait;
-use sonos_volume_bridge_domain::{LocalAudioState, LocalOrigin, NormalizedVolume};
+use speaker_volume_bridge_domain::{LocalAudioState, LocalOrigin, NormalizedVolume};
 use thiserror::Error;
 use tokio::sync::broadcast;
 

@@ -1,8 +1,8 @@
 //! Read-only local Sonos discovery probe.
 //!
-//! Run with `cargo run -p sonos-volume-bridge-sonos --example discover`.
+//! Run with `cargo run -p speaker-volume-bridge-sonos --example discover`.
 
-use sonos_volume_bridge_sonos::{SonosClient, discover};
+use speaker_volume_bridge_sonos::{SonosClient, discover};
 use std::time::Duration;
 
 #[tokio::main(flavor = "current_thread")]
