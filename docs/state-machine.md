@@ -46,3 +46,8 @@ notifications.
 
 Opt-in UI demo builds run this state machine and the normal Night Mode scheduler
 against a loopback simulated Sonos speaker. Local audio remains native. See ADR 0014.
+
+Audio echo suppression retains repeated and overlapping expected local states for
+500 ms without pausing listening. Unchanged local properties are not rewritten.
+See [ADR 0017](decisions/0017-volume-feedback-suppression.md) for platform behavior,
+regression coverage, and the limitations of value-based origin detection.

@@ -191,6 +191,90 @@ mod tests {
         Synchronizer::new(VolumeMapping::Linear, s(55), true, true, false).unwrap()
     }
     #[test]
+    fn echoes_never_write_back_across_modes_mappings_and_observation_sources() {
+        use sonos_volume_bridge_domain::MappingPoint;
+        for mapping in [
+            VolumeMapping::Linear,
+            VolumeMapping::CappedLinear { maximum: s(60) },
+            VolumeMapping::Piecewise {
+                points: vec![
+                    MappingPoint {
+                        local: v(0),
+                        sonos: s(0),
+                    },
+                    MappingPoint {
+                        local: v(50),
+                        sonos: s(20),
+                    },
+                    MappingPoint {
+                        local: v(100),
+                        sonos: s(80),
+                    },
+                ],
+            },
+        ] {
+            for two_way in [false, true] {
+                for sync_mute in [false, true] {
+                    for mute_zero in [false, true] {
+                        let mut machine = Synchronizer::new(
+                            mapping.clone(),
+                            s(55),
+                            sync_mute,
+                            two_way,
+                            mute_zero,
+                        )
+                        .unwrap();
+                        for source in [
+                            SonosObservationSource::ExplicitRead,
+                            SonosObservationSource::Event,
+                            SonosObservationSource::Poll,
+                        ] {
+                            let effects = machine
+                                .handle(SyncEvent::SonosConfirmed {
+                                    volume: s(24),
+                                    muted: MuteState(true),
+                                    source,
+                                    at_ms: 1,
+                                })
+                                .unwrap();
+                            assert_eq!(effects.len(), usize::from(two_way));
+                            for echo in [local(0), local(24), local(55)] {
+                                for _ in 0..3 {
+                                    assert_eq!(
+                                        machine
+                                            .handle(SyncEvent::LocalChanged {
+                                                state: echo,
+                                                origin: LocalOrigin::Application,
+                                                at_ms: 2,
+                                            })
+                                            .unwrap(),
+                                        vec![Effect::SuppressedLocalCallback]
+                                    );
+                                }
+                            }
+                            for origin in [LocalOrigin::User, LocalOrigin::Unknown] {
+                                assert!(
+                                    machine
+                                        .handle(SyncEvent::LocalChanged {
+                                            state: local(30),
+                                            origin,
+                                            at_ms: 3,
+                                        })
+                                        .unwrap()
+                                        .iter()
+                                        .any(|effect| matches!(
+                                            effect,
+                                            Effect::RequestSonosVolume(_)
+                                        ))
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    #[test]
     fn startup_confirmation_only_applies_sonos_state() {
         let mut machine = sync();
         let effects = machine

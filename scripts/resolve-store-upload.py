@@ -74,13 +74,45 @@ def verify(directory, tag):
                         raise ValueError('Embedded package architecture differs from its bundle.')
 
 
+def verify_submission(data, tag, upload_directory=None):
+    if not re.fullmatch(r'v\d+\.\d+\.\d+', tag):
+        raise ValueError('Invalid release tag.')
+    # Accept the CLI serializer's camelCase or PascalCase property casing.
+    data = {key.lower(): value for key, value in data.items()}
+    status = data.get('status', '')
+    if status not in {'PreProcessing', 'Certification', 'Release', 'Published', 'ReadyForRelease'}:
+        raise ValueError('Store submission is not in an accepted processing state.')
+    packages = [{key.lower(): value for key, value in item.items()}
+                for item in (data.get('applicationpackages') or [])]
+    uploaded = [item for item in packages if item.get('version') == tag[1:] + '.0'
+                and item.get('filestatus') == 'Uploaded']
+    architectures = {(item.get('architecture') or '').lower() for item in uploaded}
+    if {'x64', 'arm64'} <= architectures:
+        return
+    # Partner Center reports a multi-architecture upload as one Neutral package.
+    # Match its exact filename/version and establish coverage from the verified
+    # local payload, never from the Neutral label alone.
+    if upload_directory is not None:
+        verify(upload_directory, tag)
+        filename = next(Path(upload_directory).iterdir()).name
+        if any(item.get('filename') == filename
+               and (item.get('architecture') or '').lower() == 'neutral'
+               for item in uploaded):
+            return
+    raise ValueError('Store has not confirmed the selected version and verified architecture coverage.')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--tag', required=True)
     parser.add_argument('--mode', choices=('validate', 'submit'), default='validate')
     parser.add_argument('--verify-directory')
+    parser.add_argument('--verify-submission')
     args = parser.parse_args()
-    if args.verify_directory:
+    if args.verify_submission:
+        verify_submission(json.loads(Path(args.verify_submission).read_text(encoding='utf-8-sig')), args.tag, args.verify_directory)
+        print('Store confirms the selected upload version; architecture coverage verified. Certification is separate.')
+    elif args.verify_directory:
         verify(args.verify_directory, args.tag)
         print('Release version and both architecture packages verified.')
     else:

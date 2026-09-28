@@ -114,8 +114,7 @@ jobs:
         with:
           shared-key: workspace-${{ runner.os }}-${{ runner.arch }}
       - run: cargo check --workspace
-      - if: runner.os == 'Windows'
-        run: cargo test --workspace
+      - run: cargo test --workspace
       - if: runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/tests/test-windows-architecture.ps1

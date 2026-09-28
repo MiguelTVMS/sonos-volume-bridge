@@ -298,4 +298,16 @@ requires a protected environment; it never rebuilds or increments the version.
 Normal release and manual retry call the same reusable Store publishing workflow
 with a published GA tag. It validates the tag and bundle before protected submission;
 standalone packaging remains separate. Both paths share the pinned CLI publishing
-script and submission concurrency group. See [release recovery](release.md#retry-or-debug-an-existing-microsoft-store-release).
+script and submission concurrency group. Publishing selects the upload file directly
+and verifies Store-reported package versions and architectures after commit. See [release recovery](release.md#retry-or-debug-an-existing-microsoft-store-release).
+
+Store submission metadata may represent the combined upload as one Neutral
+package. Accept that representation only when its uploaded filename and version
+match the retained artifact and local verification confirms both embedded x64
+and ARM64 packages. Neutral alone does not prove architecture coverage. This
+submission check does not establish certification or public availability.
+
+Audio echo suppression retains repeated and overlapping expected local states for
+500 ms without pausing listening. Unchanged local properties are not rewritten.
+See [ADR 0017](decisions/0017-volume-feedback-suppression.md) for platform behavior,
+regression coverage, and the limitations of value-based origin detection.

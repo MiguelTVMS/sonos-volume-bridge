@@ -106,6 +106,8 @@ jobs:
         run: |
           msstore reconfigure --tenantId $env:AZURE_AD_TENANT_ID --sellerId $env:SELLER_ID --clientId $env:AZURE_AD_APPLICATION_CLIENT_ID --clientSecret $env:AZURE_AD_APPLICATION_SECRET
           if ($LASTEXITCODE -ne 0) { throw 'Microsoft Store authentication failed.' }
-      - name: Submit the existing verified upload
+      - name: Submit and verify the existing upload
         shell: pwsh
-        run: ./scripts/publish-msstore.ps1 -InputDirectory store-upload
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: ./scripts/publish-msstore.ps1 -InputDirectory store-upload -ReleaseTag $env:RELEASE_TAG

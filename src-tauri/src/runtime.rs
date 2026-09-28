@@ -765,10 +765,20 @@ struct DeviceAudioPort(Arc<dyn SystemAudioController>);
 #[async_trait]
 impl LocalAudioPort for DeviceAudioPort {
     async fn apply(&self, state: LocalAudioState) -> Result<(), IntegrationError> {
-        self.0
-            .set_volume(state.volume, LocalOrigin::Application)
+        let current = self
+            .0
+            .current_state()
             .await
             .map_err(|error| IntegrationError::Audio(error.to_string()))?;
+        if current.volume != state.volume {
+            self.0
+                .set_volume(state.volume, LocalOrigin::Application)
+                .await
+                .map_err(|error| IntegrationError::Audio(error.to_string()))?;
+        }
+        if current.muted == state.muted {
+            return Ok(());
+        }
         match self
             .0
             .set_muted(state.muted.0, LocalOrigin::Application)
@@ -882,7 +892,8 @@ mod tests {
             Ok(())
         }
 
-        async fn set_muted(&self, _: bool, _: LocalOrigin) -> Result<(), PlatformAudioError> {
+        async fn set_muted(&self, muted: bool, _: LocalOrigin) -> Result<(), PlatformAudioError> {
+            assert!(muted, "unchanged mute must not be written");
             Err(PlatformAudioError::MuteUnavailable)
         }
 
@@ -901,7 +912,7 @@ mod tests {
         }));
         let state = LocalAudioState {
             volume: NormalizedVolume::new(42).expect("valid test volume"),
-            muted: MuteState(false),
+            muted: MuteState(true),
         };
 
         port.apply(state)
@@ -912,6 +923,23 @@ mod tests {
             *applied_volume.lock().expect("test mutex"),
             Some(state.volume)
         );
+    }
+
+    #[tokio::test]
+    async fn unchanged_confirmation_does_not_write_local_audio() {
+        let (events, _) = broadcast::channel(1);
+        let applied_volume = Arc::new(Mutex::new(None));
+        let port = DeviceAudioPort(Arc::new(MuteUnavailableAudio {
+            events,
+            applied_volume: Arc::clone(&applied_volume),
+        }));
+        port.apply(LocalAudioState {
+            volume: NormalizedVolume::new(20).unwrap(),
+            muted: MuteState(false),
+        })
+        .await
+        .unwrap();
+        assert_eq!(*applied_volume.lock().unwrap(), None);
     }
 
     #[test]

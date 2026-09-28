@@ -294,3 +294,21 @@ The shared publishing script requires a directory containing exactly one
 `.msixupload`. Native Windows CI invokes that same script with `--help`, using
 the actual pinned CLI, so unsupported publishing arguments fail before release.
 Successful submission is separate from Store certification and availability.
+
+The publishing command passes the verified `.msixupload` file as its positional
+argument. Passing the repository directory triggers project detection and can
+select Electron, whose package filter ignores MSIX uploads. Native regression
+coverage checks the actual file argument as well as CLI argument parsing.
+
+After commit, the workflow queries Store submission metadata for up to five minutes.
+It requires uploaded packages with the selected version for both x64 and ARM64;
+a successful commit alone is insufficient. An incomplete check fails the job and
+requires inspection before any publishing retry. These read-only checks do not
+resubmit. Dry run does not query authenticated Store state and cannot establish
+remote acceptance. Certification and public availability remain separate.
+
+Store submission metadata may represent the combined upload as one Neutral
+package. Accept that representation only when its uploaded filename and version
+match the retained artifact and local verification confirms both embedded x64
+and ARM64 packages. Neutral alone does not prove architecture coverage. This
+submission check does not establish certification or public availability.

@@ -80,6 +80,43 @@ class StoreUploadTests(unittest.TestCase):
         with patch.object(module, 'gh', return_value={'isDraft': False, 'isPrerelease': True, 'tagName': 'v1.2.3'}), self.assertRaises(ValueError):
             module.resolve('v1.2.3', 'submit', 'owner/repo', 'refs/heads/develop')
 
+    def test_submission_requires_actual_uploaded_version_and_both_architectures(self):
+        def package(arch, version='1.5.4.0', status='Uploaded'):
+            return {'Architecture': arch, 'Version': version, 'FileStatus': status}
+        good = [package('x64'), package('ARM64')]
+        module.verify_submission({'Status': 'PreProcessing', 'ApplicationPackages': good}, 'v1.5.4')
+        for packages in ([package('x64', '1.4.1.0')], good[:1],
+                         [good[0], package('arm64', status='PendingUpload')],
+                         [good[0], package('arm64', status='PendingDelete')], []):
+            with self.assertRaises(ValueError):
+                module.verify_submission({'Status': 'PreProcessing', 'ApplicationPackages': packages}, 'v1.5.4')
+        for status in ('CommitFailed', 'CommitStarted', 'CertificationFailed'):
+            with self.assertRaises(ValueError):
+                module.verify_submission({'Status': status, 'ApplicationPackages': good}, 'v1.5.4')
+        # No inference from filenames: Store must report structured metadata.
+        with self.assertRaises(ValueError):
+            module.verify_submission({'Status': 'PreProcessing', 'ApplicationPackages': [
+                {'FileName': 'Example_1.5.4.0_x64_arm64.msixupload', 'FileStatus': 'Uploaded'}]}, 'v1.5.4')
+
+    def test_neutral_store_upload_requires_matching_verified_local_bundle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            payload = Path(directory) / 'Example.msixupload'
+            payload.write_bytes(upload('1.5.4.0'))
+            package = {'FileName': payload.name, 'Version': '1.5.4.0',
+                       'Architecture': 'Neutral', 'FileStatus': 'Uploaded'}
+            response = {'Status': 'PreProcessing', 'ApplicationPackages': [package]}
+            module.verify_submission(response, 'v1.5.4', directory)
+            with self.assertRaises(ValueError):
+                module.verify_submission(response, 'v1.5.4')
+            for field, value in (('FileName', 'Different.msixupload'), ('Version', '1.4.1.0'),
+                                 ('FileStatus', 'PendingDelete'), ('FileStatus', 'PendingUpload')):
+                with self.assertRaises(ValueError):
+                    module.verify_submission(dict(response, ApplicationPackages=[dict(package, **{field: value})]), 'v1.5.4', directory)
+            for data in (upload('1.4.1.0'), upload('1.5.4.0', architectures=('x64',))):
+                payload.write_bytes(data)
+                with self.assertRaises(ValueError):
+                    module.verify_submission(response, 'v1.5.4', directory)
+
     def test_manual_and_release_publish_share_tag_and_dry_run_workflow(self):
         text = (ROOT / '.github/workflows/microsoft-store-publish.yml').read_text()
         for event in ('workflow_dispatch', 'workflow_call'):

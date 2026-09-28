@@ -4,6 +4,7 @@
 //! adapter works with either supported Ubuntu audio server. `pactl subscribe`
 //! provides change notifications without depending on a desktop environment.
 
+use crate::expected_writes::ExpectedWrites;
 use crate::{
     AudioDeviceSelection, AudioOutputDevice, PlatformAudioError, SystemAudioController,
     SystemAudioEvent,
@@ -16,12 +17,11 @@ use std::{
     process::{Child, Command, Stdio},
     sync::{Arc, Mutex},
     thread,
-    time::{Duration, Instant},
+    time::Instant,
 };
 use tokio::sync::broadcast;
 
 const PACTL: &str = "pactl";
-const EXPECTED_WRITE_LIFETIME: Duration = Duration::from_millis(500);
 
 /// Lists currently available PulseAudio/PipeWire output sinks.
 pub fn list_output_devices() -> Result<Vec<AudioOutputDevice>, PlatformAudioError> {
@@ -46,7 +46,7 @@ pub fn list_output_devices() -> Result<Vec<AudioOutputDevice>, PlatformAudioErro
 pub struct LinuxAudioController {
     selection: AudioDeviceSelection,
     events: broadcast::Sender<SystemAudioEvent>,
-    expected: Arc<Mutex<Option<(LocalAudioState, Instant)>>>,
+    expected: Arc<Mutex<ExpectedWrites>>,
     subscriber: Arc<Mutex<Option<Child>>>,
 }
 
@@ -73,7 +73,7 @@ impl LinuxAudioController {
         Self {
             selection,
             events,
-            expected: Arc::new(Mutex::new(None)),
+            expected: Arc::new(Mutex::new(ExpectedWrites::default())),
             subscriber: Arc::new(Mutex::new(None)),
         }
     }
@@ -135,15 +135,7 @@ impl LinuxAudioController {
         let Ok(mut expected) = self.expected.lock() else {
             return LocalOrigin::Unknown;
         };
-        let Some((expected_state, expires_at)) = *expected else {
-            return LocalOrigin::Unknown;
-        };
-        if Instant::now() > expires_at {
-            *expected = None;
-            return LocalOrigin::Unknown;
-        }
-        if expected_state == state {
-            *expected = None;
+        if expected.matches(state, 0, Instant::now()) {
             LocalOrigin::Application
         } else {
             LocalOrigin::Unknown
@@ -155,8 +147,10 @@ impl LinuxAudioController {
     }
 
     fn set_expected(&self, state: LocalAudioState) -> Result<(), PlatformAudioError> {
-        *self.expected.lock().map_err(|_| poisoned())? =
-            Some((state, Instant::now() + EXPECTED_WRITE_LIFETIME));
+        self.expected
+            .lock()
+            .map_err(|_| poisoned())?
+            .record(state, Instant::now());
         Ok(())
     }
 }
@@ -272,7 +266,7 @@ mod tests {
     }
 
     #[test]
-    fn expected_write_is_suppressed_once_before_expiry() {
+    fn expected_write_suppresses_repeated_callbacks_before_expiry() {
         let controller = LinuxAudioController::new(AudioDeviceSelection::FollowDefault);
         let state = LocalAudioState {
             volume: NormalizedVolume::new(40).unwrap(),
@@ -280,6 +274,6 @@ mod tests {
         };
         controller.set_expected(state).unwrap();
         assert_eq!(controller.expected_origin(state), LocalOrigin::Application);
-        assert_eq!(controller.expected_origin(state), LocalOrigin::Unknown);
+        assert_eq!(controller.expected_origin(state), LocalOrigin::Application);
     }
 }
