@@ -110,6 +110,24 @@ pub fn update(app: &AppHandle, start_at_login: bool) -> Result<(), String> {
     update_unpacked(app, start_at_login)
 }
 
+/// Retarget an existing registration without re-enabling an OS-disabled startup item.
+#[cfg(not(target_os = "macos"))]
+pub fn refresh_existing(app: &AppHandle) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        // The Store manifest updates the executable while preserving task state.
+        if windows::ApplicationModel::Package::Current().is_ok() {
+            return Ok(());
+        }
+        if app.autolaunch().is_enabled().map_err(|e| e.to_string())? {
+            app.autolaunch().enable().map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+    #[cfg(target_os = "linux")]
+    refresh_linux_label(app)
+}
+
 #[cfg(all(test, not(target_os = "macos")))]
 mod tests {
     use super::is_missing_entry;
@@ -140,7 +158,11 @@ fn refresh_linux_label(app: &AppHandle) -> Result<(), String> {
             "{}.desktop",
             registration_name(crate::ui_demo_enabled())
         ));
-    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let content = match std::fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.to_string()),
+    };
     let display_name = if crate::ui_demo_enabled() {
         "Speaker Volume Bridge — UI demo"
     } else {
@@ -157,6 +179,14 @@ fn branded_desktop_entry(content: &str, name: &str) -> String {
                 format!("Name={name}")
             } else if line.starts_with("Comment=") {
                 format!("Comment={name} startup")
+            } else if line == "Exec=/usr/bin/sonos-volume-bridge"
+                || line.starts_with("Exec=/usr/bin/sonos-volume-bridge ")
+            {
+                line.replacen(
+                    "/usr/bin/sonos-volume-bridge",
+                    "/usr/bin/speaker-volume-bridge",
+                    1,
+                )
             } else {
                 line.to_owned()
             }
@@ -167,6 +197,14 @@ fn branded_desktop_entry(content: &str, name: &str) -> String {
 }
 #[cfg(test)]
 mod rebrand_tests {
+    #[test]
+    fn startup_migration_preserves_desktop_disabled_state_and_arguments() {
+        let entry = "[Desktop Entry]\nName=sonos-volume-bridge\nExec=/usr/bin/sonos-volume-bridge --quiet\nHidden=true\nX-GNOME-Autostart-enabled=false\n";
+        let renamed = super::branded_desktop_entry(entry, "Speaker Volume Bridge");
+        assert!(renamed.contains("Exec=/usr/bin/speaker-volume-bridge --quiet\n"));
+        assert!(renamed.contains("Hidden=true\n"));
+        assert!(renamed.contains("X-GNOME-Autostart-enabled=false\n"));
+    }
     #[test]
     fn display_name_changes_without_changing_startup_target() {
         let entry = "[Desktop Entry]\nName=sonos-volume-bridge\nExec=/usr/bin/speaker-volume-bridge\nTerminal=false\n";

@@ -125,8 +125,9 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
                     "migrated selected local audio output to a persistent Core Audio UID"
                 );
             }
+            #[cfg(not(target_os = "macos"))]
             if configuration.start_at_login
-                && let Err(error) = autostart::update(app.handle(), true)
+                && let Err(error) = autostart::refresh_existing(app.handle())
             {
                 tracing::warn!(%error, "Could not refresh the existing login registration");
             }
