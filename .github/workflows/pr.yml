@@ -99,7 +99,7 @@ jobs:
         with:
           name: external-pr-rust-lint-logs-${{ github.run_id }}
           path: .ci-artifacts
-      - run: cargo clippy -p sonos-volume-bridge --all-targets --features ui-demo -- -D warnings
+      - run: cargo clippy -p speaker-volume-bridge --all-targets --features ui-demo -- -D warnings
 
   rust-tests:
     name: External PR • Rust tests
@@ -138,7 +138,7 @@ jobs:
           test_exit=${PIPESTATUS[0]}
           echo "result=$test_exit" >> "$GITHUB_OUTPUT"
           exit $test_exit
-      - run: cargo test -p sonos-volume-bridge --features ui-demo
+      - run: cargo test -p speaker-volume-bridge --features ui-demo
       - name: Generate test result summary
         if: always()
         run: |

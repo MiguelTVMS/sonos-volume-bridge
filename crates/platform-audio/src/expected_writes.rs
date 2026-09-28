@@ -1,5 +1,5 @@
 //! Value-based echo tracking for adapters without native callback context IDs.
-use sonos_volume_bridge_domain::LocalAudioState;
+use speaker_volume_bridge_domain::LocalAudioState;
 use std::{
     collections::VecDeque,
     time::{Duration, Instant},
@@ -39,7 +39,7 @@ impl ExpectedWrites {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sonos_volume_bridge_domain::{MuteState, NormalizedVolume};
+    use speaker_volume_bridge_domain::{MuteState, NormalizedVolume};
     fn state(volume: u8, muted: bool) -> LocalAudioState {
         LocalAudioState {
             volume: NormalizedVolume::new(volume).unwrap(),

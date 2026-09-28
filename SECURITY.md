@@ -17,7 +17,7 @@ vulnerability that might already have been fixed.
 ## Reporting a Vulnerability
 
 Please report suspected security vulnerabilities privately through
-[GitHub Security Advisories](https://github.com/MiguelTVMS/sonos-volume-bridge/security/advisories/new).
+[GitHub Security Advisories](https://github.com/MiguelTVMS/speaker-volume-bridge/security/advisories/new).
 
 Do not disclose the vulnerability through a public issue, discussion, pull
 request, or other public channel.
@@ -29,7 +29,7 @@ vulnerability details in an initial public request for contact.
 A useful report should include:
 
 - A concise description of the vulnerability and its potential impact.
-- The affected Sonos Volume Bridge version.
+- The affected Speaker Volume Bridge version.
 - Any prerequisites or configuration needed to reproduce it.
 - Clear reproduction steps or a minimal proof of concept.
 - The expected and observed behavior.
@@ -64,7 +64,7 @@ explain why and may suggest reporting it as an ordinary issue.
 
 Examples of security issues that are in scope include:
 
-- Unauthorized control of a Sonos device caused by Sonos Volume Bridge.
+- Unauthorized control of a Sonos device caused by Speaker Volume Bridge.
 - Arbitrary code execution or privilege escalation.
 - Unsafe parsing of data received from devices or the local network.
 - Exposure of sensitive information.
@@ -75,7 +75,7 @@ Examples of security issues that are in scope include:
 The following are generally outside the project's security scope:
 
 - Vulnerabilities in Sonos products, services, or Windows that are not caused
-  or worsened by Sonos Volume Bridge.
+  or worsened by Speaker Volume Bridge.
 - General bugs, compatibility problems, and feature requests.
 - Availability problems caused only by local network conditions.
 - Reports without a practical security impact.

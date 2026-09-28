@@ -9,7 +9,7 @@ use tokio::{
 use url::Url;
 
 pub const SPEAKER_ID: &str = "uuid:RINCON_DEMO01400";
-const SID: &str = "uuid:sonos-volume-bridge-demo";
+const SID: &str = "uuid:speaker-volume-bridge-demo";
 
 pub struct DemoSpeaker {
     pub location: Url,
@@ -262,8 +262,8 @@ mod tests {
         night_schedule, runtime,
         state::AppState,
     };
-    use sonos_volume_bridge_domain::{MuteState, SonosVolume};
-    use sonos_volume_bridge_sonos::{CallbackListener, GenaClient, SonosClient};
+    use speaker_volume_bridge_domain::{MuteState, SonosVolume};
+    use speaker_volume_bridge_sonos::{CallbackListener, GenaClient, SonosClient};
     use tauri::Manager;
 
     #[tokio::test]

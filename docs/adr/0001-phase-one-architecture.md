@@ -4,7 +4,7 @@
 
 ## Context and decision
 
-SonosVolumeBridge is a local-network desktop application whose speaker is the
+SpeakerVolumeBridge is a local-network desktop application whose speaker is the
 sole authority. We use a Cargo workspace with a pure `domain` crate and an
 adapter-agnostic `synchronization` crate. The domain has no Tauri, OS, network,
 or asynchronous-runtime dependency. The synchronizer produces effects for

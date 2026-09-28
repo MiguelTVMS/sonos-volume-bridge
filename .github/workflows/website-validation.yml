@@ -7,6 +7,7 @@ on:
       - "pages/**"
       - "scripts/generate-page-markdown.py"
       - "scripts/tests/consent.test.cjs"
+      - "scripts/tests/test_website_seo.py"
       - ".github/workflows/website-validation.yml"
 
 permissions:
@@ -24,3 +25,4 @@ jobs:
           node-version: "lts/*"
       - run: node --test scripts/tests/consent.test.cjs
       - run: python3 scripts/generate-page-markdown.py --check
+      - run: python3 -m unittest discover -s scripts/tests -p test_website_seo.py

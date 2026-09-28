@@ -52,7 +52,7 @@ fn initialize_tray<E>(
 fn register_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let connection = app_connection(app);
     let icon = icon_for(theme(app), connection);
-    let title = MenuItem::with_id(app, "title", "Sonos Volume Bridge", false, None::<&str>)?;
+    let title = MenuItem::with_id(app, "title", "Speaker Volume Bridge", false, None::<&str>)?;
     let status = MenuItem::with_id(
         app,
         "status",
@@ -88,7 +88,7 @@ fn register_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .icon(icon)
         .icon_as_template(connection == ConnectionState::Connected)
         .menu(&menu)
-        .tooltip("Sonos Volume Bridge")
+        .tooltip("Speaker Volume Bridge")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "settings" | "diagnostics" => show_settings(app),
             "night-schedule-enabled" => toggle_schedule(app),
@@ -428,7 +428,7 @@ pub fn refresh<R: Runtime>(app: &AppHandle<R>) {
     let status = format!("State: {}", connection_label(connection));
     let speaker = speaker_label(snapshot.sonos_name.as_deref(), snapshot.sonos_volume);
     let tooltip = format!(
-        "SonosVolumeBridge\n{status}\n{speaker}\nLocal: {}",
+        "Speaker Volume Bridge\n{status}\n{speaker}\nLocal: {}",
         snapshot
             .local_volume
             .map_or_else(|| "—".to_owned(), |volume| format!("{volume}%"))
@@ -466,7 +466,8 @@ fn connection_state(status: &UiStatus) -> ConnectionState {
         | UiStatus::WaitingForSonosConfirmation
         | UiStatus::SubscriptionDegraded
         | UiStatus::PollingFallback => ConnectionState::Connected,
-        UiStatus::Discovering
+        UiStatus::LegacyAppRunning
+        | UiStatus::Discovering
         | UiStatus::Connecting
         | UiStatus::SonosUnavailable
         | UiStatus::LocalAudioUnavailable
@@ -689,6 +690,7 @@ mod tests {
     #[test]
     fn unavailable_states_are_disconnected() {
         for status in [
+            UiStatus::LegacyAppRunning,
             UiStatus::Discovering,
             UiStatus::Connecting,
             UiStatus::SonosUnavailable,

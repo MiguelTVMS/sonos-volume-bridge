@@ -1,6 +1,6 @@
 //! Adapter-agnostic synchronization state machine.
 
-use sonos_volume_bridge_domain::{
+use speaker_volume_bridge_domain::{
     ConfirmedSonosState, LocalAudioState, LocalOrigin, MappingError, MuteState, PendingIntent,
     SonosVolume, SuppressionDecision, SyncState, VolumeMapping,
 };
@@ -163,7 +163,7 @@ impl Synchronizer {
 
     pub fn classify_expected_local_callback(
         &self,
-        expected: sonos_volume_bridge_domain::ExpectedLocalWrite,
+        expected: speaker_volume_bridge_domain::ExpectedLocalWrite,
         observed: LocalAudioState,
         now_ms: u64,
     ) -> SuppressionDecision {
@@ -174,7 +174,7 @@ impl Synchronizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sonos_volume_bridge_domain::NormalizedVolume;
+    use speaker_volume_bridge_domain::NormalizedVolume;
     fn v(value: u8) -> NormalizedVolume {
         NormalizedVolume::new(value).unwrap()
     }
@@ -192,7 +192,7 @@ mod tests {
     }
     #[test]
     fn echoes_never_write_back_across_modes_mappings_and_observation_sources() {
-        use sonos_volume_bridge_domain::MappingPoint;
+        use speaker_volume_bridge_domain::MappingPoint;
         for mapping in [
             VolumeMapping::Linear,
             VolumeMapping::CappedLinear { maximum: s(60) },

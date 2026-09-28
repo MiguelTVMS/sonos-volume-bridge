@@ -3,7 +3,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Sonos Volume Bridge Settings",
+        "title": "Speaker Volume Bridge Settings",
         "width": 960,
         "minWidth": 760,
         "height": 820,

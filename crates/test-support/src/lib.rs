@@ -3,7 +3,7 @@
 mod soap;
 pub use soap::{MockSoapServer, SoapReply};
 
-use sonos_volume_bridge_domain::{MuteState, SonosVolume};
+use speaker_volume_bridge_domain::{MuteState, SonosVolume};
 use std::sync::Arc;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},

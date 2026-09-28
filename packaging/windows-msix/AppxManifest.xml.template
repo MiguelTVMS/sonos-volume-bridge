@@ -12,7 +12,7 @@
     Version="{{VERSION}}"
     ProcessorArchitecture="{{ARCHITECTURE}}" />
   <Properties>
-    <DisplayName>Sonos Volume Bridge</DisplayName>
+    <DisplayName>Speaker Volume Bridge</DisplayName>
     <PublisherDisplayName>Miguel.MS</PublisherDisplayName>
     <Description>Keep a Sonos speaker's volume synchronized with this computer.</Description>
     <Logo>Assets\StoreLogo.png</Logo>
@@ -32,11 +32,11 @@
   <Applications>
     <Application
       Id="SonosVolumeBridge"
-      Executable="sonos-volume-bridge.exe"
+      Executable="speaker-volume-bridge.exe"
       uap10:RuntimeBehavior="packagedClassicApp"
       uap10:TrustLevel="mediumIL">
       <uap:VisualElements
-        DisplayName="Sonos Volume Bridge"
+        DisplayName="Speaker Volume Bridge"
         Description="Keep a Sonos speaker's volume synchronized with this computer."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
@@ -44,12 +44,12 @@
       <Extensions>
         <desktop:Extension
           Category="windows.startupTask"
-          Executable="sonos-volume-bridge.exe"
+          Executable="speaker-volume-bridge.exe"
           EntryPoint="Windows.FullTrustApplication">
           <desktop:StartupTask
             TaskId="SonosVolumeBridgeStartup"
             Enabled="false"
-            DisplayName="Sonos Volume Bridge" />
+            DisplayName="Speaker Volume Bridge" />
         </desktop:Extension>
       </Extensions>
     </Application>

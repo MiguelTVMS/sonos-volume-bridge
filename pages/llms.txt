@@ -1,4 +1,4 @@
-# Sonos Volume Bridge
+# Speaker Volume Bridge
 
 > An independent, free, MIT-licensed desktop utility that synchronizes the volume and optional mute state of one computer audio output and one Sonos speaker over the local network.
 
@@ -21,13 +21,14 @@ The website offers optional analytics and advertising through Google Tag Manager
 ## Website
 
 - [Overview and features](https://svb.miguel.ms/index.md): Product capabilities and limitations.
+- [Upgrade guide](https://svb.miguel.ms/upgrade.md): Migration, legacy-app warnings and local notifications.
 - [Downloads](https://svb.miguel.ms/#downloads): Current platform download options.
 - [Privacy policy](https://svb.miguel.ms/privacy.md): Application data practices and website hosting information.
 - [MIT license](https://svb.miguel.ms/license.txt): License terms.
 
 ## Detailed documentation
 
-- [User wiki](https://github.com/MiguelTVMS/sonos-volume-bridge/wiki): Installation, settings, compatibility, and troubleshooting.
-- [Source repository](https://github.com/MiguelTVMS/sonos-volume-bridge): Code and project documentation.
-- [Latest stable release](https://github.com/MiguelTVMS/sonos-volume-bridge/releases/latest): Current release and packages; versions are not hardcoded in this guide.
-- [Support](https://github.com/MiguelTVMS/sonos-volume-bridge/issues): Public issue tracker.
+- [User wiki](https://github.com/MiguelTVMS/speaker-volume-bridge/wiki): Installation, settings, compatibility, and troubleshooting.
+- [Source repository](https://github.com/MiguelTVMS/speaker-volume-bridge): Code and project documentation.
+- [Latest stable release](https://github.com/MiguelTVMS/speaker-volume-bridge/releases/latest): Current release and packages; versions are not hardcoded in this guide.
+- [Support](https://github.com/MiguelTVMS/speaker-volume-bridge/issues): Public issue tracker.

@@ -57,25 +57,25 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
       - if: inputs.ui_demo
-        run: cargo test -p sonos-volume-bridge --features ui-demo
+        run: cargo test -p speaker-volume-bridge --features ui-demo
       - run: pnpm dlx @tauri-apps/cli@2 build --debug --no-bundle --no-sign ${{ inputs.ui_demo && '--features ui-demo' || '' }}
       - name: Verify Windows architecture and package the installer
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           . ./scripts/windows-architecture.ps1
-          Assert-WindowsExecutableArchitecture -Path target/debug/sonos-volume-bridge.exe -Architecture '${{ runner.arch }}'
+          Assert-WindowsExecutableArchitecture -Path target/debug/speaker-volume-bridge.exe -Architecture '${{ runner.arch }}'
           pnpm dlx @tauri-apps/cli@2 bundle --debug --bundles nsis
       - name: Verify Linux ARM64 executable
         if: runner.os == 'Linux' && runner.arch == 'ARM64'
         run: |
-          file target/debug/sonos-volume-bridge
-          readelf -h target/debug/sonos-volume-bridge | grep -Eq 'Machine:.*AArch64'
+          file target/debug/speaker-volume-bridge
+          readelf -h target/debug/speaker-volume-bridge | grep -Eq 'Machine:.*AArch64'
       - uses: actions/upload-artifact@v6
         with:
           name: desktop-${{ inputs.ui_demo && 'ui-demo' || 'normal' }}-${{ runner.os }}-${{ runner.arch }}
           path: |
-            target/debug/sonos-volume-bridge.exe
-            target/debug/sonos-volume-bridge
+            target/debug/speaker-volume-bridge.exe
+            target/debug/speaker-volume-bridge
             target/debug/bundle/nsis/*.exe
           if-no-files-found: error

@@ -4,7 +4,7 @@ use crate::{
     event::first_text,
 };
 use serde::Serialize;
-use sonos_volume_bridge_domain::{MuteState, SonosVolume};
+use speaker_volume_bridge_domain::{MuteState, SonosVolume};
 use std::time::Duration;
 use url::Url;
 

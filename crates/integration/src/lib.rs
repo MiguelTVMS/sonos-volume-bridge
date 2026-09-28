@@ -3,8 +3,8 @@
 //! This crate knows no native platform API, HTTP implementation, or Tauri type.
 
 use async_trait::async_trait;
-use sonos_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, SonosVolume};
-use sonos_volume_bridge_synchronization::{
+use speaker_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, SonosVolume};
+use speaker_volume_bridge_synchronization::{
     Effect, SonosObservationSource, SyncEvent, Synchronizer,
 };
 use std::time::{Duration, Instant};
@@ -260,7 +260,7 @@ fn now_ms() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sonos_volume_bridge_domain::{NormalizedVolume, VolumeMapping};
+    use speaker_volume_bridge_domain::{NormalizedVolume, VolumeMapping};
     use std::sync::{Arc, Mutex};
     struct Sonos(Arc<Mutex<(SonosVolume, MuteState)>>);
     #[async_trait]

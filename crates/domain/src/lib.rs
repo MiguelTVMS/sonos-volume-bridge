@@ -1,4 +1,4 @@
-//! Pure domain model for SonosVolumeBridge.
+//! Pure domain model for SpeakerVolumeBridge.
 
 mod audio;
 mod mapping;

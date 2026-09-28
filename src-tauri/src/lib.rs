@@ -4,6 +4,7 @@ mod commands;
 mod config;
 #[cfg(any(test, feature = "ui-demo"))]
 mod demo;
+mod legacy_app;
 mod logging;
 mod night_schedule;
 mod runtime;
@@ -52,7 +53,7 @@ pub fn run() {
 fn configure_identity<R: tauri::Runtime>(context: &mut tauri::Context<R>, demo: bool) {
     if demo {
         context.config_mut().identifier.push_str(".ui-demo");
-        // Windows/Linux autostart keys use the package name, not the identifier.
+        // Keep the demo package distinct from normal development builds.
         context.package_info_mut().name.push_str("-ui-demo");
     }
 }
@@ -61,14 +62,21 @@ fn configure_identity<R: tauri::Runtime>(context: &mut tauri::Context<R>, demo: 
 fn run_normal(context: tauri::Context<tauri::Wry>) {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_single_instance::init(
-            |app, _arguments, _working_directory| {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
-            },
-        ));
+        .plugin(
+            tauri_plugin_single_instance::Builder::new()
+                .dbus_id(if ui_demo_enabled() {
+                    "ms.miguel.sonosvolumebridge.desktop.speaker.ui_demo"
+                } else {
+                    "ms.miguel.sonosvolumebridge.desktop.speaker"
+                })
+                .callback(|app, _arguments, _working_directory| {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                })
+                .build(),
+        );
     #[cfg(not(target_os = "macos"))]
     let builder = builder.plugin(tauri_plugin_autostart::init(
         tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -99,7 +107,7 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
                 configuration
                     .fixed_audio_device_id
                     .as_deref()
-                    .and_then(sonos_volume_bridge_platform_audio::macos::migrate_legacy_device_id)
+                    .and_then(speaker_volume_bridge_platform_audio::macos::migrate_legacy_device_id)
                     .map(|uid| {
                         configuration.fixed_audio_device_id = Some(uid);
                         store
@@ -110,27 +118,32 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
                     .is_some()
             };
             let guard = logging::initialize(&app.path().app_log_dir()?, configuration.log_level)?;
-            tracing::info!("SonosVolumeBridge application shell starting");
+            tracing::info!("SpeakerVolumeBridge application shell starting");
             #[cfg(target_os = "macos")]
             if migrated_fixed_output {
                 tracing::info!(
                     "migrated selected local audio output to a persistent Core Audio UID"
                 );
             }
+            #[cfg(not(target_os = "macos"))]
+            if configuration.start_at_login
+                && let Err(error) = autostart::refresh_existing(app.handle())
+            {
+                tracing::warn!(%error, "Could not refresh the existing login registration");
+            }
             let state = AppState::new(store, configuration, guard);
             app.manage(state);
             tray::install(app.handle())?;
-            let state = app.state::<AppState>();
-            state.start_runtime(app.handle().clone());
             schedule_wake::install(app.handle());
-            schedule_notifications::install();
+            schedule_notifications::install(app.handle());
             #[cfg(windows)]
             schedule_notifications::install_windows(app.handle());
+            legacy_app::start(app.handle().clone());
             night_schedule::start(app.handle().clone());
             if ui_demo_enabled()
                 && let Some(window) = app.get_webview_window("main")
             {
-                window.set_title("Sonos Volume Bridge — UI demo")?;
+                window.set_title("Speaker Volume Bridge — UI demo")?;
                 window.show()?;
                 window.set_focus()?;
             }
@@ -141,6 +154,9 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
             ui_demo_enabled,
             ui_demo_platform,
             commands::get_snapshot,
+            legacy_app::get_legacy_status,
+            legacy_app::recheck_legacy_app,
+            legacy_app::open_legacy_upgrade,
             commands::get_system_hour12,
             commands::save_night_schedule,
             commands::enable_night_schedule,
@@ -169,6 +185,7 @@ fn handle_window_event<R: tauri::Runtime>(window: &tauri::Window<R>, event: &tau
             let _ = window.hide();
             api.prevent_close();
         }
+        tauri::WindowEvent::Focused(true) => legacy_app::request_check(),
         tauri::WindowEvent::ThemeChanged(theme) => {
             tray::update_icon_for_theme(window.app_handle(), *theme);
         }
@@ -230,15 +247,23 @@ mod identity_tests {
     fn demo_startup_keeps_autostart_identity_separate_from_normal_app() {
         let build = |demo| {
             let mut context = tauri::test::mock_context(tauri::test::noop_assets());
-            context.package_info_mut().name = "sonos-volume-bridge".into();
+            context.package_info_mut().name = "speaker-volume-bridge".into();
             super::configure_identity(&mut context, demo);
             tauri::test::mock_builder().build(context).unwrap()
         };
         let normal = build(false);
         let demo = build(true);
-        // The autostart plugin uses package_info().name as its registration key.
-        assert_eq!(normal.package_info().name, "sonos-volume-bridge");
-        assert_eq!(demo.package_info().name, "sonos-volume-bridge-ui-demo");
+        // Source package renaming must not rename the explicit OS registration key.
+        assert_eq!(normal.package_info().name, "speaker-volume-bridge");
+        assert_eq!(demo.package_info().name, "speaker-volume-bridge-ui-demo");
+        assert_eq!(
+            super::autostart::registration_name(false),
+            "sonos-volume-bridge"
+        );
+        assert_eq!(
+            super::autostart::registration_name(true),
+            "sonos-volume-bridge-ui-demo"
+        );
         assert_ne!(normal.config().identifier, demo.config().identifier);
     }
 }

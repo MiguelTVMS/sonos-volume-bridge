@@ -1,11 +1,11 @@
-use sonos_volume_bridge_domain::{MuteState, SonosVolume};
-use sonos_volume_bridge_sonos::{
+use speaker_volume_bridge_domain::{MuteState, SonosVolume};
+use speaker_volume_bridge_sonos::{
     AvTransportService, GenaEvent, RenderingControlService, SonosClient, SonosDevice, SonosId,
 };
-use sonos_volume_bridge_sonos::{
+use speaker_volume_bridge_sonos::{
     EventDeduplicator, SonosError, parse_device_description, parse_last_change, parse_ssdp_response,
 };
-use sonos_volume_bridge_test_support::{MockSonosServer, MockSonosState};
+use speaker_volume_bridge_test_support::{MockSonosServer, MockSonosState};
 use url::Url;
 
 const LOCATION: &str = "http://192.168.1.40:1400/xml/device_description.xml";
@@ -235,7 +235,7 @@ async fn ray_speech_state_uses_dialog_level_for_read_write_and_confirmation() {
 
 #[tokio::test]
 async fn callback_accepts_eq_only_push_without_volume_or_mute() {
-    use sonos_volume_bridge_sonos::{CallbackListener, Subscription};
+    use speaker_volume_bridge_sonos::{CallbackListener, Subscription};
     use std::{
         net::{IpAddr, Ipv4Addr, SocketAddr},
         time::Duration,
@@ -285,7 +285,7 @@ async fn callback_accepts_eq_only_push_without_volume_or_mute() {
 
 #[test]
 fn partial_volume_notifications_request_authoritative_read_without_inventing_mute() {
-    use sonos_volume_bridge_sonos::parse_rendering_control_notification;
+    use speaker_volume_bridge_sonos::parse_rendering_control_notification;
     for tag in ["Volume", "Mute"] {
         let xml = format!(
             "<LastChange>&lt;Event&gt;&lt;{tag} channel=\"Master\" val=\"1\"/&gt;&lt;/Event&gt;</LastChange>"

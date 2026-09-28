@@ -1,11 +1,11 @@
 //! Manual macOS-only Core Audio probe.
 //!
-//! Run with `cargo run -p sonos-volume-bridge-platform-audio --example macos_audio_probe`.
+//! Run with `cargo run -p speaker-volume-bridge-platform-audio --example macos_audio_probe`.
 
 #[cfg(target_os = "macos")]
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use sonos_volume_bridge_platform_audio::{
+    use speaker_volume_bridge_platform_audio::{
         AudioDeviceSelection, SystemAudioController,
         macos::{MacosAudioController, list_output_devices},
     };

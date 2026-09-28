@@ -70,7 +70,8 @@ fn installed_executable(id: &str) -> Option<std::path::PathBuf> {
                 )
                 .ok()?;
             let directory: String = key.get_value("InstallLocation").ok()?;
-            let executable = Path::new(directory.trim_matches('"')).join("sonos-volume-bridge.exe");
+            let executable =
+                Path::new(directory.trim_matches('"')).join("speaker-volume-bridge.exe");
             executable
                 .is_file()
                 .then(|| dunce::canonicalize(executable).ok())
@@ -122,7 +123,7 @@ mod tests {
     #[test]
     fn startup_repairs_development_shortcut_and_keeps_installation_owner() {
         let path = std::env::temp_dir().join(format!("svb-upgrade-{}.lnk", std::process::id()));
-        let development = Path::new("C:\\development\\sonos-volume-bridge.exe");
+        let development = Path::new("C:\\development\\speaker-volume-bridge.exe");
         let installed = std::env::current_exe().unwrap();
         ensure_target(&path, development, "normal.app", &installed, None).unwrap();
         ensure_target(
