@@ -23,6 +23,16 @@ export function mountLegacyAlert(): void {
     ? 'Speaker Volume Bridge has paused synchronization to prevent conflicting volume changes. Quit Sonos Volume Bridge from its menu bar or system tray. Synchronization will resume automatically.'
     : 'Quit Sonos Volume Bridge before using Speaker Volume Bridge, then check again.';
   root.innerHTML = `<strong>${title}</strong><p>${message}</p><button type="button" class="secondary" id="legacy-recheck">Check again</button> <a href="https://svb.miguel.ms/upgrade.html" target="_blank" rel="noopener noreferrer">View upgrade instructions</a>`;
+  root.querySelector<HTMLAnchorElement>('a')?.addEventListener('click', (event) => {
+    if (!isTauri()) return;
+    event.preventDefault();
+    void invoke('open_legacy_upgrade').catch(() => {
+      const guidance = document.createElement('p');
+      guidance.textContent =
+        'Open https://svb.miguel.ms/upgrade.html in your browser for upgrade instructions.';
+      root.append(guidance);
+    });
+  });
   root.querySelector<HTMLButtonElement>('#legacy-recheck')?.addEventListener('click', async () => {
     const button = root.querySelector<HTMLButtonElement>('#legacy-recheck');
     if (button) button.disabled = true;

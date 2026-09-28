@@ -156,6 +156,7 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
             commands::get_snapshot,
             legacy_app::get_legacy_status,
             legacy_app::recheck_legacy_app,
+            legacy_app::open_legacy_upgrade,
             commands::get_system_hour12,
             commands::save_night_schedule,
             commands::enable_night_schedule,

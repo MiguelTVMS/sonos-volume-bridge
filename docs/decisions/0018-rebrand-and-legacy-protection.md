@@ -8,7 +8,7 @@ Process inspection lives in the desktop shell (`legacy_app`), using the public s
 
 The shell's write barrier drains active writes before entering a conflict. It rejects speaker writes, audio synchronization and scheduled Night Mode writes while paused. Runtime cancellation interrupts initialization as well as active sessions, dropping queued session work. Recovery creates a new runtime from the latest persisted configuration and requests normal schedule reconciliation. Explicitly stopped synchronization stays stopped. Unknown inspection after a confirmed conflict retains the pause.
 
-The Settings alert is authoritative. A conflict episode produces one local native notification if permission is already available; the monitor never prompts for permission. Notification activation opens Settings. No server, telemetry, automatic process termination or automatic uninstall is introduced.
+The Settings alert is authoritative. A conflict episode produces one local native notification if permission is already available; the monitor never prompts for permission. Notification activation opens Settings. The upgrade action opens a fixed project-guide address in the default browser through the desktop shell. No server, telemetry, automatic process termination or automatic uninstall is introduced.
 
 The single-instance plugin is patched to use a new process namespace while retaining the bundle ID. Linux uses the plugin's explicit D-Bus namespace option. Demo builds have their own namespace and bypass inspection. This permits the renamed Settings window to open alongside the old app while preventing two renamed instances.
 

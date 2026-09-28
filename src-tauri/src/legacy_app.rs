@@ -95,6 +95,45 @@ pub async fn recheck_legacy_app(app: AppHandle) -> Conflict {
     check(&app).await;
     get_legacy_status()
 }
+const UPGRADE_URL: &str = "https://svb.miguel.ms/upgrade.html";
+#[tauri::command]
+pub async fn open_legacy_upgrade() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(open_upgrade)
+        .await
+        .map_err(|_| "Could not open upgrade instructions.".to_owned())?
+}
+#[cfg(target_os = "macos")]
+fn open_upgrade() -> Result<(), String> {
+    use objc2_foundation::{NSString, NSURL};
+    let url = NSURL::URLWithString(&NSString::from_str(UPGRADE_URL))
+        .ok_or("Upgrade address is unavailable.")?;
+    if objc2_app_kit::NSWorkspace::sharedWorkspace().openURL(&url) {
+        Ok(())
+    } else {
+        Err("Could not open upgrade instructions.".into())
+    }
+}
+#[cfg(not(target_os = "macos"))]
+fn open_upgrade() -> Result<(), String> {
+    #[cfg(windows)]
+    let mut command = {
+        let mut command = std::process::Command::new("rundll32.exe");
+        command.arg("url.dll,FileProtocolHandler");
+        command
+    };
+    #[cfg(target_os = "linux")]
+    let mut command = std::process::Command::new("xdg-open");
+    // Fixed address only: this command exposes no arbitrary URL or shell arguments.
+    let result = command
+        .arg(UPGRADE_URL)
+        .status()
+        .map_err(|e| e.to_string())?;
+    if result.success() {
+        Ok(())
+    } else {
+        Err("Could not open upgrade instructions.".into())
+    }
+}
 fn legacy_path(path: &Path) -> bool {
     let resolved = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
     let name = resolved.file_name().and_then(|n| n.to_str()).unwrap_or("");

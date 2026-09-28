@@ -44,3 +44,26 @@ test('initial inspection failure provides guidance without claiming a conflict',
   await expect(page.getByRole('alert')).toContainText('Unable to check');
   await expect(page.getByRole('alert')).not.toContainText('has paused synchronization');
 });
+
+test('desktop upgrade action uses the native opener', async ({ page }) => {
+  await page.goto('/preview.html?platform=macos&legacy=running');
+  await expect(page.getByRole('alert')).toBeVisible();
+  await page.evaluate(() => {
+    const host = window as unknown as {
+      isTauri: boolean;
+      __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> };
+    };
+    host.isTauri = true;
+    const invoke = host.__TAURI_INTERNALS__.invoke;
+    host.__TAURI_INTERNALS__.invoke = async (command, args) => {
+      if (command === 'open_legacy_upgrade') {
+        document.documentElement.dataset.upgradeOpened = 'true';
+        return;
+      }
+      return invoke(command, args);
+    };
+  });
+  await page.getByRole('alert').getByRole('link').click();
+  await expect(page.locator('html')).toHaveAttribute('data-upgrade-opened', 'true');
+  await expect(page.getByRole('alert')).toBeVisible();
+});
