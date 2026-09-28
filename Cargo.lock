@@ -3757,7 +3757,7 @@ dependencies = [
 
 [[package]]
 name = "speaker-volume-bridge"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "async-trait",
  "block2",
@@ -3797,7 +3797,7 @@ dependencies = [
 
 [[package]]
 name = "speaker-volume-bridge-domain"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "jiff",
  "serde",
@@ -3806,7 +3806,7 @@ dependencies = [
 
 [[package]]
 name = "speaker-volume-bridge-integration"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "async-trait",
  "speaker-volume-bridge-domain",
@@ -3817,7 +3817,7 @@ dependencies = [
 
 [[package]]
 name = "speaker-volume-bridge-platform-audio"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "async-trait",
  "serde_json",
@@ -3830,7 +3830,7 @@ dependencies = [
 
 [[package]]
 name = "speaker-volume-bridge-sonos"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "if-addrs",
  "quick-xml",
@@ -3846,14 +3846,14 @@ dependencies = [
 
 [[package]]
 name = "speaker-volume-bridge-synchronization"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "speaker-volume-bridge-domain",
 ]
 
 [[package]]
 name = "speaker-volume-bridge-test-support"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "speaker-volume-bridge-domain",
  "tokio",
