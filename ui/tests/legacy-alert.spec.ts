@@ -37,13 +37,26 @@ for (const platform of ['macos', 'windows', 'linux']) {
     await expect(warning).toBeHidden();
   });
 }
-test('initial inspection failure provides guidance without claiming a conflict', async ({
-  page,
-}) => {
-  await page.goto('/preview.html?platform=macos&legacy=unknown');
-  await expect(page.getByRole('alert')).toContainText('Unable to check');
-  await expect(page.getByRole('alert')).not.toContainText('has paused synchronization');
-});
+for (const platform of ['macos', 'windows', 'linux']) {
+  for (const legacy of ['unknown', 'clear']) {
+    test(`${platform} ${legacy} inspection does not warn users without a confirmed conflict`, async ({
+      page,
+    }) => {
+      await page.goto(`/preview.html?platform=${platform}&legacy=${legacy}`);
+      await expect(page.getByRole('button', { name: 'Devices', exact: true })).toBeVisible();
+      await expect(page.getByRole('alert')).toBeHidden();
+      for (const section of ['Speaker', 'General', 'Diagnostics', 'About', 'Devices']) {
+        await page.getByRole('button', { name: section, exact: true }).click();
+        await expect(page.getByRole('alert')).toBeHidden();
+        if (section === 'Diagnostics') {
+          await expect(page.locator('#diagnostic-legacy')).toHaveText(
+            legacy === 'unknown' ? 'Check unavailable' : 'No old app detected',
+          );
+        }
+      }
+    });
+  }
+}
 
 test('desktop upgrade action uses the native opener', async ({ page }) => {
   await page.goto('/preview.html?platform=macos&legacy=running');
