@@ -13,23 +13,22 @@
     clippy::semicolon_if_nothing_returned
 )]
 
+use crate::expected_writes::ExpectedWrites;
 use crate::{
     AudioDeviceSelection, AudioOutputDevice, PlatformAudioError, SystemAudioController,
     SystemAudioEvent,
 };
 use async_trait::async_trait;
-use sonos_volume_bridge_domain::{
-    ExpectedLocalWrite, LocalAudioState, LocalOrigin, MuteState, NormalizedVolume,
-};
+use sonos_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, NormalizedVolume};
 use std::{
     ffi::c_void,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, Ordering},
         mpsc::{self, Receiver, RecvTimeoutError, SyncSender},
     },
     thread::{self, JoinHandle},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant},
 };
 use tokio::sync::{broadcast, oneshot};
 
@@ -50,7 +49,6 @@ const DEVICE_UID: UInt32 = 0x7569_6420; // 'uid '
 const VOLUME_SCALAR: UInt32 = 0x766f_6c6d; // 'volm'
 const MUTE: UInt32 = 0x6d75_7465; // 'mute'
 const STREAM_CONFIGURATION: UInt32 = 0x736c_6179; // 'slay'
-const EXPECTED_WRITE_LIFETIME_MS: u64 = 500;
 const DEVICE_UNAVAILABLE: OSStatus = -2;
 
 #[repr(C)]
@@ -257,8 +255,7 @@ enum Command {
 struct CallbackContext {
     events: broadcast::Sender<SystemAudioEvent>,
     commands: SyncSender<Command>,
-    expected: Mutex<Option<ExpectedLocalWrite>>,
-    generation: AtomicU64,
+    expected: Mutex<ExpectedWrites>,
     tolerance: u8,
 }
 
@@ -273,8 +270,7 @@ fn run_worker(
     let context = Arc::new(CallbackContext {
         events: events.clone(),
         commands,
-        expected: Mutex::new(None),
-        generation: AtomicU64::new(0),
+        expected: Mutex::new(ExpectedWrites::default()),
         tolerance,
     });
     let mut endpoint = match unsafe { Endpoint::attach(&selection, Arc::clone(&context)) } {
@@ -308,6 +304,9 @@ fn run_worker(
                 match unsafe { Endpoint::attach(&selection, Arc::clone(&context)) } {
                     Ok(next) => {
                         endpoint.detach();
+                        if let Ok(mut expected) = context.expected.lock() {
+                            *expected = ExpectedWrites::default();
+                        }
                         endpoint = next;
                         let _ = events.send(SystemAudioEvent::DefaultOutputChanged);
                     }
@@ -382,12 +381,22 @@ impl Endpoint {
         })
     }
     unsafe fn set_volume(&self, volume: NormalizedVolume) -> Result<(), OSStatus> {
-        let state = LocalAudioState {
-            volume,
-            muted: unsafe { self.state()? }.muted,
-        };
-        self.expect(state);
+        let muted = unsafe { self.state()? }.muted;
         let value = f32::from(volume.get()) / 100.0;
+        let channels = self
+            .channels
+            .iter()
+            .map(|channel| unsafe {
+                scalar(self.id, address(VOLUME_SCALAR, SCOPE_OUTPUT, *channel))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        // Per-channel devices can notify after each setter, before the final average.
+        for intermediate in channel_write_volumes(channels, value) {
+            self.expect(LocalAudioState {
+                volume: intermediate,
+                muted,
+            });
+        }
         for channel in &self.channels {
             unsafe {
                 set_scalar(
@@ -412,16 +421,11 @@ impl Endpoint {
             .map_err(map_error)
     }
     fn expect(&self, state: LocalAudioState) {
-        let generation = self.context.generation.fetch_add(1, Ordering::Relaxed) + 1;
         if let Ok(mut expected) = self.context.expected.lock() {
-            *expected = Some(ExpectedLocalWrite {
-                state,
-                expires_at_ms: now_ms() + EXPECTED_WRITE_LIFETIME_MS,
-                generation,
-                tolerance: self.context.tolerance,
-            });
+            expected.record(state, Instant::now());
         }
     }
+
     unsafe fn listen(&self) {
         let data = Arc::as_ptr(&self.context).cast_mut().cast::<c_void>();
         for channel in &self.channels {
@@ -511,6 +515,17 @@ impl Endpoint {
     }
 }
 
+fn channel_write_volumes(mut channels: Vec<f32>, target: f32) -> Vec<NormalizedVolume> {
+    let mut volumes = Vec::with_capacity(channels.len());
+    for index in 0..channels.len() {
+        channels[index] = target;
+        volumes.push(normalize(
+            channels.iter().sum::<f32>() / channels.len() as f32,
+        ));
+    }
+    volumes
+}
+
 unsafe extern "C" fn property_changed(
     object: AudioObjectID,
     _: UInt32,
@@ -522,19 +537,14 @@ unsafe extern "C" fn property_changed(
     };
     let state = unsafe { state_for_callback(object) };
     if let Ok(state) = state {
-        let origin = context
-            .expected
-            .lock()
-            .ok()
-            .and_then(|mut expected| expected.take())
-            .map_or(LocalOrigin::User, |expected| {
-                match expected.classify(state, now_ms()) {
-                    sonos_volume_bridge_domain::SuppressionDecision::Suppress => {
-                        LocalOrigin::Application
-                    }
-                    sonos_volume_bridge_domain::SuppressionDecision::Forward => LocalOrigin::User,
-                }
-            });
+        let origin =
+            if context.expected.lock().is_ok_and(|mut expected| {
+                expected.matches(state, context.tolerance, Instant::now())
+            }) {
+                LocalOrigin::Application
+            } else {
+                LocalOrigin::User
+            };
         let _ = context
             .events
             .send(SystemAudioEvent::StateChanged { state, origin });
@@ -852,14 +862,6 @@ fn map_error(status: OSStatus) -> PlatformAudioError {
 fn legacy_audio_object_id(id: &str) -> Option<AudioObjectID> {
     id.parse().ok()
 }
-fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
-        .try_into()
-        .unwrap_or(u64::MAX)
-}
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn normalize(value: f32) -> NormalizedVolume {
     NormalizedVolume::new((value.clamp(0.0, 1.0) * 100.0).round() as u8)
@@ -869,6 +871,39 @@ fn normalize(value: f32) -> NormalizedVolume {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sonos_volume_bridge_domain::ExpectedLocalWrite;
+    #[test]
+    fn channel_transitions_and_duplicate_final_callbacks_are_suppressed() {
+        let now = Instant::now();
+        let mut expected = ExpectedWrites::default();
+        let volumes = channel_write_volumes(vec![0.2, 0.4], 0.6);
+        assert_eq!(
+            volumes
+                .iter()
+                .map(|volume| volume.get())
+                .collect::<Vec<_>>(),
+            vec![50, 60]
+        );
+        for volume in volumes {
+            expected.record(
+                LocalAudioState {
+                    volume,
+                    muted: MuteState(false),
+                },
+                now,
+            );
+        }
+        for volume in [50, 60, 50, 60] {
+            assert!(expected.matches(
+                LocalAudioState {
+                    volume: NormalizedVolume::new(volume).unwrap(),
+                    muted: MuteState(false),
+                },
+                1,
+                now
+            ));
+        }
+    }
     #[test]
     fn expected_writes_suppress_matching_callbacks() {
         let expected = ExpectedLocalWrite {

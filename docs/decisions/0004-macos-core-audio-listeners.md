@@ -10,9 +10,10 @@ the default output device, output volume, and mute properties using
 `AudioObjectAddPropertyListener`.
 
 Before a bridge-originated write, the worker records an `ExpectedLocalWrite`
-with a monotonic generation, short expiry, and caller-supplied volume tolerance.
-The callback matches and consumes only the expected state; all other callbacks
-are reported as user-originated. This avoids a global boolean or timing-only
+with a monotonic expiry and caller-supplied volume tolerance.
+As refined in [ADR 0017](0017-volume-feedback-suppression.md), callbacks match
+a bounded history retained until expiry, including intermediate channel states;
+nonmatching callbacks are reported as user-originated. This avoids a global boolean or timing-only
 suppression scheme.
 
 When a mutable master volume is unavailable, the adapter discovers output
