@@ -183,13 +183,35 @@ async fn check(app: &AppHandle) {
         state.start_runtime(app.clone());
     }
     let _ = app.emit("legacy-app-changed", status);
-    if entered {
-        if let Some(window) = app.get_webview_window("main") {
+    announce_conflict(entered, &DesktopNotice(app)).await;
+}
+#[async_trait::async_trait]
+trait ConflictNotice: Sync {
+    fn show_settings(&self);
+    async fn permitted(&self) -> bool;
+    async fn send(&self);
+}
+struct DesktopNotice<'a>(&'a AppHandle);
+#[async_trait::async_trait]
+impl ConflictNotice for DesktopNotice<'_> {
+    fn show_settings(&self) {
+        if let Some(window) = self.0.get_webview_window("main") {
             let _ = window.show();
             let _ = window.set_focus();
         }
-        if crate::schedule_notifications::permitted(app, false).await {
-            crate::schedule_notifications::send(app, "Speaker Volume Bridge paused", MESSAGE).await;
+    }
+    async fn permitted(&self) -> bool {
+        crate::schedule_notifications::permitted(self.0, false).await
+    }
+    async fn send(&self) {
+        crate::schedule_notifications::send(self.0, "Speaker Volume Bridge paused", MESSAGE).await;
+    }
+}
+async fn announce_conflict(entered: bool, notice: &impl ConflictNotice) {
+    if entered {
+        notice.show_settings();
+        if notice.permitted().await {
+            notice.send().await;
         }
     }
 }
@@ -222,6 +244,59 @@ mod tests {
         assert_eq!(state.observe(Detection::Clear), (false, true));
         assert_eq!(state.observe(Detection::Clear), (false, false));
         assert_eq!(state.observe(Detection::LegacyRunning), (true, false));
+    }
+    #[tokio::test]
+    async fn native_notice_is_attempted_once_per_episode_and_denial_keeps_settings() {
+        use std::sync::atomic::AtomicUsize;
+        struct Notice {
+            granted: bool,
+            shown: AtomicUsize,
+            permissions: AtomicUsize,
+            sent: AtomicUsize,
+        }
+        #[async_trait::async_trait]
+        impl ConflictNotice for Notice {
+            fn show_settings(&self) {
+                self.shown.fetch_add(1, Ordering::SeqCst);
+            }
+            async fn permitted(&self) -> bool {
+                self.permissions.fetch_add(1, Ordering::SeqCst);
+                self.granted
+            }
+            async fn send(&self) {
+                self.sent.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        for granted in [false, true] {
+            let notice = Notice {
+                granted,
+                shown: AtomicUsize::new(0),
+                permissions: AtomicUsize::new(0),
+                sent: AtomicUsize::new(0),
+            };
+            let mut state = Conflict {
+                status: Detection::Unknown,
+                paused: false,
+            };
+            for detection in [
+                Detection::Unknown,
+                Detection::LegacyRunning,
+                Detection::LegacyRunning,
+                Detection::Unknown,
+                Detection::Clear,
+                Detection::LegacyRunning,
+            ] {
+                let (entered, _) = state.observe(detection);
+                announce_conflict(entered, &notice).await;
+            }
+            assert_eq!(notice.shown.load(Ordering::SeqCst), 2);
+            assert_eq!(notice.permissions.load(Ordering::SeqCst), 2);
+            assert_eq!(
+                notice.sent.load(Ordering::SeqCst),
+                if granted { 2 } else { 0 }
+            );
+            assert!(state.paused);
+        }
     }
     #[test]
     fn exact_executables_only() {

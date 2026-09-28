@@ -34,3 +34,5 @@ Apple name: Speaker Volume Bridge. Subtitle: Sync Mac and speaker volume. Retain
 ## Intentional legacy identifiers
 
 [The allowlist](legacy-identifiers.json) records files retaining the former product name or stable identifiers and their reasons. `python3 scripts/check-legacy-identifiers.py` rejects undocumented references, including new files. Protocol-specific Sonos names remain accurate and are outside the rebrand.
+
+Ready-to-review [Store copy and Apple reply](store-rebrand-copy.md) are staged for the verified build.

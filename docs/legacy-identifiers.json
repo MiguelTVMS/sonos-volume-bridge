@@ -8,6 +8,7 @@
   "crates/sonos/src/gena.rs": "Stable local protocol callback path retained for compatibility.",
   "docs/development.md": "Upgrade wording, stable identifiers or historical development settings.",
   "docs/rebrand-upgrade.md": "Upgrade wording, stable identifiers or historical development settings.",
+  "docs/store-rebrand-copy.md": "Draft migration copy explaining the former product name.",
   "packaging/linux/postinst": "Preserved installation, store, startup or notification identity and migration targets.",
   "packaging/linux/postrm": "Preserved installation, store, startup or notification identity and migration targets.",
   "packaging/windows-msix/AppxManifest.xml.template": "Preserved installation, store, startup or notification identity and migration targets.",
