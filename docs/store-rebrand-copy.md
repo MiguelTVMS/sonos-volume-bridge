@@ -5,7 +5,8 @@ These are drafts for the existing product records. Apply them with the first ver
 ## Apple
 
 **Name:** Speaker Volume Bridge  
-**Subtitle:** Sync Mac and speaker volume
+**Subtitle:** Sync Mac and speaker volume  
+**Keywords:** volume,menu bar,speaker,home audio,sync,mute,keyboard,local network
 
 Speaker Volume Bridge keeps your Mac's audio-output volume and a compatible Sonos speaker in sync over your local network. Use system volume controls, keyboard volume keys or supported audio-device controls. Enable two-way synchronization, synchronize mute, choose a maximum speaker volume and schedule Night Mode on supported speakers.
 
@@ -32,3 +33,19 @@ Use the following only after selecting and inspecting the uploaded renamed build
 Capture the renamed interface from the verified platform build, including its normal Settings pages. Check that every visible product title uses Speaker Volume Bridge and that screenshots agree with the submitted build. The legacy-app warning intentionally names Sonos Volume Bridge. Keep the local preview screenshot separate from native-package verification evidence.
 
 Before submission, verify the selected package, localizations, screenshots, support and privacy links. Complete any displayed Apple trader-status requirement using the publisher's verified details. Track Apple review and Microsoft certification separately; a saved name or successful upload is not certification.
+
+## Listing links
+
+- Website and Apple marketing URL: https://svb.miguel.ms/
+- Support: https://github.com/MiguelTVMS/speaker-volume-bridge/issues
+- Existing privacy-policy document: https://github.com/MiguelTVMS/speaker-volume-bridge/blob/develop/PRIVACY.md
+
+Microsoft distinguishes the localized Store product name from the installed name
+in the package manifest. Save the reserved name in the existing submission, then
+upload the matching renamed package before certification. A saved draft is not a
+public rename. Check every localization; retain the previous reservation during
+the transition. See [Microsoft’s MSIX listing guidance](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/add-and-edit-store-listing-info).
+
+Apple keywords use descriptive terms rather than another company’s name. Sonos
+compatibility remains in the description and independence notice. See [Apple’s
+platform metadata reference](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information/).
