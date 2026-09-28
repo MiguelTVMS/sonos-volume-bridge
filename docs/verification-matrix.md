@@ -602,3 +602,7 @@ verify both native notification registrations disappear without manual cleanup.
 Repeat an in-place update and verify notification delivery remains available.
 Automated tests isolate installation lookup from real machine registry state and
 do not prove native shell cache refresh or elevation/account behavior.
+
+## Legacy warning visibility regression
+
+On a clean install or a sandboxed build with no detected legacy process, open Settings and navigate Devices, Speaker, General, Diagnostics and About. No yellow legacy warning should appear; unavailable inspection is shown only in Diagnostics. Start the legacy app and confirm the warning and pause; if inspection subsequently becomes unavailable, the previous conflict remains paused with accurate wording. Exit the legacy app and recheck to recover. Cross-platform browser regression coverage exercises the production alert renderer with unknown, clear and confirmed conflict states; native sandbox process inspection remains a separate manual check.

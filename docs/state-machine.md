@@ -54,4 +54,4 @@ regression coverage, and the limitations of value-based origin detection.
 
 ## Legacy application protection
 
-The desktop shell pauses synchronization and scheduled speaker writes while the old executable is running. Unknown inspection retains an existing pause. Confirmed absence reconciles current configuration without replaying queued commands or restarting user-stopped synchronization. See [decision 0018](decisions/0018-rebrand-and-legacy-protection.md) and [upgrade guidance](rebrand-upgrade.md).
+The desktop shell pauses synchronization and scheduled speaker writes while the old executable is running. Unknown inspection retains an existing pause. Initial inspection failures appear only as a neutral Diagnostics status; the yellow Settings warning requires a previously confirmed running legacy app. Confirmed absence reconciles current configuration without replaying queued commands or restarting user-stopped synchronization. See [decision 0018](decisions/0018-rebrand-and-legacy-protection.md) and [upgrade guidance](rebrand-upgrade.md).
