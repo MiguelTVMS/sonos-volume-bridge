@@ -3712,7 +3712,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge"
-version = "1.5.4"
+version = "1.5.5"
 dependencies = [
  "async-trait",
  "block2",
@@ -3751,7 +3751,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-domain"
-version = "1.5.4"
+version = "1.5.5"
 dependencies = [
  "jiff",
  "serde",
@@ -3760,7 +3760,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-integration"
-version = "1.5.4"
+version = "1.5.5"
 dependencies = [
  "async-trait",
  "sonos-volume-bridge-domain",
@@ -3771,7 +3771,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-platform-audio"
-version = "1.5.4"
+version = "1.5.5"
 dependencies = [
  "async-trait",
  "serde_json",
@@ -3784,7 +3784,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-sonos"
-version = "1.5.4"
+version = "1.5.5"
 dependencies = [
  "if-addrs",
  "quick-xml",
@@ -3800,14 +3800,14 @@ dependencies = [
 
 [[package]]
 name = "sonos-volume-bridge-synchronization"
-version = "1.5.4"
+version = "1.5.5"
 dependencies = [
  "sonos-volume-bridge-domain",
 ]
 
 [[package]]
 name = "sonos-volume-bridge-test-support"
-version = "1.5.4"
+version = "1.5.5"
 dependencies = [
  "sonos-volume-bridge-domain",
  "tokio",
