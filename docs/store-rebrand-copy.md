@@ -4,8 +4,10 @@ These are drafts for the existing product records. Apply them with the first ver
 
 ## Apple
 
-**Name:** Speaker Volume Bridge  
-**Subtitle:** Sync Mac and speaker volume  
+**Name:** Speaker Volume Bridge
+
+**Subtitle:** Sync Mac and speaker volume
+
 **Keywords:** volume,menu bar,speaker,home audio,sync,mute,keyboard,local network
 
 Speaker Volume Bridge keeps your Mac's audio-output volume and a compatible Sonos speaker in sync over your local network. Use system volume controls, keyboard volume keys or supported audio-device controls. Enable two-way synchronization, synchronize mute, choose a maximum speaker volume and schedule Night Mode on supported speakers.
