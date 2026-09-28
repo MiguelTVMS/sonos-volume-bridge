@@ -428,7 +428,7 @@ pub fn refresh<R: Runtime>(app: &AppHandle<R>) {
     let status = format!("State: {}", connection_label(connection));
     let speaker = speaker_label(snapshot.sonos_name.as_deref(), snapshot.sonos_volume);
     let tooltip = format!(
-        "SpeakerVolumeBridge\n{status}\n{speaker}\nLocal: {}",
+        "Speaker Volume Bridge\n{status}\n{speaker}\nLocal: {}",
         snapshot
             .local_volume
             .map_or_else(|| "—".to_owned(), |volume| format!("{volume}%"))

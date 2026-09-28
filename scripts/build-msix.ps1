@@ -117,7 +117,7 @@ $namespace = New-Object System.Xml.XmlNamespaceManager($verifiedManifest.NameTab
 $namespace.AddNamespace('f', 'http://schemas.microsoft.com/appx/manifest/foundation/windows10')
 $identity = $verifiedManifest.SelectSingleNode('/f:Package/f:Identity', $namespace)
 $language = $verifiedManifest.SelectSingleNode('/f:Package/f:Resources/f:Resource', $namespace)
-if ($identity.Name -ne 'Miguel.MS.SpeakerVolumeBridge' -or
+if ($identity.Name -ne 'Miguel.MS.SonosVolumeBridge' -or
     $identity.Publisher -ne 'CN=7D58CCC9-6311-4A59-95A9-FF7375C0ECDC' -or
     $identity.Version -ne $msixVersion -or
     $identity.ProcessorArchitecture -ne $Architecture -or

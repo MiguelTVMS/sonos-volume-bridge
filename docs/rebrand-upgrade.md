@@ -6,7 +6,7 @@ Formerly Sonos Volume Bridge. SVB and svb.miguel.ms stay unchanged. Sonos compat
 
 - Quit Sonos Volume Bridge from its menu bar or system tray before upgrading.
 - **macOS direct download:** install Speaker Volume Bridge.app, remove the old Sonos Volume Bridge.app bundle, and keep application settings/data. Check Start at login after replacing the bundle. Do not run the Store and direct-download editions together.
-- **Windows:** update the existing installation or the existing Microsoft Store product. The installer retains its installation directory and settings and migrates shortcuts and startup targets. Do not create a second Store product.
+- **Windows:** update the existing installation or the existing Microsoft Store product. The installer retains its installation directory and settings and migrates shortcuts and startup targets. Do not create a second Store product. Rebrand upgrades run in place and do not close the old process; a locked obsolete executable is scheduled for removal at reboot.
 - **Linux:** install the new speaker-volume-bridge Debian package. It replaces sonos-volume-bridge; the old shell command remains a compatibility symlink. Check your desktop environment's startup list and remove a manually created duplicate startup entry if present.
 
 If the old app runs, Settings displays a persistent warning and synchronization pauses. Quit the old app and select Check again, or wait for the next five-second check. The new app never terminates the old app. If process inspection is unavailable, quit the old app manually; the UI does not assert that it is absent. Native notifications depend on existing OS permission and are sent once per conflict episode.

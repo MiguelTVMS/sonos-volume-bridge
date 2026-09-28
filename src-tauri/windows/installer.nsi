@@ -507,6 +507,12 @@ Function .onInit
 
   !insertmacro SetContext
 
+  ; Rebrand upgrades are in-place: never invoke the legacy uninstaller or stop it.
+  ReadRegStr $0 SHCTX "${UNINSTKEY}" "MainBinaryName"
+  ${If} $0 == "sonos-volume-bridge.exe"
+    StrCpy $UpdateMode 1
+  ${EndIf}
+
   ${If} $INSTDIR == "${PLACEHOLDER_INSTALL_DIR}"
     ; Set default install location
     !if "${INSTALLMODE}" == "perMachine"
@@ -655,8 +661,6 @@ Section Install
 
   !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
 
-  !insertmacro CheckIfAppIsRunning "sonos-volume-bridge.exe" "${LEGACYPRODUCTNAME}"
-
   ; Copy main executable
   File "${MAINBINARYSRCPATH}"
 
@@ -704,7 +708,7 @@ Section Install
   ReadRegStr $OldMainBinaryName SHCTX "${UNINSTKEY}" "MainBinaryName"
   ${If} $OldMainBinaryName != ""
   ${AndIf} $OldMainBinaryName != "${MAINBINARYNAME}.exe"
-    Delete "$INSTDIR\$OldMainBinaryName"
+    Delete /REBOOTOK "$INSTDIR\$OldMainBinaryName"
   ${EndIf}
 
   ; Migrate owned legacy shortcuts without touching unrelated links.

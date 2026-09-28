@@ -15,6 +15,7 @@
   "pages/index.md": "Upgrade wording, stable identifiers or historical development settings.",
   "pages/upgrade.html": "Upgrade wording, stable identifiers or historical development settings.",
   "pages/upgrade.md": "Upgrade wording, stable identifiers or historical development settings.",
+  "scripts/build-msix.ps1": "Validate the existing Microsoft Store package identity after display-name changes.",
   "scripts/prepare-release-downloads.sh": "Compatibility download aliases and regression coverage.",
   "scripts/tests/test_rebrand_identity.py": "Regression contract for preserved store/installer identities and Debian replacement.",
   "scripts/tests/test_release_downloads.py": "Compatibility download aliases and regression coverage.",

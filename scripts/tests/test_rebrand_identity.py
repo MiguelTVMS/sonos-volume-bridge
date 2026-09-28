@@ -15,6 +15,7 @@ class RebrandIdentityTests(unittest.TestCase):
         ns = {'p': 'http://schemas.microsoft.com/appx/manifest/foundation/windows10',
               'desktop': 'http://schemas.microsoft.com/appx/manifest/desktop/windows10'}
         self.assertEqual(manifest.find('p:Identity', ns).attrib['Name'], 'Miguel.MS.SonosVolumeBridge')
+        self.assertIn("$identity.Name -ne 'Miguel.MS.SonosVolumeBridge'", (ROOT / 'scripts/build-msix.ps1').read_text())
         app = manifest.find('p:Applications/p:Application', ns)
         self.assertEqual(app.attrib['Id'], 'SonosVolumeBridge')
         self.assertEqual(app.attrib['Executable'], 'speaker-volume-bridge.exe')
@@ -29,6 +30,8 @@ class RebrandIdentityTests(unittest.TestCase):
 
     def test_installer_registry_identity_is_independent_of_visible_name(self):
         script = (ROOT / 'src-tauri/windows/installer.nsi').read_text()
+        self.assertNotIn('CheckIfAppIsRunning \"sonos-volume-bridge.exe\"', script)
+        self.assertIn('Delete /REBOOTOK \"$INSTDIR\\$OldMainBinaryName\"', script)
         self.assertIn('!define LEGACYPRODUCTNAME "Sonos Volume Bridge"', script)
         self.assertIn('Uninstall\\${LEGACYPRODUCTNAME}', script)
         self.assertIn('!define MANUPRODUCTKEY "${MANUKEY}\\${LEGACYPRODUCTNAME}"', script)

@@ -21,6 +21,7 @@ The website offers optional analytics and advertising through Google Tag Manager
 ## Website
 
 - [Overview and features](https://svb.miguel.ms/index.md): Product capabilities and limitations.
+- [Upgrade guide](https://svb.miguel.ms/upgrade.md): Migration, legacy-app warnings and local notifications.
 - [Downloads](https://svb.miguel.ms/#downloads): Current platform download options.
 - [Privacy policy](https://svb.miguel.ms/privacy.md): Application data practices and website hosting information.
 - [MIT license](https://svb.miguel.ms/license.txt): License terms.
