@@ -15,6 +15,11 @@ on:
         default: Beta
         type: choice
         options: [GA, Beta, Alpha]
+      draft_release:
+        description: Keep GitHub release private for native validation (no promotion or Store submission)
+        required: false
+        default: false
+        type: boolean
       publish_microsoft_store:
         description: Submit release to Microsoft Store (GA only)
         required: false
@@ -813,6 +818,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
           RELEASE_CHANNEL: ${{ inputs.channel }}
+          DRAFT_RELEASE: ${{ inputs.draft_release }}
         run: |
           mapfile -t release_assets < <(find release-assets -type f -print)
           test "${#release_assets[@]}" -gt 0
@@ -831,6 +837,9 @@ jobs:
               ;;
             *) echo "Unsupported release channel: $RELEASE_CHANNEL" >&2; exit 1 ;;
           esac
+          if [ "$DRAFT_RELEASE" = "true" ]; then
+            release_flags+=(--draft)
+          fi
           release_intro="$(cat <<EOF
           ## Speaker Volume Bridge $RELEASE_TAG
 
@@ -852,6 +861,10 @@ jobs:
           EOF
           )"
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            if [ "$DRAFT_RELEASE" = "true" ] && [ "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" != "true" ]; then
+              echo "Refusing to replace public assets during a draft validation run." >&2
+              exit 1
+            fi
             gh release upload "$RELEASE_TAG" "${release_assets[@]}" --clobber
           else
             gh release create "$RELEASE_TAG" "${release_assets[@]}" "${release_flags[@]}" \
@@ -862,7 +875,7 @@ jobs:
 
   propose-main-promotion:
     name: Open stable release PR into main
-    if: ${{ !cancelled() && inputs.channel == 'GA' && needs.prepare-version.result == 'success' && needs.publish-release.result == 'success' }}
+    if: ${{ !cancelled() && !inputs.draft_release && inputs.channel == 'GA' && needs.prepare-version.result == 'success' && needs.publish-release.result == 'success' }}
     needs: [prepare-version, publish-release]
     runs-on: ubuntu-latest
     permissions:
@@ -892,7 +905,7 @@ jobs:
 
   publish-microsoft-store:
     name: Submit GA release to Microsoft Store
-    if: ${{ !cancelled() && inputs.channel == 'GA' && inputs.publish_microsoft_store && needs.prepare-version.result == 'success' && needs.all-platform-builds.result == 'success' && needs.windows-msix.result == 'success' && needs.publish-release.result == 'success' }}
+    if: ${{ !cancelled() && !inputs.draft_release && inputs.channel == 'GA' && inputs.publish_microsoft_store && needs.prepare-version.result == 'success' && needs.all-platform-builds.result == 'success' && needs.windows-msix.result == 'success' && needs.publish-release.result == 'success' }}
     needs: [prepare-version, all-platform-builds, windows-msix, publish-release]
     permissions:
       contents: read

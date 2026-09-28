@@ -312,3 +312,18 @@ package. Accept that representation only when its uploaded filename and version
 match the retained artifact and local verification confirms both embedded x64
 and ARM64 packages. Neutral alone does not prove architecture coverage. This
 submission check does not establish certification or public availability.
+
+## Hold the rebrand release for native validation
+
+For the first renamed release, dispatch Release from `develop` with `bump=Minor`,
+`channel=GA`, `draft_release=true`, `build_app_store=true` and
+`publish_microsoft_store=false`. Signing approvals still apply. The workflow
+produces a private draft GitHub release and Actions artifacts; it skips main
+promotion and automatic Store submission even if Store submission is selected.
+A draft run refuses to overwrite an existing public release.
+
+Download the artifacts and complete the native checks in [the upgrade guide](rebrand-upgrade.md).
+After those checks pass, publish the existing draft and prepare the normal
+reviewed main-promotion PR for that exact release. Do not rerun the version-bump
+workflow just to publish the draft: that would increment the version again.
+Complete both Store submissions manually with the verified packages.
