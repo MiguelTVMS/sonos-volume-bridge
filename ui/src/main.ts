@@ -1,4 +1,3 @@
-import { mountLegacyAlert, installLegacyAlert } from './legacy-alert';
 import {
   scheduleMarkup,
   setSystemHour12,
@@ -331,7 +330,6 @@ function render(nextSnapshot: Snapshot): void {
         <div class="sidebar-speaker"><span>Speaker</span><b id="runtime-speaker">${escapeHtml(speakerName)}</b></div>
       </aside>
       <form id="settings" class="content">
-        <section id="legacy-alert" class="legacy-alert" role="alert" aria-live="assertive" hidden></section>
         ${panel(
           'devices',
           `<div class="panel-heading"><h2>Devices</h2><p>Choose the speaker and audio output to keep in step.</p></div>
@@ -372,7 +370,7 @@ function render(nextSnapshot: Snapshot): void {
         ${panel(
           'diagnostics',
           `<div class="panel-heading"><h2>Diagnostics</h2><p>Live information about the speaker and audio output.</p></div>
-          <dl class="status-list"><div><dt>Connection</dt><dd id="diagnostic-connection">${escapeHtml(status)}</dd></div><div><dt>Speaker</dt><dd id="diagnostic-speaker">${escapeHtml(speakerName)}</dd></div><div><dt>Speaker volume</dt><dd id="diagnostic-sonos-volume">${volumeText(nextSnapshot.sonosVolume)}</dd></div><div><dt>Speaker input format</dt><dd id="diagnostic-audio-input">Unavailable</dd></div><div><dt>Selected output</dt><dd id="diagnostic-output">${escapeHtml(selectedOutputName(c))}</dd></div><div><dt>Output volume</dt><dd id="diagnostic-local-volume">${volumeText(nextSnapshot.localVolume)}</dd></div><div><dt>Mute</dt><dd id="diagnostic-mute">${muteText(nextSnapshot.muted)}</dd></div><div><dt>Speaker search</dt><dd>${escapeHtml(discoveryStatus)}</dd></div><div><dt>Legacy app check</dt><dd id="diagnostic-legacy">Check unavailable</dd></div></dl>
+          <dl class="status-list"><div><dt>Connection</dt><dd id="diagnostic-connection">${escapeHtml(status)}</dd></div><div><dt>Speaker</dt><dd id="diagnostic-speaker">${escapeHtml(speakerName)}</dd></div><div><dt>Speaker volume</dt><dd id="diagnostic-sonos-volume">${volumeText(nextSnapshot.sonosVolume)}</dd></div><div><dt>Speaker input format</dt><dd id="diagnostic-audio-input">Unavailable</dd></div><div><dt>Selected output</dt><dd id="diagnostic-output">${escapeHtml(selectedOutputName(c))}</dd></div><div><dt>Output volume</dt><dd id="diagnostic-local-volume">${volumeText(nextSnapshot.localVolume)}</dd></div><div><dt>Mute</dt><dd id="diagnostic-mute">${muteText(nextSnapshot.muted)}</dd></div><div><dt>Speaker search</dt><dd>${escapeHtml(discoveryStatus)}</dd></div></dl>
           <details class="technical-details" id="technical-details"${diagnosticDetailsVisible ? ' open' : ''}><summary>Speaker technical details</summary><p>Shows the saved speaker identity and local endpoint for troubleshooting.</p><pre id="diagnostic-payload">${diagnosticDetailsVisible ? 'Loading…' : ''}</pre></details>
           <div class="diagnostics-actions"><button class="secondary" type="button" id="export">Export diagnostics</button><button class="danger" type="button" id="reset">Reset settings</button></div>`,
         )}
@@ -385,7 +383,6 @@ function render(nextSnapshot: Snapshot): void {
         <output id="notice" aria-live="polite">${escapeHtml(currentNotice)}</output>
       </form>
     </div>`;
-  mountLegacyAlert();
   placeNotice();
   applySpeakerControls(app, speakerSettings, document.activeElement);
   app.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(updateRangeFill);
@@ -957,7 +954,3 @@ async function writeSchedule(
     void refreshAllSettings();
   }
 }
-
-void installLegacyAlert().catch(() => {
-  /* Native status remains available on the next event. */
-});

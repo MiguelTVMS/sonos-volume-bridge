@@ -21,13 +21,11 @@
   "scripts/tests/test_rebrand_identity.py": "Regression contract for preserved store/installer identities and Debian replacement.",
   "scripts/tests/test_release_downloads.py": "Compatibility download aliases and regression coverage.",
   "src-tauri/src/autostart.rs": "Preserved installation, store, startup or notification identity and migration targets.",
-  "src-tauri/src/legacy_app.rs": "Old executable detection, user warning and regression coverage.",
   "src-tauri/src/lib.rs": "Preserved installation, store, startup or notification identity and migration targets.",
   "src-tauri/src/schedule_notifications/windows.rs": "Preserved installation, store, startup or notification identity and migration targets.",
   "src-tauri/src/schedule_notifications/windows/shortcut.rs": "Preserved installation, store, startup or notification identity and migration targets.",
   "src-tauri/tauri.conf.json": "Preserved installation, store, startup or notification identity and migration targets.",
   "src-tauri/windows/installer.nsi": "Preserved installation, store, startup or notification identity and migration targets.",
-  "ui/src/legacy-alert.ts": "Old executable detection, user warning and regression coverage.",
-  "ui/tests/legacy-alert.spec.ts": "Old executable detection, user warning and regression coverage.",
-  "scripts/tests/test-windows-install-directory.ps1": "Isolated regression fixtures for legacy default folder migration."
+  "scripts/tests/test-windows-install-directory.ps1": "Isolated regression fixtures for legacy default folder migration.",
+  "docs/removing-old-app.md": "Manual uninstall and optional clean-reset instructions for the former product."
 }

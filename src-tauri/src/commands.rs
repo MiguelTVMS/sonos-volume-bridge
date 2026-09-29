@@ -266,14 +266,12 @@ pub async fn set_speaker_setting(
     enabled: bool,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let intent = crate::legacy_app::write_intent();
     let configuration = state
         .configuration
         .lock()
         .map_err(|_| "application state is unavailable".to_owned())?
         .clone();
     let gate = state.speaker_gate.lock().await;
-    intent.validate()?;
     let current = state
         .configuration
         .lock()
@@ -368,6 +366,26 @@ mod persistence_tests {
         });
         assert_eq!(result.unwrap_err(), "registration denied");
         assert!(!store.0.load_or_default().unwrap().start_at_login);
+    }
+
+    #[test]
+    fn failed_login_item_removal_keeps_the_saved_setting_enabled() {
+        let store = TestStore::new();
+        let previous = AppConfiguration {
+            start_at_login: true,
+            ..AppConfiguration::default()
+        };
+        store.0.save(&previous).unwrap();
+        let next = AppConfiguration {
+            start_at_login: false,
+            ..previous
+        };
+        let result = persist_settings(&store.0, true, next, |enabled| {
+            assert!(!enabled);
+            Err("removal denied".to_owned())
+        });
+        assert_eq!(result.unwrap_err(), "removal denied");
+        assert!(store.0.load_or_default().unwrap().start_at_login);
     }
 
     #[test]

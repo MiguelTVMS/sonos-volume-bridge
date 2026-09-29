@@ -466,8 +466,7 @@ fn connection_state(status: &UiStatus) -> ConnectionState {
         | UiStatus::WaitingForSonosConfirmation
         | UiStatus::SubscriptionDegraded
         | UiStatus::PollingFallback => ConnectionState::Connected,
-        UiStatus::LegacyAppRunning
-        | UiStatus::Discovering
+        UiStatus::Discovering
         | UiStatus::Connecting
         | UiStatus::SonosUnavailable
         | UiStatus::LocalAudioUnavailable
@@ -690,7 +689,6 @@ mod tests {
     #[test]
     fn unavailable_states_are_disconnected() {
         for status in [
-            UiStatus::LegacyAppRunning,
             UiStatus::Discovering,
             UiStatus::Connecting,
             UiStatus::SonosUnavailable,
