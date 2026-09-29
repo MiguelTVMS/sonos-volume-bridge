@@ -89,6 +89,9 @@ do not create write loops.
 Settings can be saved on first launch with Start at login disabled. The login
 service is contacted only when that option changes, so login-service errors do
 not block unrelated settings updates.
+On macOS, disabling an already-absent login item also saves successfully. If
+macOS refuses to remove an entry that remains registered, Settings explains how
+to remove it through System Settings and keeps the previous saved preference.
 
 Speaker sound controls update from local Sonos RenderingControl push notifications.
 Settings-only events no longer require accompanying volume/mute fields. The app

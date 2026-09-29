@@ -130,6 +130,12 @@ Both modes still enforce local intent deduplication and Sonos confirmation autho
 - Diagnostics and frontend status are redacted and human friendly.
 - Configuration writes are atomic with `.json.tmp` staging and schema validation.
 
+The macOS login adapter treats absent Service Management entries as already
+disabled, including `NotFound` after bundle replacement, and rechecks status
+after failed removal. Registered or unknown states preserve removal errors and
+the existing configuration. This remains shell-only behavior; see
+[ADR 0006](decisions/0006-tauri-shell-and-safe-settings.md).
+
 The protocol adapter uses Reqwest 0.13 and quick-xml 0.42. XML decoding is
 performed by the streaming reader; protocol parsing retains explicit reference
 unescaping and typed errors. See [ADR 0002](decisions/0002-local-sonos-client.md).

@@ -11,6 +11,18 @@ Formerly Sonos Volume Bridge. SVB and svb.miguel.ms stay unchanged. Sonos compat
 
 If the old app runs, Settings displays a persistent warning and synchronization pauses. Quit the old app and select Check again, or wait for the next five-second check. The new app never terminates the old app. If process inspection is unavailable before any conflict was detected, only Diagnostics shows a neutral check-unavailable status; no yellow alert appears. If you know the old app is running, quit it manually. A previously confirmed conflict keeps its warning and pause until absence is confirmed. Native notifications depend on existing OS permission and are sent once per conflict episode.
 
+### macOS Start at login recovery
+
+If disabling Start at login reports “Operation not permitted” after replacing
+the old app, open **System Settings > General > Login Items & Extensions**.
+Under **Open at Login**, remove any **Sonos Volume Bridge** or **Speaker Volume
+Bridge** entry using the minus button. Launch the installed app from Applications
+and retry disabling Start at login. Removing a bundle can leave the saved app
+preference enabled even when its macOS login registration is already absent.
+The login adapter accepts that absent state without attempting removal. Other
+removal failures retain the saved preference and show the recovery steps.
+Application settings do not need to be deleted for this recovery.
+
 ## Engineering and CI responsibilities
 
 CI checks Rust, the frontend, website, workflow contracts and package assembly. CI builds the renamed installers and both new and legacy download filenames. It cannot reserve names, prove a real upgrade, exercise physical Sonos hardware, approve Apple jobs, select an App Store build or confirm Store certification.

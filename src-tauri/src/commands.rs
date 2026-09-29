@@ -371,6 +371,26 @@ mod persistence_tests {
     }
 
     #[test]
+    fn failed_login_item_removal_keeps_the_saved_setting_enabled() {
+        let store = TestStore::new();
+        let previous = AppConfiguration {
+            start_at_login: true,
+            ..AppConfiguration::default()
+        };
+        store.0.save(&previous).unwrap();
+        let next = AppConfiguration {
+            start_at_login: false,
+            ..previous
+        };
+        let result = persist_settings(&store.0, true, next, |enabled| {
+            assert!(!enabled);
+            Err("removal denied".to_owned())
+        });
+        assert_eq!(result.unwrap_err(), "removal denied");
+        assert!(store.0.load_or_default().unwrap().start_at_login);
+    }
+
+    #[test]
     fn explicit_login_changes_are_applied_and_persisted() {
         let store = TestStore::new();
         for (previous, enabled) in [(false, true), (true, false)] {
