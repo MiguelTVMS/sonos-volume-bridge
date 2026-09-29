@@ -92,6 +92,19 @@ test('global half-hour grid supports painting, saving, keyboard editing and noti
   await expect(
     page.getByRole('combobox', { name: 'Night schedule notifications', exact: true }),
   ).toHaveValue('never');
+  const disableLoudness = page.getByRole('switch', {
+    name: 'Disable loudness during Night Shift',
+    exact: true,
+  });
+  await expect(disableLoudness).not.toBeChecked();
+  const schedulePreferences = page.locator(
+    '#night-schedule > .settings-group > label, #night-schedule > .settings-group > .control-field',
+  );
+  await expect(schedulePreferences.nth(0)).toContainText('Enable schedule');
+  await expect(schedulePreferences.nth(1)).toContainText('Disable loudness during Night Shift');
+  await expect(schedulePreferences.nth(2)).toContainText('Night schedule notifications');
+  await disableLoudness.check();
+  await expect(disableLoudness).toBeChecked();
   await expect(page.locator('#schedule-notifications option')).toHaveText([
     'On start',
     'On end',

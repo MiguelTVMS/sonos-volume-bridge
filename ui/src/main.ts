@@ -72,6 +72,8 @@ type Configuration = {
   schemaVersion: number;
   nightModeSchedule?: NightSchedule;
   notifyNightModeScheduleTransitions?: ScheduleNotifications;
+  disableLoudnessDuringNightShift?: boolean;
+  nightShiftLoudnessRestoreSpeakerId?: string | null;
   selectedSonosId: string | null;
   lastKnownSonosAddress: string | null;
   followDefaultAudioDevice: boolean;
@@ -399,6 +401,7 @@ function render(nextSnapshot: Snapshot): void {
     app,
     snapshot?.configuration.nightModeSchedule ?? { enabled: false, blocks: emptyBlocks() },
     snapshot?.configuration.notifyNightModeScheduleTransitions ?? 'never',
+    snapshot?.configuration.disableLoudnessDuringNightShift ?? false,
     {
       save: async (blocks) => {
         if (platform === 'linux') scheduleNotice('');
@@ -410,6 +413,8 @@ function render(nextSnapshot: Snapshot): void {
         notice('');
       },
       enable: async (enabled) => writeSchedule('enable_night_schedule', { enabled }),
+      disableLoudness: async (enabled) =>
+        writeSchedule('set_disable_loudness_during_night_shift', { enabled }),
       notify: async (mode) => writeSchedule('set_schedule_notifications', { mode }),
       error: scheduleNotice,
     },
@@ -919,6 +924,7 @@ function refreshScheduleView(): void {
       (speakerSettings.capabilities?.nightSound === undefined &&
         speakerSettings.nightSound !== null),
     snapshot?.configuration.nightModeSchedule?.enabled ?? false,
+    snapshot?.configuration.disableLoudnessDuringNightShift ?? false,
   );
 }
 if (isTauri()) {

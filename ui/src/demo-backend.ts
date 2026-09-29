@@ -9,6 +9,8 @@ export function createDemoBackend(options: { hour12?: boolean | null; now?: () =
         blocks: Array.from({ length: 7 }, () => Array<boolean>(48).fill(false)),
       },
       notifyNightModeScheduleTransitions: 'never',
+      disableLoudnessDuringNightShift: false,
+      nightShiftLoudnessRestoreSpeakerId: null,
       selectedSonosId: 'sample-speaker',
       lastKnownSonosAddress: null,
       followDefaultAudioDevice: true,
@@ -72,6 +74,11 @@ export function createDemoBackend(options: { hour12?: boolean | null; now?: () =
         snapshot.configuration.notifyNightModeScheduleTransitions = (
           payload as { mode: string }
         ).mode;
+        return snapshot;
+      case 'set_disable_loudness_during_night_shift':
+        snapshot.configuration.disableLoudnessDuringNightShift = (
+          payload as { enabled: boolean }
+        ).enabled;
         return snapshot;
       case 'get_system_hour12':
         return options.hour12 ?? null;

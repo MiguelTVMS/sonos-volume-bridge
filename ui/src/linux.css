@@ -110,6 +110,10 @@
 [data-platform='linux'] .toggle {
   min-height: 64px;
 }
+[data-platform='linux'] .night-schedule > .settings-group:first-child > * {
+  min-height: 53px;
+  padding-block: 11px;
+}
 [data-platform='linux'] .field-row {
   grid-template-columns: minmax(0, 1fr) 34px;
 }

@@ -18,7 +18,7 @@ test('Ubuntu schedule status stays in one row below notifications through save a
     .evaluate((label) => getComputedStyle(label).font);
   await expect(row.locator(':scope > span')).toHaveCSS('font', labelFont);
   await expect(row.locator('#schedule-status')).toHaveText('Schedule disabled.');
-  await expect(row.locator('..').locator(':scope > :nth-child(3)')).toHaveClass(
+  await expect(row.locator('..').locator(':scope > :nth-child(4)')).toHaveClass(
     'schedule-status-row',
   );
   await page.locator('#schedule-enabled').check();
