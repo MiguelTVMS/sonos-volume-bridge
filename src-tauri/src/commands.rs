@@ -266,14 +266,12 @@ pub async fn set_speaker_setting(
     enabled: bool,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let intent = crate::legacy_app::write_intent();
     let configuration = state
         .configuration
         .lock()
         .map_err(|_| "application state is unavailable".to_owned())?
         .clone();
     let gate = state.speaker_gate.lock().await;
-    intent.validate()?;
     let current = state
         .configuration
         .lock()

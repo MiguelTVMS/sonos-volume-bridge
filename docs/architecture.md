@@ -318,8 +318,13 @@ Audio echo suppression retains repeated and overlapping expected local states fo
 See [ADR 0017](decisions/0017-volume-feedback-suppression.md) for platform behavior,
 regression coverage, and the limitations of value-based origin detection.
 
-## Legacy application protection
+## Upgrading from the former app
 
-The desktop shell pauses synchronization and scheduled speaker writes while the old executable is running. Unknown inspection retains an existing pause. Initial inspection failures appear only as a neutral Diagnostics status; the yellow Settings warning requires a previously confirmed running legacy app. Confirmed absence reconciles current configuration without replaying queued commands or restarting user-stopped synchronization. See [decision 0018](decisions/0018-rebrand-and-legacy-protection.md) and [upgrade guidance](rebrand-upgrade.md).
+Users quit and remove the former app before using the renamed app. The shell
+starts synchronization directly and does not inspect other processes, gate writes
+on a legacy-app check, or display a conflict warning. Settings and Night Mode keep
+their normal selection/write serialization and explicit stop behavior. See
+[decision 0018](decisions/0018-rebrand-and-legacy-protection.md) and the
+[manual removal guide](removing-old-app.md).
 
 Windows installer directory migration stays in the NSIS adapter: only the former default folder is relocated; custom directories, data identity and Store identity remain stable. See ADR 0018.

@@ -9,7 +9,15 @@ Formerly Sonos Volume Bridge. SVB and svb.miguel.ms stay unchanged. Sonos compat
 - **Windows:** update the existing installation or the existing Microsoft Store product. The installer migrates the former default installation folder to Speaker Volume Bridge, preserves custom installation paths and settings, and updates shortcuts and startup targets. Do not create a second Store product. Quit the installed app before upgrading. A blocked folder move stops the installer without removing the existing folder; an existing destination is never merged or overwritten.
 - **Linux:** install the new speaker-volume-bridge Debian package. It replaces sonos-volume-bridge; the old shell command remains a compatibility symlink. Check your desktop environment's startup list and remove a manually created duplicate startup entry if present.
 
-If the old app runs, Settings displays a persistent warning and synchronization pauses. Quit the old app and select Check again, or wait for the next five-second check. The new app never terminates the old app. If process inspection is unavailable before any conflict was detected, only Diagnostics shows a neutral check-unavailable status; no yellow alert appears. If you know the old app is running, quit it manually. A previously confirmed conflict keeps its warning and pause until absence is confirmed. Native notifications depend on existing OS permission and are sent once per conflict episode.
+## Remove the old app before using the replacement
+
+Follow the [complete removal guide](removing-old-app.md) for macOS, Windows or
+Linux. It covers quitting the old process, removing startup entries and app
+bundles/packages, and optionally erasing saved settings for a clean reinstall.
+Both names share settings within a distribution, so erase them only when you
+want to reset the renamed app too. Running both versions can cause competing
+volume and Night Mode commands. The application does not detect or pause for
+another installed version.
 
 ### macOS Start at login recovery
 
@@ -27,9 +35,12 @@ Application settings do not need to be deleted for this recovery.
 
 CI checks Rust, the frontend, website, workflow contracts and package assembly. CI builds the renamed installers and both new and legacy download filenames. It cannot reserve names, prove a real upgrade, exercise physical Sonos hardware, approve Apple jobs, select an App Store build or confirm Store certification.
 
-Before release, an engineer must verify clean install and upgrade on macOS, Windows x64/ARM64 and Linux AMD64/ARM64. Confirm preserved settings, stopped/running state, shortcuts, startup preferences, notification activation and uninstall. Test old app present at startup, launched later, exit/recheck, repeated episodes, denied notification permission, unknown inspection and compatibility symlinks. Confirm no speaker or Night Mode writes during a conflict and no replay of queued volume changes. Test multiple renamed instances, demo isolation and real Sonos discovery/control.
-
-**Release is blocked until actual sandboxed Mac App Store and packaged Windows builds pass those checks.** Local tests are not evidence of signed/sandboxed behavior. Keep results in private release evidence.
+Before release, verify clean install and upgrade on macOS, Windows x64/ARM64 and
+Linux AMD64/ARM64. Follow the manual removal guide and confirm the old app no
+longer starts at login. Check retained versus erased preferences, normal startup,
+single-instance behavior, manual speaker controls, Night scheduling, notification
+activation and uninstall. Signed Store and packaged desktop behavior requires
+native validation; unit tests do not establish an installed upgrade outcome.
 
 ## Publication sequence
 

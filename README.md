@@ -1,9 +1,13 @@
 # Speaker Volume Bridge
 
-Formerly **Sonos Volume Bridge**. See the [upgrade guide](docs/rebrand-upgrade.md) before replacing an existing installation.
+> [!WARNING]
+> **Upgrading from Sonos Volume Bridge? Quit and remove the old app first.**
+> Running both apps can cause conflicting volume and Night Mode changes. Follow
+> the [complete old-app removal guide](docs/removing-old-app.md), including login
+> items and optional settings cleanup, before using Speaker Volume Bridge.
 
-
-Formerly **Sonos Volume Bridge**. The new name keeps the same app and settings. See [upgrade instructions](https://svb.miguel.ms/upgrade.html).
+Formerly **Sonos Volume Bridge**. The same app with a new name. See the
+[upgrade guide](docs/rebrand-upgrade.md) to preserve your existing settings.
 
 Control the volume of a Sonos speaker with the volume controls you already use
 on your computer.
@@ -15,7 +19,7 @@ cloud account, Home Assistant, or a separate remote control.
 ## Why use it?
 
 If you use a Sonos speaker while working at your computer, changing the volume
-usually means reaching for the Sonos app or the speaker itself. Sonos Volume
+usually means reaching for the Sonos app or the speaker itself. Speaker Volume
 Bridge connects that speaker to your computer's normal volume controls, so
 keyboard volume keys, system controls, and supported audio-device controls can
 adjust it for you.

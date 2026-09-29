@@ -162,7 +162,6 @@ async fn discover_network() -> Result<Vec<DiscoveredSonos>, String> {
 /// Confirms that the selected speaker accepts a RenderingControl volume write
 /// without changing its currently confirmed volume.
 pub async fn test_selected_device(configuration: AppConfiguration) -> Result<(), String> {
-    let _permit = crate::legacy_app::write_permit().await?;
     let client = SonosClient::builder()
         .timeout(SONOS_TIMEOUT)
         .build()
@@ -212,7 +211,6 @@ pub async fn set_speaker_setting(
     if matches!(setting, SpeakerSetting::NightSound) {
         return crate::night_schedule::set_manual(&configuration, enabled).await;
     }
-    let _permit = crate::legacy_app::write_permit().await?;
     let client = SonosClient::builder()
         .timeout(SONOS_TIMEOUT)
         .build()
@@ -235,7 +233,6 @@ pub async fn set_speaker_level(
     setting: SpeakerSetting,
     value: i8,
 ) -> Result<(), String> {
-    let _permit = crate::legacy_app::write_permit().await?;
     let client = SonosClient::builder()
         .timeout(SONOS_TIMEOUT)
         .build()
@@ -266,7 +263,6 @@ pub async fn set_speaker_level(
     }
 }
 pub async fn use_tv_audio(configuration: AppConfiguration) -> Result<(), String> {
-    let _permit = crate::legacy_app::write_permit().await?;
     let client = SonosClient::builder()
         .timeout(SONOS_TIMEOUT)
         .build()
@@ -758,18 +754,12 @@ impl SonosPort for DeviceSonosPort {
         ))
     }
     async fn set_volume(&self, volume: SonosVolume) -> Result<(), IntegrationError> {
-        let _permit = crate::legacy_app::write_permit()
-            .await
-            .map_err(IntegrationError::Sonos)?;
         self.client
             .set_volume(&self.device, volume)
             .await
             .map_err(|error| IntegrationError::Sonos(error.to_string()))
     }
     async fn set_mute(&self, muted: MuteState) -> Result<(), IntegrationError> {
-        let _permit = crate::legacy_app::write_permit()
-            .await
-            .map_err(IntegrationError::Sonos)?;
         self.client
             .set_mute(&self.device, muted)
             .await
@@ -780,9 +770,6 @@ struct DeviceAudioPort(Arc<dyn SystemAudioController>);
 #[async_trait]
 impl LocalAudioPort for DeviceAudioPort {
     async fn apply(&self, state: LocalAudioState) -> Result<(), IntegrationError> {
-        let _permit = crate::legacy_app::write_permit()
-            .await
-            .map_err(IntegrationError::Audio)?;
         let current = self
             .0
             .current_state()
@@ -865,7 +852,6 @@ fn update_snapshot(
 
 fn status_name(status: &UiStatus) -> &'static str {
     match status {
-        UiStatus::LegacyAppRunning => "legacy_app_running",
         UiStatus::Discovering => "discovering",
         UiStatus::Connecting => "connecting",
         UiStatus::Synchronized => "synchronized",
