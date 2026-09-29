@@ -586,17 +586,3 @@ button.icon-button {
 .schedule-editor-content p {
   margin: 0;
 }
-
-.legacy-alert {
-  margin: 12px 0;
-  padding: 14px;
-  border: 1px solid #b7791f;
-  border-radius: 8px;
-  background: color-mix(in srgb, #e6a23c 14%, transparent);
-}
-.legacy-alert[hidden] {
-  display: none;
-}
-.legacy-alert p {
-  margin: 8px 0;
-}

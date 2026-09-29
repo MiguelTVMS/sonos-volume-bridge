@@ -359,13 +359,38 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn normal_schedule_worker_and_commands_lock_demo_speaker_after_enable() {
+    async fn speaker_commands_and_schedule_work_without_process_inspection() {
         let speaker = speaker().await.unwrap();
         let configuration = AppConfiguration {
             selected_sonos_id: Some(SPEAKER_ID.into()),
             last_known_sonos_address: Some(speaker.location.to_string()),
             ..AppConfiguration::default()
         };
+        // Exercise the production write adapters before any background worker:
+        // manual controls do not depend on a process check to allow writes.
+        runtime::test_selected_device(configuration.clone())
+            .await
+            .unwrap();
+        runtime::set_speaker_setting(
+            configuration.clone(),
+            runtime::SpeakerSetting::Loudness,
+            false,
+        )
+        .await
+        .unwrap();
+        runtime::set_speaker_level(configuration.clone(), runtime::SpeakerSetting::Bass, -3)
+            .await
+            .unwrap();
+        runtime::use_tv_audio(configuration.clone()).await.unwrap();
+        let settings = runtime::speaker_settings(configuration.clone()).await;
+        assert_eq!(settings.loudness, Some(false));
+        assert_eq!(settings.bass, Some(-3));
+        assert_eq!(
+            runtime::audio_input_format(configuration.clone())
+                .await
+                .as_deref(),
+            Some("Stereo")
+        );
         let directory =
             std::env::temp_dir().join(format!("sonos-demo-schedule-test-{}", std::process::id()));
         let store = ConfigStore::new(directory.join("config.json"));

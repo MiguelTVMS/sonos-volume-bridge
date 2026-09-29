@@ -33,3 +33,19 @@ login-service changes and filesystem writes are not one atomic transaction.
 Regression tests cover a missing configuration file with an unavailable login
 service, unchanged enabled login settings, rejected explicit changes, and both
 successful login transitions.
+
+On macOS, disabling is idempotent for both `NotRegistered` and `NotFound`.
+Service Management can report `NotFound` for a fresh or replaced app bundle and
+return `SMAppServiceErrorDomain` code 1 if asked to unregister that absent item.
+After an unregister failure, reread status to allow concurrent removal by System
+Settings or macOS cleanup. Only these absent states permit saving the disabled
+preference; registered, approval-required and unknown states retain errors.
+Enabling still requires registration unless the service is already enabled.
+Removal failures show a readable description and the System Settings recovery
+path, including the former app name, instead of an Objective-C debug dump.
+
+Adapter regressions cover absent entries, concurrent removal, denied removal,
+revoked approval and enabling. Persistence coverage verifies that a failed
+removal keeps the saved preference enabled. Native temporary-bundle checks
+reproduced the absent-item error; this does not establish the exact prior state
+of an affected installed app.

@@ -4,7 +4,6 @@ mod commands;
 mod config;
 #[cfg(any(test, feature = "ui-demo"))]
 mod demo;
-mod legacy_app;
 mod logging;
 mod night_schedule;
 mod runtime;
@@ -138,7 +137,7 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
             schedule_notifications::install(app.handle());
             #[cfg(windows)]
             schedule_notifications::install_windows(app.handle());
-            legacy_app::start(app.handle().clone());
+            app.state::<AppState>().start_runtime(app.handle().clone());
             night_schedule::start(app.handle().clone());
             if ui_demo_enabled()
                 && let Some(window) = app.get_webview_window("main")
@@ -154,9 +153,6 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
             ui_demo_enabled,
             ui_demo_platform,
             commands::get_snapshot,
-            legacy_app::get_legacy_status,
-            legacy_app::recheck_legacy_app,
-            legacy_app::open_legacy_upgrade,
             commands::get_system_hour12,
             commands::save_night_schedule,
             commands::enable_night_schedule,
@@ -185,7 +181,6 @@ fn handle_window_event<R: tauri::Runtime>(window: &tauri::Window<R>, event: &tau
             let _ = window.hide();
             api.prevent_close();
         }
-        tauri::WindowEvent::Focused(true) => legacy_app::request_check(),
         tauri::WindowEvent::ThemeChanged(theme) => {
             tray::update_icon_for_theme(window.app_handle(), *theme);
         }

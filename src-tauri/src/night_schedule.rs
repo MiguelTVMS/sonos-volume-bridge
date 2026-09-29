@@ -23,7 +23,6 @@ pub struct ScheduleStatus {
     pub notifications_blocked: bool,
 }
 struct Port {
-    intent: crate::legacy_app::WriteIntent,
     client: SonosClient,
     device: SonosDevice,
 }
@@ -38,7 +37,6 @@ impl NightModePort for Port {
         }
     }
     async fn write(&self, value: bool) -> Result<(), String> {
-        let _permit = self.intent.permit().await?;
         self.client
             .set_eq(&self.device, "NightMode", value)
             .await
@@ -46,17 +44,12 @@ impl NightModePort for Port {
     }
 }
 async fn port(configuration: &AppConfiguration) -> Option<Port> {
-    let intent = crate::legacy_app::write_intent();
     let client = SonosClient::builder()
         .timeout(Duration::from_secs(3))
         .build()
         .ok()?;
     let device = runtime::resolve_device(&client, configuration).await.ok()?;
-    Some(Port {
-        intent,
-        client,
-        device,
-    })
+    Some(Port { client, device })
 }
 pub async fn supported(configuration: &AppConfiguration) -> bool {
     if let Some(port) = port(configuration).await {
@@ -92,16 +85,6 @@ pub fn start<R: Runtime>(app: AppHandle<R>) {
             let state = app.state::<AppState>();
             if state.schedule_stopped.load(Ordering::Relaxed) {
                 return;
-            }
-            if crate::legacy_app::paused() {
-                publish(
-                    &app,
-                    ScheduleStatus {
-                        message: crate::legacy_app::MESSAGE.into(),
-                        ..Default::default()
-                    },
-                );
-                continue;
             }
             let gate = state.speaker_gate.lock().await;
             let Ok(configuration) = state.configuration.lock().map(|c| c.clone()) else {

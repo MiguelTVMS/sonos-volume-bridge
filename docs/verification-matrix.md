@@ -603,9 +603,18 @@ Repeat an in-place update and verify notification delivery remains available.
 Automated tests isolate installation lookup from real machine registry state and
 do not prove native shell cache refresh or elevation/account behavior.
 
-## Legacy warning visibility regression
+## Manual rebrand cleanup and normal startup
 
-On a clean install or a sandboxed build with no detected legacy process, open Settings and navigate Devices, Speaker, General, Diagnostics and About. No yellow legacy warning should appear; unavailable inspection is shown only in Diagnostics. Start the legacy app and confirm the warning and pause; if inspection subsequently becomes unavailable, the previous conflict remains paused with accurate wording. Exit the legacy app and recheck to recover. Cross-platform browser regression coverage exercises the production alert renderer with unknown, clear and confirmed conflict states; native sandbox process inspection remains a separate manual check.
+Follow the [old-app removal guide](removing-old-app.md) on each supported desktop.
+Check startup-entry removal, preserved preferences during an ordinary upgrade,
+and optional preference deletion during a clean reinstall. Launch the renamed
+app and verify synchronization starts without a process-inspection step. Navigate
+Settings, save preferences, use manual speaker controls and apply a Night schedule;
+no legacy warning or diagnostics field should remain. Existing Night Mode locks
+and explicit Stop behavior must still work. Browser regressions cover Settings
+navigation and saves, while the loopback speaker test exercises production manual
+commands and the scheduler. Native installed startup and cleanup remain separate
+manual checks.
 
 ## Renamed Windows installation directory
 

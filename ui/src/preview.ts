@@ -34,13 +34,3 @@ if (appearance === 'light' || appearance === 'dark') {
   }
   document.documentElement.style.colorScheme = appearance;
 }
-
-// Preview-only conflict states never inspect or affect real processes.
-const legacy = new URLSearchParams(location.search).get('legacy');
-if (legacy === 'running' || legacy === 'unknown') {
-  const { updateLegacyAlert } = await import('./legacy-alert');
-  updateLegacyAlert({
-    status: legacy === 'running' ? 'legacyRunning' : 'unknown',
-    paused: legacy === 'running',
-  });
-}
