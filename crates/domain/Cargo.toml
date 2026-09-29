@@ -1,6 +1,6 @@
 [package]
-name = "sonos-volume-bridge-domain"
-description = "Pure domain types and policies for SonosVolumeBridge"
+name = "speaker-volume-bridge-domain"
+description = "Pure domain types and policies for SpeakerVolumeBridge"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

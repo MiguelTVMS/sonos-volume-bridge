@@ -9,13 +9,13 @@ destinations=()
 
 # Validate the complete set before moving anything. Accept normalized files on retry.
 for suffix in "${suffixes[@]}"; do
-  source_path="$assets_dir/sonos-volume-bridge-$release_tag-$suffix"
+  source_path="$assets_dir/speaker-volume-bridge-$release_tag-$suffix"
   destination_suffix="$suffix"
   if [[ "$suffix" == linux-amd64.deb ]]; then
     # Debian metadata uses amd64; public downloads consistently use x64.
     destination_suffix=linux-x64.deb
   fi
-  destination_path="$assets_dir/sonos-volume-bridge-$destination_suffix"
+  destination_path="$assets_dir/speaker-volume-bridge-$destination_suffix"
   if [[ ! -e "$source_path" ]]; then
     source_path="$destination_path"
   fi
@@ -30,4 +30,9 @@ for index in "${!sources[@]}"; do
   if [[ "${sources[$index]}" != "${destinations[$index]}" ]]; then
     mv "${sources[$index]}" "${destinations[$index]}"
   fi
+done
+
+# Preserve existing latest-download URLs after the repository redirect.
+for destination in "${destinations[@]}"; do
+  cp "$destination" "${destination%/*}/sonos-volume-bridge-${destination##*/speaker-volume-bridge-}"
 done

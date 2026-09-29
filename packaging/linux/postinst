@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+if [ "$1" = configure ]; then
+  if [ ! -e /usr/bin/sonos-volume-bridge ] || [ -L /usr/bin/sonos-volume-bridge ]; then
+    ln -sfn speaker-volume-bridge /usr/bin/sonos-volume-bridge
+  fi
+fi

@@ -136,11 +136,43 @@ class ReleaseWorkflowTests(unittest.TestCase):
                     for failure in ('failure', 'cancelled', 'skipped'):
                         self.assertFalse(permitted(results | {job: failure}, selected))
 
+    def test_draft_release_flags_and_downstream_publication_gates(self):
+        graph = jobs(WORKFLOW.read_text())
+        body = graph['publish-release']
+        script = body.split('          release_flags=()', 1)[1].split('          release_intro=', 1)[0]
+        script = 'release_flags=()\n' + '\n'.join(line[10:] for line in script.splitlines())
+        script += '\nprintf "%s\\n" "${release_flags[@]}"'
+        for channel in ('GA', 'Beta', 'Alpha'):
+            for draft in (False, True):
+                result = subprocess.check_output(['bash', '-e', '-c', script], text=True,
+                    env=dict(os.environ, RELEASE_CHANNEL=channel, DRAFT_RELEASE=str(draft).lower()))
+                self.assertEqual('--draft' in result.splitlines(), draft)
+                self.assertEqual('--prerelease' in result.splitlines(), channel != 'GA')
+        for job in ('propose-main-promotion', 'publish-microsoft-store'):
+            expression = re.search(r'    if: \$\{\{ (.*?) \}\}', graph[job])[1]
+            for draft in (False, True):
+                value = expression.replace('cancelled()', 'False')
+                value = value.replace('inputs.draft_release', str(draft))
+                value = value.replace('inputs.channel', repr('GA'))
+                value = value.replace('inputs.publish_microsoft_store', 'True')
+                value = re.sub(r'needs\.[\w-]+\.result', repr('success'), value)
+                value = value.replace('&&', ' and ').replace('!', ' not ')
+                self.assertEqual(eval(value.strip(), {'__builtins__': {}}, {}), not draft, job)
+
+    def test_draft_run_cannot_overwrite_a_public_release(self):
+        body = jobs(WORKFLOW.read_text())['publish-release']
+        guard = body.split('            if [ "$DRAFT_RELEASE"', 1)[1].split('            gh release upload', 1)[0]
+        script = 'gh() { echo "$EXISTING_DRAFT"; }\nif [ "$DRAFT_RELEASE"' + guard
+        for existing, expected in (('true', 0), ('false', 1)):
+            result = subprocess.run(['bash', '-eu', '-c', script], capture_output=True,
+                env=dict(os.environ, DRAFT_RELEASE='true', EXISTING_DRAFT=existing, RELEASE_TAG='v1.6.0'))
+            self.assertEqual(result.returncode, expected, result.stderr)
+
     def test_macos_publishes_only_the_verified_dmg(self):
         body = jobs(WORKFLOW.read_text())['macos-direct']
         self.assertNotIn('macos.zip', body)
         self.assertNotIn('Archive the notarized app bundle', body)
-        self.assertIn('sonos-volume-bridge-*-macos.dmg', body)
+        self.assertIn('speaker-volume-bridge-*-macos.dmg', body)
         self.assertIn('xcrun stapler validate "$image"', body)
         self.assertIn('hdiutil verify "$image"', body)
 

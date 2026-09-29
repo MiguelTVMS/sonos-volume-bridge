@@ -60,7 +60,7 @@ try {
     $upload = Join-Path $temporary 'upload'
     New-Item -ItemType Directory -Path $inputs, $upload | Out-Null
     foreach ($package in $packages) { Copy-Item -LiteralPath $package.FullName -Destination $inputs }
-    $bundle = Join-Path $upload 'SonosVolumeBridge.msixbundle'
+    $bundle = Join-Path $upload 'SpeakerVolumeBridge.msixbundle'
     & $makeAppx bundle /d $inputs /p $bundle /bv $version /o
     if ($LASTEXITCODE -ne 0) { throw 'MSIX bundle creation failed.' }
 
@@ -74,7 +74,7 @@ try {
             throw 'Bundle did not preserve both architecture packages.'
         }
     }
-    $archivePath = Join-Path $temporary 'SonosVolumeBridge.msixupload'
+    $archivePath = Join-Path $temporary 'SpeakerVolumeBridge.msixupload'
     [System.IO.Compression.ZipFile]::CreateFromDirectory($upload, $archivePath)
     New-Item -ItemType Directory -Path (Split-Path -Parent $OutputPath) -Force | Out-Null
     Move-Item -LiteralPath $archivePath -Destination $OutputPath -Force

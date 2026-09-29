@@ -512,7 +512,7 @@ minimum/default window sizes.
 
 On a fresh Windows user profile, launch with `cargo tauri dev` without demo features.
 Choose a compatible speaker, select On start and end, and save a block covering
-the current time. Confirm a Sonos Volume Bridge notification, then save an empty
+the current time. Confirm a Speaker Volume Bridge notification, then save an empty
 grid and confirm the off notification. Enable a schedule spanning the next
 half-hour boundary and verify a single start/end notification at matching
 boundaries. Repeat with On start, On end and Never to check filtering. Repeat
@@ -533,7 +533,7 @@ sender through the initial permission check and Save/start/end delivery, and
 preserves denied/unavailable outcomes. Removing first-use preregistration fails
 that regression. Existing integration tests cover schedule boundary/filter policy.
 
-The opt-in `cargo test -p sonos-volume-bridge native_development_notification_smoke
+The opt-in `cargo test -p speaker-volume-bridge native_development_notification_smoke
 -- --ignored --nocapture` sends a real Windows test notification and checks native
 API success. It passed locally after the fix. Automated success does not prove a
 visible banner, native WebView layout, hardware timing or packaged delivery;
@@ -582,7 +582,7 @@ visible in Windows Installed apps. Run the installer through the existing Window
 Explorer desktop instead, preserving configuration when moving between redirected
 and normal locations. Check the uninstall DisplayName through the independent
 Windows registry provider, then reopen Settings > Apps > Installed apps and search
-for Sonos Volume Bridge. Confirm its uninstall action is available and that no
+for Speaker Volume Bridge. Confirm its uninstall action is available and that no
 desktop shortcut is created. This is an installation-context verification step;
 the NSIS template already writes the normal uninstall metadata.
 
@@ -602,3 +602,23 @@ verify both native notification registrations disappear without manual cleanup.
 Repeat an in-place update and verify notification delivery remains available.
 Automated tests isolate installation lookup from real machine registry state and
 do not prove native shell cache refresh or elevation/account behavior.
+
+## Legacy warning visibility regression
+
+On a clean install or a sandboxed build with no detected legacy process, open Settings and navigate Devices, Speaker, General, Diagnostics and About. No yellow legacy warning should appear; unavailable inspection is shown only in Diagnostics. Start the legacy app and confirm the warning and pause; if inspection subsequently becomes unavailable, the previous conflict remains paused with accurate wording. Exit the legacy app and recheck to recover. Cross-platform browser regression coverage exercises the production alert renderer with unknown, clear and confirmed conflict states; native sandbox process inspection remains a separate manual check.
+
+## Renamed Windows installation directory
+
+On x64 and ARM64, install an older direct-download build into its default folder,
+set preferences and enable startup, then quit it and run the new installer.
+The directory page must propose Speaker Volume Bridge. Verify files move, settings
+persist, one installed-app entry remains, shortcuts and startup launch the new
+executable, existing notification activation works before/after first launch, and
+uninstall removes the new installation. Repeat with startup disabled, a custom
+installation directory (retained), the already-renamed executable in the old
+folder, and a clean install. Cancel on the directory page and verify no move.
+With an occupied destination or a locked source, installation must abort and
+preserve the source. The NSIS harness executes production location-selection and
+move functions on both Windows CI architectures, including collision and locked
+source cases. Native full-installer, login and toast checks remain manual gates;
+macOS-hosted tests do not establish Windows behavior.

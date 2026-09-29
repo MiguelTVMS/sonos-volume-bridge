@@ -80,19 +80,19 @@ jobs:
         run: cargo tauri build --bundles app
       - name: Verify the signed and notarized app
         run: |
-          app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
+          app_path='target/release/bundle/macos/Speaker Volume Bridge.app'
           ./scripts/verify-macos-artifact.sh direct "$app_path"
           xcrun stapler validate "$app_path"
           spctl --assess --type execute --verbose=4 "$app_path"
       - name: Archive the verified app bundle
         run: |
           ditto -c -k --sequesterRsrc --keepParent \
-            'target/release/bundle/macos/Sonos Volume Bridge.app' \
-            "sonos-volume-bridge-${GITHUB_SHA}-macos-verification.zip"
+            'target/release/bundle/macos/Speaker Volume Bridge.app' \
+            "speaker-volume-bridge-${GITHUB_SHA}-macos-verification.zip"
       - uses: actions/upload-artifact@v7
         with:
           name: macos-signing-verification
-          path: sonos-volume-bridge-*-macos-verification.zip
+          path: speaker-volume-bridge-*-macos-verification.zip
           if-no-files-found: error
       - name: Remove temporary Apple credentials
         if: always()

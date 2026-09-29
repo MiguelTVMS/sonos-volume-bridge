@@ -13,7 +13,7 @@ pub(super) fn install<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
         .config()
         .product_name
         .clone()
-        .unwrap_or_else(|| "Sonos Volume Bridge".into());
+        .unwrap_or_else(|| "Speaker Volume Bridge".into());
     let app = app.clone();
     activation::set_open_settings(move || {
         let handle = app.clone();
@@ -128,7 +128,7 @@ impl Transport for Native {
         // Windows cannot read Setting until an unpackaged app has sent its first toast.
         // Follow the Windows Community Toolkit's silent preregistration sequence.
         let xml = XmlDocument::new()?;
-        xml.LoadXml(&HSTRING::from("<toast><visual><binding template=\"ToastGeneric\"><text>Sonos Volume Bridge</text></binding></visual><audio silent=\"true\"/></toast>"))?;
+        xml.LoadXml(&HSTRING::from("<toast><visual><binding template=\"ToastGeneric\"><text>Speaker Volume Bridge</text></binding></visual><audio silent=\"true\"/></toast>"))?;
         let toast = ToastNotification::CreateToastNotification(&xml)?;
         let tag = HSTRING::from("svb-register");
         toast.SetSuppressPopup(true)?;
@@ -344,8 +344,11 @@ mod tests {
     #[test]
     #[ignore = "Displays a native Windows toast; run manually on an interactive desktop"]
     fn native_development_notification_smoke() {
-        let notifier =
-            notifier("ms.miguel.sonosvolumebridge.desktop", "Sonos Volume Bridge").unwrap();
+        let notifier = notifier(
+            "ms.miguel.sonosvolumebridge.desktop",
+            "Speaker Volume Bridge",
+        )
+        .unwrap();
         assert!(
             notifier.permitted(),
             "Windows notifications must be enabled for the development host: {:?}",
@@ -353,7 +356,7 @@ mod tests {
         );
         notifier
             .send(
-                "Sonos Volume Bridge",
+                "Speaker Volume Bridge",
                 "Windows night schedule notification test.",
             )
             .unwrap();

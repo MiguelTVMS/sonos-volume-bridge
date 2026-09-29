@@ -1,6 +1,6 @@
 //! Optional Night Mode orchestration, independent from volume synchronization.
 use async_trait::async_trait;
-use sonos_volume_bridge_domain::NightModeSchedule;
+use speaker_volume_bridge_domain::NightModeSchedule;
 
 pub const LOCK_MESSAGE: &str =
     "Night Mode is on because of your schedule. Disable the schedule to turn Night Mode off.";

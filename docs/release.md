@@ -200,11 +200,11 @@ The GitHub Release publishing job runs `scripts/prepare-release-downloads.sh`
 to rename build outputs to five permanent filenames, with one file per package.
 The release tag identifies the version; duplicate versioned files are not uploaded:
 
-- `sonos-volume-bridge-macos.dmg` (website download)
-- `sonos-volume-bridge-windows-x64-unsigned.exe`
-- `sonos-volume-bridge-windows-arm64-unsigned.exe`
-- `sonos-volume-bridge-linux-x64.deb`
-- `sonos-volume-bridge-linux-arm64.deb`
+- `speaker-volume-bridge-macos.dmg` (website download)
+- `speaker-volume-bridge-windows-x64-unsigned.exe`
+- `speaker-volume-bridge-windows-arm64-unsigned.exe`
+- `speaker-volume-bridge-linux-x64.deb`
+- `speaker-volume-bridge-linux-arm64.deb`
 
 The website uses `releases/latest/download/<filename>` so stable downloads follow
 the latest non-prerelease without a website deployment. Missing or empty source
@@ -312,3 +312,33 @@ package. Accept that representation only when its uploaded filename and version
 match the retained artifact and local verification confirms both embedded x64
 and ARM64 packages. Neutral alone does not prove architecture coverage. This
 submission check does not establish certification or public availability.
+
+## Hold the rebrand release for native validation
+
+For the first renamed release, dispatch Release from `develop` with `bump=Minor`,
+`channel=GA`, `draft_release=true`, `build_app_store=true` and
+`publish_microsoft_store=false`. Signing approvals still apply. The workflow
+produces a private draft GitHub release and Actions artifacts; it skips main
+promotion and automatic Store submission even if Store submission is selected.
+A draft run refuses to overwrite an existing public release.
+
+Download the artifacts and complete the native checks in [the upgrade guide](rebrand-upgrade.md).
+After those checks pass, publish the existing draft and prepare the normal
+reviewed main-promotion PR for that exact release. Do not rerun the version-bump
+workflow just to publish the draft: that would increment the version again.
+Complete both Store submissions manually with the verified packages.
+
+### Signing wait timer maintenance
+
+GitHub environment wait timers are repository settings, not workflow delays.
+After review, preview the maintenance operation with
+`python3 scripts/remove-signing-wait.py --repo OWNER/REPOSITORY`.
+An administrator can use the same command with `--apply` to remove the wait timers
+from the two Apple signing environments. It reads and preserves existing required
+reviewers, self-review policy and deployment branch policy, then verifies the
+result. Existing secrets and branch/tag rules are not rewritten. An unexpected
+configuration or concurrent edit stops the operation. If one environment update
+fails, inspect both before retrying; updates are not atomic across environments.
+This is an explicit administrative step after PR approval: merging the PR does
+not change live settings or initiate a release. See GitHub's
+[environment API](https://docs.github.com/en/rest/deployments/environments#create-or-update-an-environment).

@@ -35,7 +35,7 @@ body:
     id: install_method
     attributes:
       label: Installation method
-      description: How was Sonos Volume Bridge installed?
+      description: How was Speaker Volume Bridge installed?
       options:
         - Windows installer (NSIS/EXE)
         - Microsoft Store (MSIX)

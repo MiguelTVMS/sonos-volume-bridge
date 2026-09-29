@@ -5,7 +5,7 @@
       "name": "Tauri: Debug desktop app",
       "type": "cppvsdbg",
       "request": "launch",
-      "program": "${workspaceFolder}\\target\\debug\\sonos-volume-bridge.exe",
+      "program": "${workspaceFolder}\\target\\debug\\speaker-volume-bridge.exe",
       "cwd": "${workspaceFolder}",
       "preLaunchTask": "Tauri: build debug",
       "console": "integratedTerminal",

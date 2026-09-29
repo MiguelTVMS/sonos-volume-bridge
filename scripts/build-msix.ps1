@@ -14,7 +14,7 @@ $packageSource = Join-Path $repositoryRoot 'packaging\windows-msix'
 . (Join-Path $PSScriptRoot 'windows-architecture.ps1')
 
 if ([string]::IsNullOrWhiteSpace($ExecutablePath)) {
-    $ExecutablePath = Join-Path $targetRoot 'release\sonos-volume-bridge.exe'
+    $ExecutablePath = Join-Path $targetRoot 'release\speaker-volume-bridge.exe'
 }
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $targetRoot 'release\bundle\msix'
@@ -45,9 +45,9 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Cargo metadata failed.'
 }
 $metadata = $metadataText | ConvertFrom-Json
-$applicationPackage = $metadata.packages | Where-Object { $_.name -eq 'sonos-volume-bridge' }
+$applicationPackage = $metadata.packages | Where-Object { $_.name -eq 'speaker-volume-bridge' }
 if ($null -eq $applicationPackage) {
-    throw 'The sonos-volume-bridge package was not found in cargo metadata.'
+    throw 'The speaker-volume-bridge package was not found in cargo metadata.'
 }
 
 $semanticVersion = [System.Management.Automation.SemanticVersion]::Parse($applicationPackage.version)
@@ -86,7 +86,7 @@ foreach ($directory in @($stagingDirectory, $verificationDirectory)) {
 
 $assetsDirectory = Join-Path $stagingDirectory 'Assets'
 New-Item -ItemType Directory -Path $assetsDirectory | Out-Null
-Copy-Item -LiteralPath $ExecutablePath -Destination (Join-Path $stagingDirectory 'sonos-volume-bridge.exe')
+Copy-Item -LiteralPath $ExecutablePath -Destination (Join-Path $stagingDirectory 'speaker-volume-bridge.exe')
 Copy-Item -LiteralPath (Join-Path $packageSource 'Assets\StoreLogo.png') -Destination $assetsDirectory
 Copy-Item -LiteralPath (Join-Path $packageSource 'Assets\Square44x44Logo.png') -Destination $assetsDirectory
 Copy-Item -LiteralPath (Join-Path $packageSource 'Assets\Square150x150Logo.png') -Destination $assetsDirectory
@@ -97,7 +97,7 @@ $manifestPath = Join-Path $stagingDirectory 'AppxManifest.xml'
 Set-Content -LiteralPath $manifestPath -Value $manifest -Encoding utf8NoBOM
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
-$packagePath = Join-Path $OutputDirectory "SonosVolumeBridge_${msixVersion}_${Architecture}.msix"
+$packagePath = Join-Path $OutputDirectory "SpeakerVolumeBridge_${msixVersion}_${Architecture}.msix"
 if (Test-Path -LiteralPath $packagePath) {
     Remove-Item -LiteralPath $packagePath -Force
 }
@@ -124,7 +124,7 @@ if ($identity.Name -ne 'Miguel.MS.SonosVolumeBridge' -or
     $language.Language -ne 'en-US') {
     throw 'The generated package identity, version, architecture, or language is invalid.'
 }
-if (-not (Test-Path -LiteralPath (Join-Path $verificationDirectory 'sonos-volume-bridge.exe') -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath (Join-Path $verificationDirectory 'speaker-volume-bridge.exe') -PathType Leaf)) {
     throw 'The generated package does not contain the application executable.'
 }
 

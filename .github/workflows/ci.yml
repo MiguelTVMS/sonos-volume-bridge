@@ -50,6 +50,10 @@ jobs:
               - 'scripts/tests/test_release_downloads.py'
               - 'scripts/tests/test_release_workflow.py'
               - 'scripts/tests/test_linux_installer.py'
+              - 'scripts/tests/test_rebrand_identity.py'
+              - 'scripts/remove-signing-wait.py'
+              - 'scripts/tests/test_signing_wait.py'
+              - 'packaging/linux/**'
               - 'pages/index.html'
               - '.github/workflows/ci.yml'
               - '.github/workflows/release-candidate.yml'
@@ -74,6 +78,7 @@ jobs:
               - 'scripts/tests/test-msix-upload.ps1'
               - 'scripts/tests/test-windows-architecture.ps1'
               - 'scripts/tests/test-windows-uninstall.ps1'
+              - 'scripts/tests/test-windows-install-directory.ps1'
               - 'packaging/windows-msix/**'
             ui:
               - 'ui/**'
@@ -95,6 +100,8 @@ jobs:
       - run: python3 -m unittest discover -s scripts/tests -p test_release_workflow.py
       - run: python3 -m unittest discover -s scripts/tests -p test_store_upload.py
       - run: python3 -m unittest discover -s scripts/tests -p test_linux_installer.py
+      - run: python3 -m unittest discover -s scripts/tests -p test_rebrand_identity.py
+      - run: python3 -m unittest discover -s scripts/tests -p test_signing_wait.py
 
   rust:
     name: Rust (${{ matrix.os }})
@@ -118,10 +125,10 @@ jobs:
       - if: runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/tests/test-windows-architecture.ps1
-      - run: cargo check -p sonos-volume-bridge --features ui-demo
-      - run: cargo check -p sonos-volume-bridge --features ui-windows
-      - run: cargo check -p sonos-volume-bridge --features ui-macos
-      - run: cargo check -p sonos-volume-bridge --features ui-ubuntu
+      - run: cargo check -p speaker-volume-bridge --features ui-demo
+      - run: cargo check -p speaker-volume-bridge --features ui-windows
+      - run: cargo check -p speaker-volume-bridge --features ui-macos
+      - run: cargo check -p speaker-volume-bridge --features ui-ubuntu
       - uses: pnpm/action-setup@v6
         if: runner.os == 'Windows'
         with:
@@ -138,7 +145,7 @@ jobs:
       - name: Package native Store MSIX for combined upload verification
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./scripts/build-msix.ps1 -ExecutablePath target/debug/sonos-volume-bridge.exe -Architecture '${{ runner.arch }}'
+        run: ./scripts/build-msix.ps1 -ExecutablePath target/debug/speaker-volume-bridge.exe -Architecture '${{ runner.arch }}'
       - uses: actions/upload-artifact@v7
         if: runner.os == 'Windows'
         with:
@@ -149,6 +156,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/tests/test-windows-uninstall.ps1
+      - name: Windows install directory migration regression
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/tests/test-windows-install-directory.ps1
 
   windows-store-upload:
     name: Combined Microsoft Store upload regression
@@ -204,8 +215,8 @@ jobs:
       - run: pnpm run ci:rustfmt
       - run: pnpm run ci:clippy
       - run: pnpm run ci:test
-      - run: cargo clippy -p sonos-volume-bridge --all-targets --features ui-demo -- -D warnings
-      - run: cargo test -p sonos-volume-bridge --features ui-demo
+      - run: cargo clippy -p speaker-volume-bridge --all-targets --features ui-demo -- -D warnings
+      - run: cargo test -p speaker-volume-bridge --features ui-demo
 
   frontend:
     name: Frontend
@@ -232,3 +243,4 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: ./scripts/verify-macos-packaging-config.sh
+      - run: python3 scripts/check-legacy-identifiers.py

@@ -50,12 +50,18 @@ Older releases do not gain these files automatically.
 
 ## Search and assistant discovery
 
-The canonical origin is `https://svb.miguel.ms`. Both HTML pages declare canonical,
+The canonical origin is `https://svb.miguel.ms`. All three HTML pages declare canonical,
 Open Graph, social-card, and JSON-LD metadata. The sitemap lists only canonical
 HTML pages. robots.txt allows crawling and links to the sitemap. llms.txt is a
 curated project guide, an emerging convention rather than a ranking guarantee.
 Keep its claims consistent with the visible page and privacy policy. No ratings,
 reviews, or unverified compatibility claims are added to structured data.
+
+The application schema retains the former product name as `alternateName` for
+the rebrand. Social images include their actual dimensions and accessible text.
+Run `python3 -m unittest discover -s scripts/tests -p test_website_seo.py` to
+check metadata consistency, sitemap coverage, image dimensions, and local links
+and fragments. The website validation workflow runs these checks before merge.
 
 After deployment, submit the sitemap in Google Search Console and Bing Webmaster
 Tools. Validate structured data with their inspection tools. Updating these files
@@ -63,7 +69,7 @@ does not itself submit the site or guarantee indexing or rich results.
 
 ## Markdown versions
 
-Every HTML page has a generated Markdown counterpart (`index.md`, `privacy.md`).
+Every HTML page has a generated Markdown counterpart (`index.md`, `privacy.md`, `upgrade.md`).
 The HTML alternate link and llms.txt point to these files. Run
 `python3 scripts/generate-page-markdown.py` after editing page content, and
 `python3 scripts/generate-page-markdown.py --check` to detect stale copies.
@@ -111,7 +117,7 @@ product because the site publishes with the release. Keep the visible copy and
 llms.txt aligned. The section introduces no tracking or external assets.
 
 The Ubuntu card provides distinct x64 and ARM64 download buttons. The ARM64
-URL targets the next release that includes `sonos-volume-bridge-linux-arm64.deb`;
+URL targets the next release that includes `speaker-volume-bridge-linux-arm64.deb`;
 it will become available after the first GA release containing that asset.
 
 The Windows card likewise provides x64 and ARM64 buttons. Publish both

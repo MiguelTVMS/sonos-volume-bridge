@@ -34,7 +34,7 @@ class LinuxInstallerTests(unittest.TestCase):
                 bundle, package = self.package(root, arch)
                 result = self.collect(root, bundle, arch)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                output = root / f"sonos-volume-bridge-v1.2.3-linux-{arch}.deb"
+                output = root / f"speaker-volume-bridge-v1.2.3-linux-{arch}.deb"
                 self.assertEqual(output.read_bytes(), package.read_bytes())
 
     def test_rejects_wrong_architecture_missing_empty_and_ambiguous_packages(self):
@@ -49,7 +49,7 @@ class LinuxInstallerTests(unittest.TestCase):
                 elif case == "multiple":
                     (bundle / "other.deb").write_bytes(package.read_bytes())
                 self.assertNotEqual(self.collect(root, bundle, "arm64").returncode, 0)
-                self.assertFalse(list(root.glob("sonos-volume-bridge-*.deb")))
+                self.assertFalse(list(root.glob("speaker-volume-bridge-*.deb")))
 
 
 if __name__ == "__main__":

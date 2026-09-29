@@ -10,21 +10,21 @@ use crate::{
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use sonos_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, SonosVolume};
-use sonos_volume_bridge_integration::{
+use speaker_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, SonosVolume};
+use speaker_volume_bridge_integration::{
     Coordinator, IntegrationError, LocalAudioPort, SonosPort, SynchronizationPolicy,
 };
-use sonos_volume_bridge_platform_audio::{
+use speaker_volume_bridge_platform_audio::{
     AudioDeviceSelection, PlatformAudioError, SystemAudioController, SystemAudioEvent,
 };
 #[cfg(any(test, not(feature = "ui-demo")))]
-use sonos_volume_bridge_sonos::SonosId;
+use speaker_volume_bridge_sonos::SonosId;
 #[cfg(not(feature = "ui-demo"))]
-use sonos_volume_bridge_sonos::discover;
-use sonos_volume_bridge_sonos::{
+use speaker_volume_bridge_sonos::discover;
+use speaker_volume_bridge_sonos::{
     CallbackListener, EventDeduplicator, GenaClient, SonosClient, SonosDevice,
 };
-use sonos_volume_bridge_synchronization::Synchronizer;
+use speaker_volume_bridge_synchronization::Synchronizer;
 use std::{
     net::{IpAddr, SocketAddr},
     sync::{Arc, Mutex},
@@ -67,7 +67,7 @@ pub struct AvailableAudioOutput {
 
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 fn map_audio_outputs(
-    devices: Vec<sonos_volume_bridge_platform_audio::AudioOutputDevice>,
+    devices: Vec<speaker_volume_bridge_platform_audio::AudioOutputDevice>,
 ) -> Vec<AvailableAudioOutput> {
     devices
         .into_iter()
@@ -86,19 +86,19 @@ fn map_audio_outputs(
 pub fn available_audio_outputs() -> Result<Vec<AvailableAudioOutput>, String> {
     #[cfg(windows)]
     {
-        sonos_volume_bridge_platform_audio::windows::list_output_devices()
+        speaker_volume_bridge_platform_audio::windows::list_output_devices()
             .map(map_audio_outputs)
             .map_err(|_| "Unable to list local output devices.".to_owned())
     }
     #[cfg(target_os = "macos")]
     {
-        sonos_volume_bridge_platform_audio::macos::list_output_devices()
+        speaker_volume_bridge_platform_audio::macos::list_output_devices()
             .map(map_audio_outputs)
             .map_err(|_| "Unable to list local output devices.".to_owned())
     }
     #[cfg(target_os = "linux")]
     {
-        sonos_volume_bridge_platform_audio::linux::list_output_devices()
+        speaker_volume_bridge_platform_audio::linux::list_output_devices()
             .map(map_audio_outputs)
             .map_err(|_| "Unable to list local output devices.".to_owned())
     }
@@ -162,6 +162,7 @@ async fn discover_network() -> Result<Vec<DiscoveredSonos>, String> {
 /// Confirms that the selected speaker accepts a RenderingControl volume write
 /// without changing its currently confirmed volume.
 pub async fn test_selected_device(configuration: AppConfiguration) -> Result<(), String> {
+    let _permit = crate::legacy_app::write_permit().await?;
     let client = SonosClient::builder()
         .timeout(SONOS_TIMEOUT)
         .build()
@@ -179,7 +180,7 @@ pub async fn test_selected_device(configuration: AppConfiguration) -> Result<(),
         .map_err(|_| "The selected Sonos device rejected the volume test.".to_owned())
 }
 
-pub use sonos_volume_bridge_sonos::SpeakerSettings;
+pub use speaker_volume_bridge_sonos::SpeakerSettings;
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -211,6 +212,7 @@ pub async fn set_speaker_setting(
     if matches!(setting, SpeakerSetting::NightSound) {
         return crate::night_schedule::set_manual(&configuration, enabled).await;
     }
+    let _permit = crate::legacy_app::write_permit().await?;
     let client = SonosClient::builder()
         .timeout(SONOS_TIMEOUT)
         .build()
@@ -233,6 +235,7 @@ pub async fn set_speaker_level(
     setting: SpeakerSetting,
     value: i8,
 ) -> Result<(), String> {
+    let _permit = crate::legacy_app::write_permit().await?;
     let client = SonosClient::builder()
         .timeout(SONOS_TIMEOUT)
         .build()
@@ -263,6 +266,7 @@ pub async fn set_speaker_level(
     }
 }
 pub async fn use_tv_audio(configuration: AppConfiguration) -> Result<(), String> {
+    let _permit = crate::legacy_app::write_permit().await?;
     let client = SonosClient::builder()
         .timeout(SONOS_TIMEOUT)
         .build()
@@ -350,7 +354,12 @@ async fn run_supervisor(
             return;
         }
         update_snapshot(&snapshot, &app, generation, UiStatus::Connecting, None);
-        let result = run_session(&configuration, &snapshot, &app, generation, &mut shutdown).await;
+        let mut cancelled = shutdown.clone();
+        let result = tokio::select! {
+            biased;
+            _ = cancelled.changed() => return,
+            result = run_session(&configuration, &snapshot, &app, generation, &mut shutdown) => result,
+        };
         if *shutdown.borrow() {
             return;
         }
@@ -583,7 +592,7 @@ async fn run_session(
     }
 }
 
-fn renewal_at(subscription: &sonos_volume_bridge_sonos::Subscription) -> Instant {
+fn renewal_at(subscription: &speaker_volume_bridge_sonos::Subscription) -> Instant {
     Instant::now()
         + subscription
             .timeout
@@ -704,21 +713,21 @@ fn create_audio(
     #[cfg(windows)]
     {
         Ok(Arc::new(
-            sonos_volume_bridge_platform_audio::windows::WindowsAudioController::start(selection)
+            speaker_volume_bridge_platform_audio::windows::WindowsAudioController::start(selection)
                 .map_err(RuntimeError::Local)?,
         ))
     }
     #[cfg(target_os = "macos")]
     {
         Ok(Arc::new(
-            sonos_volume_bridge_platform_audio::macos::MacosAudioController::start(selection, 1)
+            speaker_volume_bridge_platform_audio::macos::MacosAudioController::start(selection, 1)
                 .map_err(RuntimeError::Local)?,
         ))
     }
     #[cfg(target_os = "linux")]
     {
         Ok(Arc::new(
-            sonos_volume_bridge_platform_audio::linux::LinuxAudioController::start(selection)
+            speaker_volume_bridge_platform_audio::linux::LinuxAudioController::start(selection)
                 .map_err(RuntimeError::Local)?,
         ))
     }
@@ -749,12 +758,18 @@ impl SonosPort for DeviceSonosPort {
         ))
     }
     async fn set_volume(&self, volume: SonosVolume) -> Result<(), IntegrationError> {
+        let _permit = crate::legacy_app::write_permit()
+            .await
+            .map_err(IntegrationError::Sonos)?;
         self.client
             .set_volume(&self.device, volume)
             .await
             .map_err(|error| IntegrationError::Sonos(error.to_string()))
     }
     async fn set_mute(&self, muted: MuteState) -> Result<(), IntegrationError> {
+        let _permit = crate::legacy_app::write_permit()
+            .await
+            .map_err(IntegrationError::Sonos)?;
         self.client
             .set_mute(&self.device, muted)
             .await
@@ -765,6 +780,9 @@ struct DeviceAudioPort(Arc<dyn SystemAudioController>);
 #[async_trait]
 impl LocalAudioPort for DeviceAudioPort {
     async fn apply(&self, state: LocalAudioState) -> Result<(), IntegrationError> {
+        let _permit = crate::legacy_app::write_permit()
+            .await
+            .map_err(IntegrationError::Audio)?;
         let current = self
             .0
             .current_state()
@@ -847,6 +865,7 @@ fn update_snapshot(
 
 fn status_name(status: &UiStatus) -> &'static str {
     match status {
+        UiStatus::LegacyAppRunning => "legacy_app_running",
         UiStatus::Discovering => "discovering",
         UiStatus::Connecting => "connecting",
         UiStatus::Synchronized => "synchronized",
@@ -864,8 +883,8 @@ fn status_name(status: &UiStatus) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sonos_volume_bridge_domain::NormalizedVolume;
-    use sonos_volume_bridge_sonos::RenderingControlService;
+    use speaker_volume_bridge_domain::NormalizedVolume;
+    use speaker_volume_bridge_sonos::RenderingControlService;
     use tokio::sync::broadcast;
     use url::Url;
 
@@ -957,7 +976,7 @@ mod tests {
 
     #[test]
     fn renewal_happens_before_subscription_expiry() {
-        let subscription = sonos_volume_bridge_sonos::Subscription {
+        let subscription = speaker_volume_bridge_sonos::Subscription {
             id: "uuid:test".to_owned(),
             timeout: Duration::from_secs(10),
         };

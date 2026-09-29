@@ -11,7 +11,7 @@ try {
     & $builder -PackageDirectory $PackageDirectory -OutputPath $output
     $archive = [System.IO.Compression.ZipFile]::OpenRead($output)
     try {
-        if ($archive.Entries.Count -ne 1 -or $archive.Entries[0].Name -ne 'SonosVolumeBridge.msixbundle') {
+        if ($archive.Entries.Count -ne 1 -or $archive.Entries[0].Name -ne 'SpeakerVolumeBridge.msixbundle') {
             throw 'Upload must contain exactly the verified bundle.'
         }
     } finally { $archive.Dispose() }

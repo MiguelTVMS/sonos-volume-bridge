@@ -1,3 +1,4 @@
+import { mountLegacyAlert, installLegacyAlert } from './legacy-alert';
 import {
   scheduleMarkup,
   setSystemHour12,
@@ -161,9 +162,9 @@ let refreshAgain = false;
 let currentNotice = '';
 let appVersion = 'Loading…';
 
-const repositoryUrl = 'https://github.com/MiguelTVMS/sonos-volume-bridge';
+const repositoryUrl = 'https://github.com/MiguelTVMS/speaker-volume-bridge';
 const sonosDisclaimer =
-  'Sonos Volume Bridge is an independent, community-developed project. It is not affiliated with, sponsored by, endorsed by, or supported by Sonos. This application contains no Sonos source code. “Sonos” and related product names are trademarks of their respective owners and are used only to identify compatibility with Sonos products.';
+  'Speaker Volume Bridge is an independent, community-developed project. It is not affiliated with, sponsored by, endorsed by, or supported by Sonos. This application contains no Sonos source code. “Sonos” and related product names are trademarks of their respective owners and are used only to identify compatibility with Sonos products.';
 const mitLicense = `MIT License
 
 Copyright (c) 2026 João Miguel Tabosa Vaz Marques Silva
@@ -317,7 +318,7 @@ function render(nextSnapshot: Snapshot): void {
         <span id="toolbar-section-title" data-tauri-drag-region>${activePage === 'schedule' ? 'Night schedule' : activePage[0].toUpperCase() + activePage.slice(1)}</span>
       </div>
       <aside class="sidebar">
-        <div class="app-heading">${demoMode ? '<p class="demo-indicator">UI demo · simulated devices</p>' : ''}<h1><span class="sonos-name">SONOS</span><span>Volume Bridge</span></h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
+        <div class="app-heading">${demoMode ? '<p class="demo-indicator">UI demo · simulated devices</p>' : ''}<h1><span class="sonos-name">SPEAKER</span><span>Volume Bridge</span></h1><p class="status" id="runtime-status">${escapeHtml(status)}</p></div>
         <nav aria-label="Settings sections">
           ${pageButton('devices', 'Devices')}
           ${pageButton('speaker', 'Speaker')}
@@ -330,6 +331,7 @@ function render(nextSnapshot: Snapshot): void {
         <div class="sidebar-speaker"><span>Speaker</span><b id="runtime-speaker">${escapeHtml(speakerName)}</b></div>
       </aside>
       <form id="settings" class="content">
+        <section id="legacy-alert" class="legacy-alert" role="alert" aria-live="assertive" hidden></section>
         ${panel(
           'devices',
           `<div class="panel-heading"><h2>Devices</h2><p>Choose the speaker and audio output to keep in step.</p></div>
@@ -370,19 +372,20 @@ function render(nextSnapshot: Snapshot): void {
         ${panel(
           'diagnostics',
           `<div class="panel-heading"><h2>Diagnostics</h2><p>Live information about the speaker and audio output.</p></div>
-          <dl class="status-list"><div><dt>Connection</dt><dd id="diagnostic-connection">${escapeHtml(status)}</dd></div><div><dt>Speaker</dt><dd id="diagnostic-speaker">${escapeHtml(speakerName)}</dd></div><div><dt>Speaker volume</dt><dd id="diagnostic-sonos-volume">${volumeText(nextSnapshot.sonosVolume)}</dd></div><div><dt>Speaker input format</dt><dd id="diagnostic-audio-input">Unavailable</dd></div><div><dt>Selected output</dt><dd id="diagnostic-output">${escapeHtml(selectedOutputName(c))}</dd></div><div><dt>Output volume</dt><dd id="diagnostic-local-volume">${volumeText(nextSnapshot.localVolume)}</dd></div><div><dt>Mute</dt><dd id="diagnostic-mute">${muteText(nextSnapshot.muted)}</dd></div><div><dt>Speaker search</dt><dd>${escapeHtml(discoveryStatus)}</dd></div></dl>
+          <dl class="status-list"><div><dt>Connection</dt><dd id="diagnostic-connection">${escapeHtml(status)}</dd></div><div><dt>Speaker</dt><dd id="diagnostic-speaker">${escapeHtml(speakerName)}</dd></div><div><dt>Speaker volume</dt><dd id="diagnostic-sonos-volume">${volumeText(nextSnapshot.sonosVolume)}</dd></div><div><dt>Speaker input format</dt><dd id="diagnostic-audio-input">Unavailable</dd></div><div><dt>Selected output</dt><dd id="diagnostic-output">${escapeHtml(selectedOutputName(c))}</dd></div><div><dt>Output volume</dt><dd id="diagnostic-local-volume">${volumeText(nextSnapshot.localVolume)}</dd></div><div><dt>Mute</dt><dd id="diagnostic-mute">${muteText(nextSnapshot.muted)}</dd></div><div><dt>Speaker search</dt><dd>${escapeHtml(discoveryStatus)}</dd></div><div><dt>Legacy app check</dt><dd id="diagnostic-legacy">Check unavailable</dd></div></dl>
           <details class="technical-details" id="technical-details"${diagnosticDetailsVisible ? ' open' : ''}><summary>Speaker technical details</summary><p>Shows the saved speaker identity and local endpoint for troubleshooting.</p><pre id="diagnostic-payload">${diagnosticDetailsVisible ? 'Loading…' : ''}</pre></details>
           <div class="diagnostics-actions"><button class="secondary" type="button" id="export">Export diagnostics</button><button class="danger" type="button" id="reset">Reset settings</button></div>`,
         )}
         ${panel(
           'about',
           `<div class="panel-heading"><h2>About</h2><p>Version, licensing, and project information.</p></div>
-          <dl class="status-list about-list"><div><dt>Version</dt><dd>${escapeHtml(appVersion)}</dd></div><div><dt>Source code</dt><dd><a href="${repositoryUrl}" target="_blank" rel="noopener noreferrer">github.com/MiguelTVMS/sonos-volume-bridge</a></dd></div><div><dt>License</dt><dd>MIT License © 2026 João Miguel Tabosa Vaz Marques Silva</dd></div></dl>
+          <dl class="status-list about-list"><div><dt>Version</dt><dd>${escapeHtml(appVersion)}</dd></div><div><dt>Source code</dt><dd><a href="${repositoryUrl}" target="_blank" rel="noopener noreferrer">github.com/MiguelTVMS/speaker-volume-bridge</a></dd></div><div><dt>License</dt><dd>MIT License © 2026 João Miguel Tabosa Vaz Marques Silva</dd></div></dl>
           <section class="settings-group about-disclaimer" aria-labelledby="sonos-notice-title"><h3 id="sonos-notice-title">Sonos trademark and independence notice</h3><p>${escapeHtml(sonosDisclaimer)}</p></section><details class="technical-details about-license"><summary>Read the MIT License</summary><pre>${escapeHtml(mitLicense)}</pre></details>`,
         )}
         <output id="notice" aria-live="polite">${escapeHtml(currentNotice)}</output>
       </form>
     </div>`;
+  mountLegacyAlert();
   placeNotice();
   applySpeakerControls(app, speakerSettings, document.activeElement);
   app.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(updateRangeFill);
@@ -954,3 +957,7 @@ async function writeSchedule(
     void refreshAllSettings();
   }
 }
+
+void installLegacyAlert().catch(() => {
+  /* Native status remains available on the next event. */
+});

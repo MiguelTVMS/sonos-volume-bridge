@@ -17,7 +17,7 @@ use crate::{
     SystemAudioEvent,
 };
 use async_trait::async_trait;
-use sonos_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, NormalizedVolume};
+use speaker_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, NormalizedVolume};
 use std::{
     sync::{
         Arc, Mutex,
@@ -57,7 +57,7 @@ pub const APPLICATION_EVENT_CONTEXT: GUID = GUID::from_u128(0x8d0c6f84_7e52_41cb
 /// [`AudioDeviceSelection::Fixed`].
 pub fn list_output_devices() -> Result<Vec<AudioOutputDevice>, PlatformAudioError> {
     let worker = thread::Builder::new()
-        .name("sonos-volume-bridge-output-enumeration".to_owned())
+        .name("speaker-volume-bridge-output-enumeration".to_owned())
         .spawn(list_output_devices_on_worker)
         .map_err(|error| PlatformAudioError::Platform(error.to_string()))?;
     worker.join().map_err(|_| {
@@ -171,7 +171,7 @@ impl WindowsAudioController {
         let shutdown = Arc::new(AtomicBool::new(false));
         let worker_shutdown = Arc::clone(&shutdown);
         let thread = thread::Builder::new()
-            .name("sonos-volume-bridge-core-audio".to_owned())
+            .name("speaker-volume-bridge-core-audio".to_owned())
             .spawn(move || {
                 run_worker(
                     selection,

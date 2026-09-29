@@ -67,7 +67,7 @@ jobs:
           merge-multiple: true
           path: microsoft-store-msix
       - shell: pwsh
-        run: ./scripts/build-msix-upload.ps1 -PackageDirectory microsoft-store-msix -OutputPath store-upload/SonosVolumeBridge.msixupload
+        run: ./scripts/build-msix-upload.ps1 -PackageDirectory microsoft-store-msix -OutputPath store-upload/SpeakerVolumeBridge.msixupload
       - uses: actions/upload-artifact@v7
         with:
           name: microsoft-store-upload

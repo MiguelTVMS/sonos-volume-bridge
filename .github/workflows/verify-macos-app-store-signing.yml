@@ -131,21 +131,21 @@ jobs:
       - name: Build and verify the App Store application
         run: |
           cargo tauri build --bundles app --config src-tauri/tauri.appstore.conf.json --no-sign
-          app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
-          app_executable="$app_path/Contents/MacOS/sonos-volume-bridge"
+          app_path='target/release/bundle/macos/Speaker Volume Bridge.app'
+          app_executable="$app_path/Contents/MacOS/speaker-volume-bridge"
           xattr -cr "$app_path"
           codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" --options runtime --entitlements src-tauri/Entitlements.appstore.plist "$app_executable"
           codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" --options runtime --entitlements src-tauri/Entitlements.appstore.plist "$app_path"
           ./scripts/verify-macos-artifact.sh app-store "$app_path"
-          unsigned_package_path='sonos-volume-bridge-macos-app-store.pkg.unsigned'
+          unsigned_package_path='speaker-volume-bridge-macos-app-store.pkg.unsigned'
           xcrun productbuild --component "$app_path" /Applications "$unsigned_package_path"
-          xcrun productsign --sign "$APPLE_MAC_INSTALLER_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" "$unsigned_package_path" sonos-volume-bridge-macos-app-store.pkg
+          xcrun productsign --sign "$APPLE_MAC_INSTALLER_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" "$unsigned_package_path" speaker-volume-bridge-macos-app-store.pkg
           rm -f "$unsigned_package_path"
-          pkgutil --check-signature sonos-volume-bridge-macos-app-store.pkg 2>&1 | grep -F '3rd Party Mac Developer Installer:'
+          pkgutil --check-signature speaker-volume-bridge-macos-app-store.pkg 2>&1 | grep -F '3rd Party Mac Developer Installer:'
       - uses: actions/upload-artifact@v7
         with:
           name: macos-app-store-signing-verification
-          path: sonos-volume-bridge-macos-app-store.pkg
+          path: speaker-volume-bridge-macos-app-store.pkg
           if-no-files-found: error
       - name: Remove temporary Apple credentials
         if: always()

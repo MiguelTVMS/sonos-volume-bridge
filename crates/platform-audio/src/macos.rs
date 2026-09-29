@@ -19,7 +19,7 @@ use crate::{
     SystemAudioEvent,
 };
 use async_trait::async_trait;
-use sonos_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, NormalizedVolume};
+use speaker_volume_bridge_domain::{LocalAudioState, LocalOrigin, MuteState, NormalizedVolume};
 use std::{
     ffi::c_void,
     sync::{
@@ -180,7 +180,7 @@ impl MacosAudioController {
         let shutdown = Arc::new(AtomicBool::new(false));
         let worker_shutdown = Arc::clone(&shutdown);
         let thread = thread::Builder::new()
-            .name("sonos-volume-bridge-core-audio".to_owned())
+            .name("speaker-volume-bridge-core-audio".to_owned())
             .spawn(move || {
                 run_worker(
                     selection,
@@ -871,7 +871,7 @@ fn normalize(value: f32) -> NormalizedVolume {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sonos_volume_bridge_domain::ExpectedLocalWrite;
+    use speaker_volume_bridge_domain::ExpectedLocalWrite;
     #[test]
     fn channel_transitions_and_duplicate_final_callbacks_are_suppressed() {
         let now = Instant::now();
@@ -921,7 +921,7 @@ mod tests {
         };
         assert_eq!(
             expected.classify(observed, 9),
-            sonos_volume_bridge_domain::SuppressionDecision::Suppress
+            speaker_volume_bridge_domain::SuppressionDecision::Suppress
         );
     }
 

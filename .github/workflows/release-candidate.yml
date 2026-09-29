@@ -15,6 +15,11 @@ on:
         default: Beta
         type: choice
         options: [GA, Beta, Alpha]
+      draft_release:
+        description: Keep GitHub release private for native validation (no promotion or Store submission)
+        required: false
+        default: false
+        type: boolean
       publish_microsoft_store:
         description: Submit release to Microsoft Store (GA only)
         required: false
@@ -184,21 +189,21 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.prepare-version.outputs.version }}
         run: |
-          application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "sonos-volume-bridge"))')"
+          application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "speaker-volume-bridge"))')"
           test "$RELEASE_VERSION" = "$application_version"
       - run: cargo tauri build --no-bundle
-      - run: test -x target/release/sonos-volume-bridge
+      - run: test -x target/release/speaker-volume-bridge
       - name: Archive the unsigned macOS executable
         env:
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
         run: |
           tar -czf \
-            "sonos-volume-bridge-${RELEASE_TAG}-macos-unsigned.tar.gz" \
-            target/release/sonos-volume-bridge ui/dist
+            "speaker-volume-bridge-${RELEASE_TAG}-macos-unsigned.tar.gz" \
+            target/release/speaker-volume-bridge ui/dist
       - uses: actions/upload-artifact@v7
         with:
           name: macos-unsigned-${{ needs.prepare-version.outputs.tag }}
-          path: sonos-volume-bridge-*-macos-unsigned.tar.gz
+          path: speaker-volume-bridge-*-macos-unsigned.tar.gz
           if-no-files-found: error
           retention-days: 1
 
@@ -258,7 +263,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.prepare-version.outputs.version }}
         run: |
-          application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "sonos-volume-bridge"))')"
+          application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "speaker-volume-bridge"))')"
           test "$RELEASE_VERSION" = "$application_version"
       - run: cargo tauri build --bundles deb
       - name: Collect the Debian installer
@@ -269,7 +274,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: linux-${{ matrix.arch }}-release
-          path: sonos-volume-bridge-*-linux-${{ matrix.arch }}.deb
+          path: speaker-volume-bridge-*-linux-${{ matrix.arch }}.deb
           if-no-files-found: error
   macos-direct:
     name: Sign and notarize macOS direct-download app
@@ -309,8 +314,8 @@ jobs:
           path: macos-unsigned
       - name: Restore the unsigned macOS executable
         run: |
-          tar -xzf macos-unsigned/sonos-volume-bridge-*-macos-unsigned.tar.gz
-          test -x target/release/sonos-volume-bridge
+          tar -xzf macos-unsigned/speaker-volume-bridge-*-macos-unsigned.tar.gz
+          test -x target/release/speaker-volume-bridge
           test -d ui/dist
       - name: Import the Developer ID certificate
         env:
@@ -362,7 +367,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.prepare-version.outputs.version }}
         run: |
-          application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "sonos-volume-bridge"))')"
+          application_version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "speaker-volume-bridge"))')"
           test "$RELEASE_VERSION" = "$application_version"
       - name: Bundle, sign, notarize, and staple the existing executable
         run: |
@@ -373,7 +378,7 @@ jobs:
           fi
       - name: Verify the signed and notarized app
         run: |
-          app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
+          app_path='target/release/bundle/macos/Speaker Volume Bridge.app'
           ./scripts/verify-macos-artifact.sh direct "$app_path"
           xcrun stapler validate "$app_path"
           spctl --assess --type execute --verbose=4 "$app_path"
@@ -385,7 +390,7 @@ jobs:
           shopt -s nullglob
           images=(target/release/bundle/dmg/*.dmg)
           test "${#images[@]}" -eq 1
-          image="sonos-volume-bridge-${RELEASE_TAG}-macos.dmg"
+          image="speaker-volume-bridge-${RELEASE_TAG}-macos.dmg"
           cp "${images[0]}" "$image"
           codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$image"
           xcrun notarytool submit "$image" \
@@ -401,7 +406,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: macos-release
-          path: sonos-volume-bridge-*-macos.dmg
+          path: speaker-volume-bridge-*-macos.dmg
           if-no-files-found: error
       - name: Remove temporary Apple credentials
         if: always()
@@ -449,8 +454,8 @@ jobs:
           path: macos-unsigned
       - name: Restore the unsigned macOS executable
         run: |
-          tar -xzf macos-unsigned/sonos-volume-bridge-*-macos-unsigned.tar.gz
-          test -x target/release/sonos-volume-bridge
+          tar -xzf macos-unsigned/speaker-volume-bridge-*-macos-unsigned.tar.gz
+          test -x target/release/speaker-volume-bridge
           test -d ui/dist
       - name: Import App Store signing certificates
         env:
@@ -541,8 +546,8 @@ jobs:
       - name: Bundle and sign the App Store application
         run: |
           cargo tauri bundle --bundles app --config src-tauri/tauri.appstore.conf.json --no-sign
-          app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
-          app_executable="$app_path/Contents/MacOS/sonos-volume-bridge"
+          app_path='target/release/bundle/macos/Speaker Volume Bridge.app'
+          app_executable="$app_path/Contents/MacOS/speaker-volume-bridge"
           xattr -cr "$app_path"
           codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" --options runtime --entitlements src-tauri/Entitlements.appstore.plist "$app_executable"
           codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" --options runtime --entitlements src-tauri/Entitlements.appstore.plist "$app_path"
@@ -550,9 +555,9 @@ jobs:
         env:
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
         run: |
-          app_path='target/release/bundle/macos/Sonos Volume Bridge.app'
+          app_path='target/release/bundle/macos/Speaker Volume Bridge.app'
           ./scripts/verify-macos-artifact.sh app-store "$app_path"
-          package_path="sonos-volume-bridge-${RELEASE_TAG}-macos-app-store.pkg"
+          package_path="speaker-volume-bridge-${RELEASE_TAG}-macos-app-store.pkg"
           unsigned_package_path="${package_path}.unsigned"
           xcrun productbuild --component "$app_path" /Applications "$unsigned_package_path"
           xcrun productsign --sign "$APPLE_MAC_INSTALLER_IDENTITY" --keychain "$RUNNER_TEMP/apple-app-store.keychain-db" "$unsigned_package_path" "$package_path"
@@ -561,7 +566,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: macos-app-store-${{ needs.prepare-version.outputs.tag }}
-          path: sonos-volume-bridge-*-macos-app-store.pkg
+          path: speaker-volume-bridge-*-macos-app-store.pkg
           if-no-files-found: error
       - name: Remove temporary Apple credentials
         if: always()
@@ -618,11 +623,11 @@ jobs:
       - name: Verify the compiled executable
         shell: pwsh
         run: |
-          if (-not (Test-Path -LiteralPath 'target/release/sonos-volume-bridge.exe' -PathType Leaf)) {
+          if (-not (Test-Path -LiteralPath 'target/release/speaker-volume-bridge.exe' -PathType Leaf)) {
             throw 'The Windows release executable was not generated.'
           }
           . ./scripts/windows-architecture.ps1
-          Assert-WindowsExecutableArchitecture -Path target/release/sonos-volume-bridge.exe -Architecture '${{ matrix.arch }}'
+          Assert-WindowsExecutableArchitecture -Path target/release/speaker-volume-bridge.exe -Architecture '${{ matrix.arch }}'
           if (-not (Test-Path -LiteralPath 'ui/dist' -PathType Container)) {
             throw 'The frontend distribution was not generated.'
           }
@@ -630,7 +635,7 @@ jobs:
         with:
           name: windows-build-${{ matrix.arch }}-${{ needs.prepare-version.outputs.tag }}
           path: |
-            target/release/sonos-volume-bridge.exe
+            target/release/speaker-volume-bridge.exe
             ui/dist
           if-no-files-found: error
           retention-days: 1
@@ -682,11 +687,11 @@ jobs:
         run: |
           $installer = Get-ChildItem target/release/bundle -Recurse -Filter '*.exe' | Select-Object -First 1
           if ($null -eq $installer) { throw 'No NSIS installer was generated.' }
-          Copy-Item $installer.FullName "sonos-volume-bridge-$env:RELEASE_TAG-windows-${{ matrix.arch }}-unsigned.exe"
+          Copy-Item $installer.FullName "speaker-volume-bridge-$env:RELEASE_TAG-windows-${{ matrix.arch }}-unsigned.exe"
       - uses: actions/upload-artifact@v7
         with:
           name: windows-${{ matrix.arch }}-release
-          path: sonos-volume-bridge-*-windows-${{ matrix.arch }}-unsigned.exe
+          path: speaker-volume-bridge-*-windows-${{ matrix.arch }}-unsigned.exe
           if-no-files-found: error
 
   windows-msix:
@@ -757,7 +762,7 @@ jobs:
           path: microsoft-store-msix
       - name: Build and verify both architecture packages in one upload
         shell: pwsh
-        run: ./scripts/build-msix-upload.ps1 -PackageDirectory microsoft-store-msix -OutputPath store-upload/SonosVolumeBridge.msixupload
+        run: ./scripts/build-msix-upload.ps1 -PackageDirectory microsoft-store-msix -OutputPath store-upload/SpeakerVolumeBridge.msixupload
       - uses: actions/upload-artifact@v7
         with:
           name: microsoft-store-upload-${{ needs.prepare-version.outputs.tag }}
@@ -813,6 +818,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag }}
           RELEASE_CHANNEL: ${{ inputs.channel }}
+          DRAFT_RELEASE: ${{ inputs.draft_release }}
         run: |
           mapfile -t release_assets < <(find release-assets -type f -print)
           test "${#release_assets[@]}" -gt 0
@@ -831,8 +837,11 @@ jobs:
               ;;
             *) echo "Unsupported release channel: $RELEASE_CHANNEL" >&2; exit 1 ;;
           esac
+          if [ "$DRAFT_RELEASE" = "true" ]; then
+            release_flags+=(--draft)
+          fi
           release_intro="$(cat <<EOF
-          ## Sonos Volume Bridge $RELEASE_TAG
+          ## Speaker Volume Bridge $RELEASE_TAG
 
           **Release channel:** $RELEASE_CHANNEL
 
@@ -852,17 +861,21 @@ jobs:
           EOF
           )"
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            if [ "$DRAFT_RELEASE" = "true" ] && [ "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" != "true" ]; then
+              echo "Refusing to replace public assets during a draft validation run." >&2
+              exit 1
+            fi
             gh release upload "$RELEASE_TAG" "${release_assets[@]}" --clobber
           else
             gh release create "$RELEASE_TAG" "${release_assets[@]}" "${release_flags[@]}" \
-              --title "Sonos Volume Bridge $RELEASE_TAG" \
+              --title "Speaker Volume Bridge $RELEASE_TAG" \
               --notes "$release_intro" \
               --generate-notes
           fi
 
   propose-main-promotion:
     name: Open stable release PR into main
-    if: ${{ !cancelled() && inputs.channel == 'GA' && needs.prepare-version.result == 'success' && needs.publish-release.result == 'success' }}
+    if: ${{ !cancelled() && !inputs.draft_release && inputs.channel == 'GA' && needs.prepare-version.result == 'success' && needs.publish-release.result == 'success' }}
     needs: [prepare-version, publish-release]
     runs-on: ubuntu-latest
     permissions:
@@ -892,7 +905,7 @@ jobs:
 
   publish-microsoft-store:
     name: Submit GA release to Microsoft Store
-    if: ${{ !cancelled() && inputs.channel == 'GA' && inputs.publish_microsoft_store && needs.prepare-version.result == 'success' && needs.all-platform-builds.result == 'success' && needs.windows-msix.result == 'success' && needs.publish-release.result == 'success' }}
+    if: ${{ !cancelled() && !inputs.draft_release && inputs.channel == 'GA' && inputs.publish_microsoft_store && needs.prepare-version.result == 'success' && needs.all-platform-builds.result == 'success' && needs.windows-msix.result == 'success' && needs.publish-release.result == 'success' }}
     needs: [prepare-version, all-platform-builds, windows-msix, publish-release]
     permissions:
       contents: read
