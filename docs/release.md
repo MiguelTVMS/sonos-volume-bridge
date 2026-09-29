@@ -327,3 +327,18 @@ After those checks pass, publish the existing draft and prepare the normal
 reviewed main-promotion PR for that exact release. Do not rerun the version-bump
 workflow just to publish the draft: that would increment the version again.
 Complete both Store submissions manually with the verified packages.
+
+### Signing wait timer maintenance
+
+GitHub environment wait timers are repository settings, not workflow delays.
+After review, preview the maintenance operation with
+`python3 scripts/remove-signing-wait.py --repo OWNER/REPOSITORY`.
+An administrator can use the same command with `--apply` to remove the wait timers
+from the two Apple signing environments. It reads and preserves existing required
+reviewers, self-review policy and deployment branch policy, then verifies the
+result. Existing secrets and branch/tag rules are not rewritten. An unexpected
+configuration or concurrent edit stops the operation. If one environment update
+fails, inspect both before retrying; updates are not atomic across environments.
+This is an explicit administrative step after PR approval: merging the PR does
+not change live settings or initiate a release. See GitHub's
+[environment API](https://docs.github.com/en/rest/deployments/environments#create-or-update-an-environment).

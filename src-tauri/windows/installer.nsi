@@ -483,6 +483,9 @@ FunctionEnd
   !include "{{this}}"
 {{/each}}
 
+Var PreviousInstallDir
+Var RelocateInstallDir
+
 Function .onInit
   ; Keep the desktop clear for interactive, passive, and silent installs.
   StrCpy $NoShortcutMode 1
@@ -506,6 +509,7 @@ Function .onInit
   !endif
 
   !insertmacro SetContext
+  ReadRegStr $PreviousInstallDir SHCTX "${MANUPRODUCTKEY}" ""
 
   ; Rebrand upgrades are in-place: never invoke the legacy uninstaller or stop it.
   ReadRegStr $0 SHCTX "${UNINSTKEY}" "MainBinaryName"
@@ -653,6 +657,8 @@ Section WebView2
 SectionEnd
 
 Section Install
+  ; Move before copying files; abort safely if Windows cannot rename the directory.
+  Call MigratePreviousInstallDirectory
   SetOutPath $INSTDIR
 
   !ifmacrodef NSIS_HOOK_PREINSTALL
@@ -712,25 +718,36 @@ Section Install
   ${EndIf}
 
   ; Migrate owned legacy shortcuts without touching unrelated links.
-  !insertmacro IsShortcutTarget "$SMPROGRAMS\${LEGACYPRODUCTNAME}.lnk" "$INSTDIR\sonos-volume-bridge.exe"
+  !insertmacro IsShortcutTarget "$SMPROGRAMS\${LEGACYPRODUCTNAME}.lnk" "$PreviousInstallDir\sonos-volume-bridge.exe"
   Pop $0
   ${If} $0 = 1
     Delete "$SMPROGRAMS\${LEGACYPRODUCTNAME}.lnk"
+    CreateShortcut "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+    !insertmacro SetLnkAppUserModelId "$SMPROGRAMS\${PRODUCTNAME}.lnk"
   ${EndIf}
-  !insertmacro IsShortcutTarget "$DESKTOP\${LEGACYPRODUCTNAME}.lnk" "$INSTDIR\sonos-volume-bridge.exe"
+  !insertmacro IsShortcutTarget "$DESKTOP\${LEGACYPRODUCTNAME}.lnk" "$PreviousInstallDir\sonos-volume-bridge.exe"
   Pop $0
   ${If} $0 = 1
     Delete "$DESKTOP\${LEGACYPRODUCTNAME}.lnk"
   ${EndIf}
-  !insertmacro IsShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${LEGACYPRODUCTNAME}.lnk" "$INSTDIR\sonos-volume-bridge.exe"
+  !insertmacro IsShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${LEGACYPRODUCTNAME}.lnk" "$PreviousInstallDir\sonos-volume-bridge.exe"
   Pop $0
   ${If} $0 = 1
     Delete "$SMPROGRAMS\$AppStartMenuFolder\${LEGACYPRODUCTNAME}.lnk"
+    CreateShortcut "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+    !insertmacro SetLnkAppUserModelId "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
   ${EndIf}
   ; Keep the existing autostart registration key, update only its executable.
   ReadRegStr $0 HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "sonos-volume-bridge"
   ${If} $0 != ""
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "sonos-volume-bridge" '$\"$INSTDIR\${MAINBINARYNAME}.exe$\"'
+  ${EndIf}
+
+  ; Update an existing owned toast activation target before the next app launch.
+  ReadRegStr $0 HKCU "Software\Classes\CLSID\{a607018c-48b4-45c8-b0b2-46c243fde206}\LocalServer32" ""
+  ${If} $0 == '$\"$PreviousInstallDir\sonos-volume-bridge.exe$\" --toast-activated'
+  ${OrIf} $0 == '$\"$PreviousInstallDir\${MAINBINARYNAME}.exe$\" --toast-activated'
+    WriteRegStr HKCU "Software\Classes\CLSID\{a607018c-48b4-45c8-b0b2-46c243fde206}\LocalServer32" "" '$\"$INSTDIR\${MAINBINARYNAME}.exe$\" --toast-activated'
   ${EndIf}
 
   ; Save current MAINBINARYNAME for future updates
@@ -933,9 +950,44 @@ Section Uninstall
 SectionEnd
 
 Function RestorePreviousInstallLocation
-  ReadRegStr $4 SHCTX "${MANUPRODUCTKEY}" ""
-  StrCmp $4 "" +2 0
-    StrCpy $INSTDIR $4
+  ReadRegStr $PreviousInstallDir SHCTX "${MANUPRODUCTKEY}" ""
+  StrCpy $RelocateInstallDir 0
+  ${If} $PreviousInstallDir == ""
+    Return
+  ${EndIf}
+  ; Only migrate the former default. User-selected custom paths stay untouched.
+  ${If} $PreviousInstallDir == "$LOCALAPPDATA\${LEGACYPRODUCTNAME}"
+  ${OrIf} $PreviousInstallDir == "$PROGRAMFILES\${LEGACYPRODUCTNAME}"
+  ${OrIf} $PreviousInstallDir == "$PROGRAMFILES64\${LEGACYPRODUCTNAME}"
+    ${GetParent} $PreviousInstallDir $0
+    StrCpy $INSTDIR "$0\${PRODUCTNAME}"
+    StrCpy $RelocateInstallDir 1
+  ${Else}
+    StrCpy $INSTDIR $PreviousInstallDir
+  ${EndIf}
+FunctionEnd
+
+Function MigratePreviousInstallDirectory
+  ${If} $RelocateInstallDir != 1
+    Return
+  ${EndIf}
+  ${If} $INSTDIR == $PreviousInstallDir
+    Return
+  ${EndIf}
+  ${IfNot} ${FileExists} "$PreviousInstallDir\*.*"
+    Return
+  ${EndIf}
+  ; Never merge two directories or move a running app on reboot.
+  ${If} ${FileExists} "$INSTDIR"
+    MessageBox MB_ICONSTOP "The destination already exists. Choose an empty destination or remove the unused installation before retrying." /SD IDOK
+    Abort
+  ${EndIf}
+  ClearErrors
+  Rename "$PreviousInstallDir" "$INSTDIR"
+  ${If} ${Errors}
+    MessageBox MB_ICONSTOP "Quit the installed app from its system tray and close files in its installation folder, then retry. The installation folder could not be moved." /SD IDOK
+    Abort
+  ${EndIf}
 FunctionEnd
 
 Function Skip
@@ -954,14 +1006,14 @@ Function CreateOrUpdateStartMenuShortcut
   ; migrate old shortcuts to target the new MAINBINARYNAME
   StrCpy $R0 0
 
-  !insertmacro IsShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
+  !insertmacro IsShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$PreviousInstallDir\$OldMainBinaryName"
   Pop $0
   ${If} $0 = 1
     !insertmacro SetShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
     StrCpy $R0 1
   ${EndIf}
 
-  !insertmacro IsShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
+  !insertmacro IsShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$PreviousInstallDir\$OldMainBinaryName"
   Pop $0
   ${If} $0 = 1
     !insertmacro SetShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
