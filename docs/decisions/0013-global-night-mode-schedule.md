@@ -35,7 +35,7 @@ not continuously. Startup, wake, reconnection, schedule edits/enabling, and cloc
 time-zone changes reconcile the expected current state without replaying missed
 transitions. Disabling scheduling leaves the current speaker value untouched.
 
-An independent, default-off **Disable loudness during Night Shift** preference
+An independent, default-off **Disable loudness during night schedule** preference
 temporarily enforces Loudness off inside enabled schedule blocks. The integration
 layer expresses read, write, confirmation, and restoration policy through an
 abstract Loudness port; the shell implements it with the Sonos adapter. Before
@@ -54,10 +54,10 @@ The tray toggles scheduling above Night sound; speaker controls remain on Speake
 toggle one cell; drag painting uses the initial cell's opposite state throughout
 the gesture. Save commits the grid and explicitly applies its current on/off state, even when
 recurring scheduling is disabled or the grid has not changed; Cancel restores saved values. Refreshes preserve
-drafts, scroll position, and cell focus. Enable, Night Shift Loudness, and
+drafts, scroll position, and cell focus. Enable, night schedule Loudness, and
 notification preferences save immediately. Generic settings writes preserve all
 independently managed schedule fields. Old schema-version-one configurations default
-to an empty disabled schedule, notifications off, and Night Shift Loudness control
+to an empty disabled schedule, notifications off, and night schedule Loudness control
 off. Invalid grid dimensions fail validation before persistence.
 
 ## Notifications

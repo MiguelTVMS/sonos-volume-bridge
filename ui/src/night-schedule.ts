@@ -11,7 +11,7 @@ export type ScheduleStatus = {
 export const lockMessage =
   'Night Mode is on because of your schedule. Disable the schedule to turn Night Mode off.';
 export const loudnessLockMessage =
-  'Loudness is off during Night Shift. Disable that option to turn Loudness on.';
+  'Loudness is off during the night schedule. Disable that option to turn Loudness on.';
 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export const emptyBlocks = (): boolean[][] =>
   Array.from({ length: 7 }, () => Array<boolean>(48).fill(false));
@@ -90,11 +90,10 @@ export function scheduleMarkup(linux = false, windows = false): string {
   return `<section id="night-schedule" data-schedule class="night-schedule" aria-labelledby="night-schedule-title">
     <div class="settings-group">
     <label class="toggle"><span>Enable schedule</span><input id="schedule-enabled" type="checkbox" role="switch"></label>
-    <label class="toggle"><span>Disable loudness during Night Shift</span><input id="schedule-disable-loudness" type="checkbox" role="switch"></label>
+    <label class="toggle"><span>Disable loudness during night schedule</span><input id="schedule-disable-loudness" type="checkbox" role="switch"></label>
     <div class="control-field"><label for="schedule-notifications">Night schedule notifications</label><select id="schedule-notifications"><option value="start">On start</option><option value="end">On end</option><option value="both">On start and end</option><option value="never">Never</option></select></div>
-    ${linux ? `<div class="schedule-status-row"><span>Status</span>${status}${permission}<p id="schedule-feedback" class="setting-note" aria-live="polite"></p></div>` : windows ? `<div class="schedule-status-card"><span class="schedule-status-label">Status</span><div class="schedule-status-content">${status}${permission}<div id="schedule-feedback"></div></div></div>` : permission}
+    ${linux ? `<div class="schedule-status-row"><span>Status</span>${status}${permission}<p id="schedule-feedback" class="setting-note" aria-live="polite"></p></div>` : `<div class="schedule-status-card"><span class="schedule-status-label">Status</span><div class="schedule-status-content">${status}${permission}${windows ? '<div id="schedule-feedback"></div>' : ''}</div></div>`}
     </div>
-    ${linux || windows ? '' : status}
     <div class="settings-group schedule-editor"><div class="schedule-editor-content">
     <p class="schedule-legend"><span>■ Scheduled on</span> □ Manual control</p>
     <div class="schedule-scroll"><div class="schedule-grid" role="grid" aria-label="Weekly Night Mode schedule"></div></div>

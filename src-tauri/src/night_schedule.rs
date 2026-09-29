@@ -90,11 +90,11 @@ pub fn locked(configuration: &AppConfiguration) -> bool {
             .is_some_and(|window| window.active)
 }
 pub fn loudness_locked(configuration: &AppConfiguration) -> bool {
-    configuration.disable_loudness_during_night_shift && locked(configuration)
+    configuration.disable_loudness_during_night_schedule && locked(configuration)
 }
 
 pub async fn restore_owned_loudness(configuration: &AppConfiguration) -> Result<(), String> {
-    if configuration.night_shift_loudness_restore_speaker_id != configuration.selected_sonos_id
+    if configuration.night_schedule_loudness_restore_speaker_id != configuration.selected_sonos_id
         || configuration.selected_sonos_id.is_none()
     {
         return Ok(());
@@ -130,18 +130,18 @@ async fn reconcile_scheduled_loudness(
 ) -> Option<String> {
     let selected = configuration.selected_sonos_id.as_deref()?;
     let owns_restore = configuration
-        .night_shift_loudness_restore_speaker_id
+        .night_schedule_loudness_restore_speaker_id
         .as_deref()
         == Some(selected);
-    if configuration.disable_loudness_during_night_shift && active {
+    if configuration.disable_loudness_during_night_schedule && active {
         if !owns_restore {
             match port.read_loudness().await {
                 NightModeReading::Supported(false) => return None,
                 NightModeReading::Supported(true) => {
-                    configuration.night_shift_loudness_restore_speaker_id =
+                    configuration.night_schedule_loudness_restore_speaker_id =
                         Some(selected.to_owned());
                     if let Err(error) = persist_loudness_state(state, configuration) {
-                        configuration.night_shift_loudness_restore_speaker_id = None;
+                        configuration.night_schedule_loudness_restore_speaker_id = None;
                         return Some(error);
                     }
                 }
@@ -161,7 +161,7 @@ async fn reconcile_scheduled_loudness(
         if let Err(error) = restore_scheduled_loudness(port).await {
             return Some(error);
         }
-        configuration.night_shift_loudness_restore_speaker_id = None;
+        configuration.night_schedule_loudness_restore_speaker_id = None;
         if let Err(error) = persist_loudness_state(state, configuration) {
             return Some(error);
         }
@@ -227,7 +227,7 @@ pub fn start<R: Runtime>(app: AppHandle<R>) {
                 || configuration.selected_sonos_id.is_none()
             {
                 let loudness_error = if configuration.selected_sonos_id.is_some()
-                    && configuration.night_shift_loudness_restore_speaker_id
+                    && configuration.night_schedule_loudness_restore_speaker_id
                         == configuration.selected_sonos_id
                 {
                     match port(&configuration).await {
@@ -332,8 +332,8 @@ pub fn start<R: Runtime>(app: AppHandle<R>) {
                         && c.night_mode_schedule == configuration.night_mode_schedule
                         && c.notify_night_mode_schedule_transitions
                             == configuration.notify_night_mode_schedule_transitions
-                        && c.disable_loudness_during_night_shift
-                            == configuration.disable_loudness_during_night_shift
+                        && c.disable_loudness_during_night_schedule
+                            == configuration.disable_loudness_during_night_schedule
                 }) {
                     continue;
                 }

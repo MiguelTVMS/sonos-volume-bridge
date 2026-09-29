@@ -250,7 +250,7 @@ is enabled in branch builds.
 
 ### Night schedule notification dropdown sizing
 
-The macOS Settings window opens at 740 by 700 points. Check Night schedule at
+The macOS Settings window opens at 740 by 760 points. Check Night schedule at
 that default size for unnecessary vertical scrolling; horizontal resizing must
 remain disabled. Browser coverage also checks the page with save feedback shown.
 
@@ -297,7 +297,7 @@ Repeat after restarting with an enabled active schedule, including opening Speak
 immediately before the first scheduler tick. Cross a half-hour start/end boundary
 and verify on enforcement, one-time off at exit, and the selected notification mode.
 
-With Loudness initially on, enable **Disable loudness during Night Shift** and enter
+With Loudness initially on, enable **Disable loudness during night schedule** and enter
 an active block. Confirm Loudness turns off, Settings and tray reject manual enable,
 and Night Mode remains scheduled. Exit the block and confirm Loudness returns on.
 Repeat with Loudness initially off and confirm it remains off after exit. Restart

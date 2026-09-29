@@ -149,7 +149,7 @@ changes are allowed. Leaving a scheduled period turns Night Mode off once.
 The tray has a checked **Night schedule** item directly above **Night sound**.
 The checkmark represents enabled scheduling; the editor opens through Settings.
 
-**Disable loudness during Night Shift** is off by default and saves immediately.
+**Disable loudness during night schedule** is off by default and saves immediately.
 When enabled, Loudness is kept off while the current time is inside the enabled
 schedule. If the bridge turned Loudness off, it restores Loudness after the period,
 when scheduling is disabled, or when this option is disabled. Loudness that was

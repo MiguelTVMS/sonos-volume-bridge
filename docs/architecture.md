@@ -189,7 +189,7 @@ adapters stay in the shell. A shared configuration/Night Mode write gate prevent
 selection races, while volume synchronization continues independently. See
 [ADR 0013](decisions/0013-global-night-mode-schedule.md).
 
-The default-off Night Shift Loudness policy uses a separate integration port over
+The default-off night schedule Loudness policy uses a separate integration port over
 the same shell-owned Sonos adapter. On entry it records speaker-scoped restoration
 ownership before disabling Loudness. While active it enforces Loudness off without
 coupling failures to Night Mode scheduling. On exit, schedule disablement, or policy

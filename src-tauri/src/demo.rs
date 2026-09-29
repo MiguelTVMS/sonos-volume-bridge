@@ -415,7 +415,7 @@ mod tests {
         runtime::set_speaker_setting(saved.clone(), runtime::SpeakerSetting::Loudness, true)
             .await
             .unwrap();
-        commands::set_disable_loudness_during_night_shift(true, app.state())
+        commands::set_disable_loudness_during_night_schedule(true, app.state())
             .await
             .unwrap();
         commands::enable_night_schedule(true, app.state(), app.handle().clone())
@@ -451,7 +451,7 @@ mod tests {
             commands::set_speaker_setting(runtime::SpeakerSetting::Loudness, true, app.state())
                 .await
                 .unwrap_err()
-                .contains("Night Shift")
+                .contains("night schedule")
         );
         commands::enable_night_schedule(false, app.state(), app.handle().clone())
             .await

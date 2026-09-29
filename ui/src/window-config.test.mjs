@@ -53,3 +53,12 @@ test('Windows supports horizontal resizing and keeps native window chrome', () =
   assert.notEqual(window.decorations, false);
   assert.notEqual(window.titleBarStyle, 'Overlay');
 });
+
+test('macOS keeps its fixed System Settings width and fits Night schedule status', () => {
+  const window = config('tauri.macos.conf.json').app.windows[0];
+  assert.equal(window.width, 740);
+  assert.equal(window.minWidth, window.width);
+  assert.equal(window.maxWidth, window.width);
+  assert.equal(window.height, 760, 'allow room for the Night schedule status row');
+  assert.ok(window.minHeight < window.height);
+});

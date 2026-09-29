@@ -234,7 +234,7 @@ fn update_speaker_controls<R: Runtime>(app: &AppHandle<R>, settings: &SpeakerSet
         let label = if locked && id == "speaker-night-sound" {
             "Night sound (disable schedule to turn off)"
         } else if locked {
-            "Loudness (disabled during Night Shift)"
+            "Loudness (disabled during night schedule)"
         } else {
             label
         };

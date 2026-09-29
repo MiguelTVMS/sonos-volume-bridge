@@ -246,7 +246,7 @@ Use `?platform=macos`, `?platform=windows`, or `?platform=linux` to review each
 presentation. Add `&appearance=dark` or `&appearance=light` to force a color scheme.
 The preview uses sample data and mocks all Tauri commands; it does
 not control speakers or write app configuration. It is not included in the
-production frontend build. Test at a 740-pixel width on macOS, 960 on Windows
+production frontend build. Test at 740 by 760 pixels on macOS, 960 on Windows
 (also its 760-pixel minimum), and 1080 on Linux (fixed width, 800-pixel default height), and both default
 and minimum window heights, including dark mode, keyboard focus, and increased contrast.
 

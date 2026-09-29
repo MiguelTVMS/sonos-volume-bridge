@@ -489,3 +489,20 @@
 [data-platform='macos'] .night-schedule .settings-group > .control-field {
   grid-template-columns: minmax(0, 1fr) auto;
 }
+[data-platform='macos'] .schedule-status-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+[data-platform='macos'] .schedule-status-content {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--secondary-text);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+[data-platform='macos'] .schedule-status-card .setting-note {
+  margin: 0;
+}

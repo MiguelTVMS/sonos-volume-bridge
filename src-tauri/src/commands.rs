@@ -39,12 +39,13 @@ pub async fn save_configuration(
     configuration.night_mode_schedule = current.night_mode_schedule.clone();
     configuration.notify_night_mode_schedule_transitions =
         current.notify_night_mode_schedule_transitions;
-    configuration.disable_loudness_during_night_shift = current.disable_loudness_during_night_shift;
-    configuration.night_shift_loudness_restore_speaker_id =
-        current.night_shift_loudness_restore_speaker_id.clone();
+    configuration.disable_loudness_during_night_schedule =
+        current.disable_loudness_during_night_schedule;
+    configuration.night_schedule_loudness_restore_speaker_id =
+        current.night_schedule_loudness_restore_speaker_id.clone();
     if configuration.selected_sonos_id != current.selected_sonos_id {
         crate::night_schedule::restore_owned_loudness(&current).await?;
-        configuration.night_shift_loudness_restore_speaker_id = None;
+        configuration.night_schedule_loudness_restore_speaker_id = None;
     }
     let previous_start_at_login = current.start_at_login;
     let configuration = persist_settings(
@@ -499,7 +500,7 @@ pub async fn enable_night_schedule<R: tauri::Runtime>(
     let previous_schedule = configuration.night_mode_schedule.clone();
     if !enabled {
         crate::night_schedule::restore_owned_loudness(&configuration).await?;
-        configuration.night_shift_loudness_restore_speaker_id = None;
+        configuration.night_schedule_loudness_restore_speaker_id = None;
     }
     configuration.night_mode_schedule.enabled = enabled;
     persist_schedule(&state, &configuration)?;
@@ -547,7 +548,7 @@ pub async fn set_schedule_notifications(
 }
 
 #[tauri::command]
-pub async fn set_disable_loudness_during_night_shift(
+pub async fn set_disable_loudness_during_night_schedule(
     enabled: bool,
     state: State<'_, AppState>,
 ) -> Result<UiSnapshot, String> {
@@ -559,9 +560,9 @@ pub async fn set_disable_loudness_during_night_shift(
         .clone();
     if !enabled {
         crate::night_schedule::restore_owned_loudness(&configuration).await?;
-        configuration.night_shift_loudness_restore_speaker_id = None;
+        configuration.night_schedule_loudness_restore_speaker_id = None;
     }
-    configuration.disable_loudness_during_night_shift = enabled;
+    configuration.disable_loudness_during_night_schedule = enabled;
     persist_schedule(&state, &configuration)?;
     state
         .schedule_reconcile

@@ -5,7 +5,7 @@ use speaker_volume_bridge_domain::NightModeSchedule;
 pub const LOCK_MESSAGE: &str =
     "Night Mode is on because of your schedule. Disable the schedule to turn Night Mode off.";
 pub const LOUDNESS_LOCK_MESSAGE: &str =
-    "Loudness is off during Night Shift. Disable that option to turn Loudness on.";
+    "Loudness is off during the night schedule. Disable that option to turn Loudness on.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NightModeReading {
