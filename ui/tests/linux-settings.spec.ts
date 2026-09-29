@@ -18,6 +18,12 @@ test('Ubuntu schedule status stays in one row below notifications through save a
     .evaluate((label) => getComputedStyle(label).font);
   await expect(row.locator(':scope > span')).toHaveCSS('font', labelFont);
   await expect(row.locator('#schedule-status')).toHaveText('Schedule disabled.');
+  const notifications = (await page.locator('#schedule-notifications').boundingBox())!;
+  const status = (await row.locator('#schedule-status').boundingBox())!;
+  expect(Math.abs(status.x + status.width - (notifications.x + notifications.width))).toBeLessThan(
+    2,
+  );
+  await expect(row.locator('#schedule-status')).toHaveCSS('text-align', 'right');
   await expect(row.locator('..').locator(':scope > :nth-child(4)')).toHaveClass(
     'schedule-status-row',
   );
