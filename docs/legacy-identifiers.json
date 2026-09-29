@@ -28,5 +28,6 @@
   "src-tauri/tauri.conf.json": "Preserved installation, store, startup or notification identity and migration targets.",
   "src-tauri/windows/installer.nsi": "Preserved installation, store, startup or notification identity and migration targets.",
   "ui/src/legacy-alert.ts": "Old executable detection, user warning and regression coverage.",
-  "ui/tests/legacy-alert.spec.ts": "Old executable detection, user warning and regression coverage."
+  "ui/tests/legacy-alert.spec.ts": "Old executable detection, user warning and regression coverage.",
+  "scripts/tests/test-windows-install-directory.ps1": "Isolated regression fixtures for legacy default folder migration."
 }

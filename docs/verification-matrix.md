@@ -606,3 +606,19 @@ do not prove native shell cache refresh or elevation/account behavior.
 ## Legacy warning visibility regression
 
 On a clean install or a sandboxed build with no detected legacy process, open Settings and navigate Devices, Speaker, General, Diagnostics and About. No yellow legacy warning should appear; unavailable inspection is shown only in Diagnostics. Start the legacy app and confirm the warning and pause; if inspection subsequently becomes unavailable, the previous conflict remains paused with accurate wording. Exit the legacy app and recheck to recover. Cross-platform browser regression coverage exercises the production alert renderer with unknown, clear and confirmed conflict states; native sandbox process inspection remains a separate manual check.
+
+## Renamed Windows installation directory
+
+On x64 and ARM64, install an older direct-download build into its default folder,
+set preferences and enable startup, then quit it and run the new installer.
+The directory page must propose Speaker Volume Bridge. Verify files move, settings
+persist, one installed-app entry remains, shortcuts and startup launch the new
+executable, existing notification activation works before/after first launch, and
+uninstall removes the new installation. Repeat with startup disabled, a custom
+installation directory (retained), the already-renamed executable in the old
+folder, and a clean install. Cancel on the directory page and verify no move.
+With an occupied destination or a locked source, installation must abort and
+preserve the source. The NSIS harness executes production location-selection and
+move functions on both Windows CI architectures, including collision and locked
+source cases. Native full-installer, login and toast checks remain manual gates;
+macOS-hosted tests do not establish Windows behavior.

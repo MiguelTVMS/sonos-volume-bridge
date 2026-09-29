@@ -36,5 +36,18 @@ class RebrandIdentityTests(unittest.TestCase):
         self.assertIn('Uninstall\\${LEGACYPRODUCTNAME}', script)
         self.assertIn('!define MANUPRODUCTKEY "${MANUKEY}\\${LEGACYPRODUCTNAME}"', script)
 
+    def test_upgrade_selects_new_default_and_moves_before_install(self):
+        script = (ROOT / 'src-tauri/windows/installer.nsi').read_text()
+        restore = script.split('Function RestorePreviousInstallLocation\n', 1)[1].split('FunctionEnd', 1)[0]
+        self.assertIn('StrCpy $INSTDIR "$0\\${PRODUCTNAME}"', restore)
+        self.assertIn('StrCpy $INSTDIR $PreviousInstallDir', restore)
+        install = script.split('Section Install\n', 1)[1].split('SectionEnd', 1)[0]
+        self.assertLess(install.index('Call MigratePreviousInstallDirectory'), install.index('SetOutPath $INSTDIR'))
+        migrate = script.split('Function MigratePreviousInstallDirectory\n', 1)[1].split('FunctionEnd', 1)[0]
+        self.assertIn('Rename "$PreviousInstallDir" "$INSTDIR"', migrate)
+        self.assertNotIn('/REBOOTOK', migrate)
+        self.assertIn('${If} ${Errors}', migrate)
+        self.assertIn('Abort', migrate)
+
 if __name__ == '__main__':
     unittest.main()
