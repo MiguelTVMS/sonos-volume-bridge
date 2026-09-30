@@ -31,8 +31,3 @@ for index in "${!sources[@]}"; do
     mv "${sources[$index]}" "${destinations[$index]}"
   fi
 done
-
-# Preserve existing latest-download URLs after the repository redirect.
-for destination in "${destinations[@]}"; do
-  cp "$destination" "${destination%/*}/sonos-volume-bridge-${destination##*/speaker-volume-bridge-}"
-done
