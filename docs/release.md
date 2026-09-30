@@ -209,8 +209,8 @@ The release tag identifies the version; duplicate versioned files are not upload
 The website uses `releases/latest/download/<filename>` so stable downloads follow
 the latest non-prerelease without a website deployment. Missing or empty source
 installers fail preparation before any inputs are renamed. Preparation can be
-repeated safely. Release publication does not create legacy
-`sonos-volume-bridge-*` aliases; every downloadable installer uses the current
+repeated safely. Release publication does not create aliases using the former
+product name; every downloadable installer uses the current
 product name. Store packages remain separate workflow artifacts. Existing
 published releases are not rewritten by this change.
 

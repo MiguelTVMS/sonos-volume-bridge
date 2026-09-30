@@ -26,7 +26,7 @@ Windows keeps the existing installer registry keys and MSIX identities and migra
 
 GitHub Release installers use only `speaker-volume-bridge-*` filenames. Legacy
 installed identities and the Debian command compatibility symlink do not require
-duplicate `sonos-volume-bridge-*` release assets.
+duplicate release assets using the former product name.
 
 Regression coverage exercises manual speaker commands and scheduling without a
 process check, and Settings navigation/saves without a legacy service. Native
