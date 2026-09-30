@@ -157,6 +157,7 @@ fn run_normal(context: tauri::Context<tauri::Wry>) {
             commands::save_night_schedule,
             commands::enable_night_schedule,
             commands::set_schedule_notifications,
+            commands::set_disable_loudness_during_night_schedule,
             commands::get_schedule_status,
             commands::save_configuration,
             commands::reset_configuration,

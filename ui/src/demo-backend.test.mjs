@@ -43,3 +43,13 @@ test('saving a schedule applies the simulated current block and accepts all noti
   demo('save_night_schedule', { blocks });
   assert.equal(demo('get_speaker_settings').nightSound, false);
 });
+
+test('night schedule Loudness policy defaults off and persists opt-in', () => {
+  const demo = createDemoBackend();
+  assert.equal(demo('get_snapshot').configuration.disableLoudnessDuringNightSchedule, false);
+  assert.equal(
+    demo('set_disable_loudness_during_night_schedule', { enabled: true }).configuration
+      .disableLoudnessDuringNightSchedule,
+    true,
+  );
+});

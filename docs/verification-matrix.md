@@ -250,7 +250,7 @@ is enabled in branch builds.
 
 ### Night schedule notification dropdown sizing
 
-The macOS Settings window opens at 740 by 700 points. Check Night schedule at
+The macOS Settings window opens at 740 by 760 points. Check Night schedule at
 that default size for unnecessary vertical scrolling; horizontal resizing must
 remain disabled. Browser coverage also checks the page with save feedback shown.
 
@@ -296,6 +296,16 @@ an empty schedule and enable: manual on/off is available outside active periods.
 Repeat after restarting with an enabled active schedule, including opening Speaker
 immediately before the first scheduler tick. Cross a half-hour start/end boundary
 and verify on enforcement, one-time off at exit, and the selected notification mode.
+
+With Loudness initially on, enable **Disable loudness during night schedule** and enter
+an active block. Confirm Loudness turns off, Settings and tray reject manual enable,
+and Night Mode remains scheduled. Exit the block and confirm Loudness returns on.
+Repeat with Loudness initially off and confirm it remains off after exit. Restart
+during the active block and confirm restoration still occurs afterward. Disable the
+option and then the schedule during separate active runs; each must restore only a
+bridge-owned change. Select another speaker while restoration ownership exists and
+confirm the marker is not applied to that speaker. Simulate unsupported and
+temporarily unavailable Loudness reads and confirm Night Mode scheduling continues.
 
 Restart: demo app settings persist and the real runtime reconciles fresh simulated
 speaker state. Repeat with `ui-windows`, `ui-macos`, and `ui-ubuntu`; native window

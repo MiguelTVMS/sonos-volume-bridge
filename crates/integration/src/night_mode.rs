@@ -4,6 +4,8 @@ use speaker_volume_bridge_domain::NightModeSchedule;
 
 pub const LOCK_MESSAGE: &str =
     "Night Mode is on because of your schedule. Disable the schedule to turn Night Mode off.";
+pub const LOUDNESS_LOCK_MESSAGE: &str =
+    "Loudness is off during the night schedule. Disable that option to turn Loudness on.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NightModeReading {
@@ -15,6 +17,49 @@ pub enum NightModeReading {
 pub trait NightModePort: Send + Sync {
     async fn read(&self) -> NightModeReading;
     async fn write(&self, value: bool) -> Result<(), String>;
+}
+
+#[async_trait]
+pub trait ScheduledLoudnessPort: Send + Sync {
+    async fn read_loudness(&self) -> NightModeReading;
+    async fn write_loudness(&self, value: bool) -> Result<(), String>;
+}
+
+/// Returns true when Loudness was on and must be restored after the active period.
+pub async fn disable_scheduled_loudness(port: &impl ScheduledLoudnessPort) -> Result<bool, String> {
+    match port.read_loudness().await {
+        NightModeReading::Supported(false) => Ok(false),
+        NightModeReading::Supported(true) => {
+            port.write_loudness(false).await?;
+            if port.read_loudness().await == NightModeReading::Supported(false) {
+                Ok(true)
+            } else {
+                Err("Could not confirm Loudness. Retrying automatically.".into())
+            }
+        }
+        NightModeReading::Unsupported => Err("Loudness is not supported by this speaker.".into()),
+        NightModeReading::Unavailable => {
+            Err("Loudness is temporarily unavailable. Retrying automatically.".into())
+        }
+    }
+}
+
+pub async fn restore_scheduled_loudness(port: &impl ScheduledLoudnessPort) -> Result<(), String> {
+    match port.read_loudness().await {
+        NightModeReading::Supported(true) => Ok(()),
+        NightModeReading::Supported(false) => {
+            port.write_loudness(true).await?;
+            if port.read_loudness().await == NightModeReading::Supported(true) {
+                Ok(())
+            } else {
+                Err("Could not restore Loudness. Retrying automatically.".into())
+            }
+        }
+        NightModeReading::Unsupported => Err("Loudness is not supported by this speaker.".into()),
+        NightModeReading::Unavailable => {
+            Err("Loudness is temporarily unavailable. Retrying automatically.".into())
+        }
+    }
 }
 #[derive(Default)]
 pub struct NightModeController {
@@ -184,6 +229,28 @@ mod tests {
             *self.value.lock().unwrap() = NightModeReading::Supported(value);
             Ok(())
         }
+    }
+    #[async_trait]
+    impl ScheduledLoudnessPort for Port {
+        async fn read_loudness(&self) -> NightModeReading {
+            self.read().await
+        }
+        async fn write_loudness(&self, value: bool) -> Result<(), String> {
+            self.write(value).await
+        }
+    }
+
+    #[tokio::test]
+    async fn scheduled_loudness_restores_only_when_it_was_changed() {
+        let enabled = Port::new(true);
+        assert!(disable_scheduled_loudness(&enabled).await.unwrap());
+        assert_eq!(*enabled.writes.lock().unwrap(), vec![false]);
+        restore_scheduled_loudness(&enabled).await.unwrap();
+        assert_eq!(*enabled.writes.lock().unwrap(), vec![false, true]);
+
+        let already_disabled = Port::new(false);
+        assert!(!disable_scheduled_loudness(&already_disabled).await.unwrap());
+        assert!(already_disabled.writes.lock().unwrap().is_empty());
     }
     #[tokio::test]
     async fn startup_external_change_exit_and_manual_activation_sequence() {

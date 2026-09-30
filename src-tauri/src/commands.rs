@@ -31,16 +31,23 @@ pub async fn save_configuration(
     app: AppHandle,
 ) -> Result<UiSnapshot, String> {
     let gate = state.speaker_gate.lock().await;
-    if let Ok(current) = state.configuration.lock() {
-        configuration.night_mode_schedule = current.night_mode_schedule.clone();
-        configuration.notify_night_mode_schedule_transitions =
-            current.notify_night_mode_schedule_transitions;
-    }
-    let previous_start_at_login = state
+    let current = state
         .configuration
         .lock()
         .map_err(|_| "application configuration is unavailable".to_owned())?
-        .start_at_login;
+        .clone();
+    configuration.night_mode_schedule = current.night_mode_schedule.clone();
+    configuration.notify_night_mode_schedule_transitions =
+        current.notify_night_mode_schedule_transitions;
+    configuration.disable_loudness_during_night_schedule =
+        current.disable_loudness_during_night_schedule;
+    configuration.night_schedule_loudness_restore_speaker_id =
+        current.night_schedule_loudness_restore_speaker_id.clone();
+    if configuration.selected_sonos_id != current.selected_sonos_id {
+        crate::night_schedule::restore_owned_loudness(&current).await?;
+        configuration.night_schedule_loudness_restore_speaker_id = None;
+    }
+    let previous_start_at_login = current.start_at_login;
     let configuration = persist_settings(
         &state.store,
         previous_start_at_login,
@@ -78,6 +85,12 @@ pub async fn reset_configuration(
     app: AppHandle,
 ) -> Result<UiSnapshot, String> {
     let gate = state.speaker_gate.lock().await;
+    let current = state
+        .configuration
+        .lock()
+        .map_err(|_| "application configuration is unavailable".to_owned())?
+        .clone();
+    crate::night_schedule::restore_owned_loudness(&current).await?;
     let configuration = state.store.reset().map_err(|error| error.to_string())?;
     state.replace_configuration(configuration);
     state.start_runtime(app);
@@ -286,6 +299,12 @@ pub async fn set_speaker_setting(
     {
         return Err(crate::night_schedule::LOCK_MESSAGE.into());
     }
+    if matches!(setting, SpeakerSetting::Loudness)
+        && enabled
+        && crate::night_schedule::loudness_locked(&current)
+    {
+        return Err(crate::night_schedule::LOUDNESS_LOCK_MESSAGE.into());
+    }
     let result = runtime::set_speaker_setting(current, setting, enabled).await;
     drop(gate);
     result
@@ -479,6 +498,10 @@ pub async fn enable_night_schedule<R: tauri::Runtime>(
         return Err("Select a speaker that supports Night Mode.".into());
     }
     let previous_schedule = configuration.night_mode_schedule.clone();
+    if !enabled {
+        crate::night_schedule::restore_owned_loudness(&configuration).await?;
+        configuration.night_schedule_loudness_restore_speaker_id = None;
+    }
     configuration.night_mode_schedule.enabled = enabled;
     persist_schedule(&state, &configuration)?;
     let applied = if enabled && !previous_schedule.enabled {
@@ -521,5 +544,29 @@ pub async fn set_schedule_notifications(
     } else if let Ok(mut status) = state.schedule_status.lock() {
         status.notifications_blocked = false;
     }
+    get_snapshot(state)
+}
+
+#[tauri::command]
+pub async fn set_disable_loudness_during_night_schedule(
+    enabled: bool,
+    state: State<'_, AppState>,
+) -> Result<UiSnapshot, String> {
+    let gate = state.speaker_gate.lock().await;
+    let mut configuration = state
+        .configuration
+        .lock()
+        .map_err(|_| "Configuration unavailable")?
+        .clone();
+    if !enabled {
+        crate::night_schedule::restore_owned_loudness(&configuration).await?;
+        configuration.night_schedule_loudness_restore_speaker_id = None;
+    }
+    configuration.disable_loudness_during_night_schedule = enabled;
+    persist_schedule(&state, &configuration)?;
+    state
+        .schedule_reconcile
+        .store(true, std::sync::atomic::Ordering::Relaxed);
+    drop(gate);
     get_snapshot(state)
 }

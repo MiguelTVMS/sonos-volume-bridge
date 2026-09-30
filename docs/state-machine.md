@@ -37,6 +37,14 @@ remain inside/outside and saves with recurrence disabled stay silent. On start/O
 that intent without changing controller state. Selection or schedule changes discard old
 pending intent. Notification preferences never reset this controller. See ADR 0013.
 
+The optional night schedule Loudness policy runs beside the Night Mode controller.
+Active plus opted-in enforces Loudness off. The bridge persists speaker-scoped
+ownership before changing an on value, retains it across restart, and restores on
+exit or policy disablement. An already-off value creates no restoration ownership.
+Unavailable or unsupported Loudness retries independently without changing the
+Night Mode state or notification intent. A restoration marker for one speaker is
+never applied to a different selected speaker.
+
 Enabling a previously disabled schedule during a selected period applies Night Mode
 immediately and sends a start notification after speaker confirmation when On start or
 On start and end is selected. Enabling outside selected periods, enabling an already

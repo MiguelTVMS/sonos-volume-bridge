@@ -60,6 +60,10 @@ pub struct AppConfiguration {
     pub night_mode_schedule: speaker_volume_bridge_domain::NightModeSchedule,
     #[serde(default)]
     pub notify_night_mode_schedule_transitions: ScheduleNotifications,
+    #[serde(default)]
+    pub disable_loudness_during_night_schedule: bool,
+    #[serde(default)]
+    pub night_schedule_loudness_restore_speaker_id: Option<String>,
     pub selected_sonos_id: Option<String>,
     pub last_known_sonos_address: Option<String>,
     pub follow_default_audio_device: bool,
@@ -94,6 +98,8 @@ impl Default for AppConfiguration {
             schema_version: SCHEMA_VERSION,
             night_mode_schedule: speaker_volume_bridge_domain::NightModeSchedule::default(),
             notify_night_mode_schedule_transitions: ScheduleNotifications::Never,
+            disable_loudness_during_night_schedule: false,
+            night_schedule_loudness_restore_speaker_id: None,
             selected_sonos_id: None,
             last_known_sonos_address: None,
             follow_default_audio_device: true,
@@ -232,15 +238,28 @@ mod tests {
         json.as_object_mut()
             .unwrap()
             .remove("notifyNightModeScheduleTransitions");
+        json.as_object_mut()
+            .unwrap()
+            .remove("disableLoudnessDuringNightSchedule");
+        json.as_object_mut()
+            .unwrap()
+            .remove("nightScheduleLoudnessRestoreSpeakerId");
         let mut configuration: AppConfiguration = serde_json::from_value(json).unwrap();
         assert!(!configuration.night_mode_schedule.enabled);
         assert_eq!(
             configuration.notify_night_mode_schedule_transitions,
             ScheduleNotifications::Never
         );
+        assert!(!configuration.disable_loudness_during_night_schedule);
+        assert_eq!(
+            configuration.night_schedule_loudness_restore_speaker_id,
+            None
+        );
         configuration.night_mode_schedule.enabled = true;
         configuration.night_mode_schedule.blocks[6][47] = true;
         configuration.notify_night_mode_schedule_transitions = ScheduleNotifications::Both;
+        configuration.disable_loudness_during_night_schedule = true;
+        configuration.night_schedule_loudness_restore_speaker_id = Some("speaker-a".into());
         let restored: AppConfiguration =
             serde_json::from_str(&serde_json::to_string(&configuration).unwrap()).unwrap();
         assert_eq!(
@@ -250,6 +269,13 @@ mod tests {
         assert_eq!(
             restored.notify_night_mode_schedule_transitions,
             ScheduleNotifications::Both
+        );
+        assert!(restored.disable_loudness_during_night_schedule);
+        assert_eq!(
+            restored
+                .night_schedule_loudness_restore_speaker_id
+                .as_deref(),
+            Some("speaker-a")
         );
         configuration.night_mode_schedule.blocks[0].pop();
         assert!(configuration.validate().is_err());

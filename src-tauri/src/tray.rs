@@ -224,15 +224,17 @@ fn update_speaker_controls<R: Runtime>(app: &AppHandle<R>, settings: &SpeakerSet
         let _ = items.menu.insert(&items.speaker_separator, 3);
     }
     for (id, label, enabled) in available {
-        let locked = id == "speaker-night-sound"
-            && app.try_state::<AppState>().is_some_and(|state| {
-                state
-                    .configuration
-                    .lock()
-                    .is_ok_and(|configuration| crate::night_schedule::locked(&configuration))
-            });
-        let label = if locked {
+        let locked = app.try_state::<AppState>().is_some_and(|state| {
+            state.configuration.lock().is_ok_and(|configuration| {
+                (id == "speaker-night-sound" && crate::night_schedule::locked(&configuration))
+                    || (id == "speaker-loudness"
+                        && crate::night_schedule::loudness_locked(&configuration))
+            })
+        });
+        let label = if locked && id == "speaker-night-sound" {
             "Night sound (disable schedule to turn off)"
+        } else if locked {
+            "Loudness (disabled during night schedule)"
         } else {
             label
         };
@@ -368,6 +370,14 @@ fn toggle_speaker_setting<R: Runtime>(app: &AppHandle<R>, setting: SpeakerSettin
             if matches!(setting, SpeakerSetting::NightSound)
                 && !enabled
                 && crate::night_schedule::locked(&current)
+            {
+                show_settings(&app);
+                let _ = app.emit("open-night-schedule", ());
+                return;
+            }
+            if matches!(setting, SpeakerSetting::Loudness)
+                && enabled
+                && crate::night_schedule::loudness_locked(&current)
             {
                 show_settings(&app);
                 let _ = app.emit("open-night-schedule", ());

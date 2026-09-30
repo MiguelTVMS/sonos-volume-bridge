@@ -2,14 +2,10 @@ import { expect, test } from '@playwright/test';
 
 const pages = ['Devices', 'Speaker', 'Night schedule', 'Volume', 'General', 'Diagnostics', 'About'];
 
-test('Windows keeps night schedule status and errors in the third card', async ({ page }) => {
+test('Windows keeps night schedule status and errors in the status card', async ({ page }) => {
   await page.goto('/preview.html?platform=windows');
   await page.getByRole('button', { name: 'Night schedule', exact: true }).click();
-  const card = page
-    .locator('#night-schedule > .settings-group')
-    .first()
-    .locator(':scope > *')
-    .nth(2);
+  const card = page.locator('#night-schedule .schedule-status-card');
   await expect(card.locator('#schedule-status')).toHaveText('Schedule disabled.');
   await expect(card.locator('.schedule-status-label')).toHaveText('Status');
   await expect(card.locator('.schedule-status-content')).toHaveCSS('text-align', 'right');

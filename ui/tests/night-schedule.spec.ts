@@ -92,13 +92,27 @@ test('global half-hour grid supports painting, saving, keyboard editing and noti
   await expect(
     page.getByRole('combobox', { name: 'Night schedule notifications', exact: true }),
   ).toHaveValue('never');
+  const disableLoudness = page.getByRole('switch', {
+    name: 'Disable loudness during night schedule',
+    exact: true,
+  });
+  await expect(disableLoudness).not.toBeChecked();
+  const schedulePreferences = page.locator(
+    '#night-schedule > .settings-group > label, #night-schedule > .settings-group > .control-field',
+  );
+  await expect(schedulePreferences.nth(0)).toContainText('Enable schedule');
+  await expect(schedulePreferences.nth(1)).toContainText('Disable loudness during night schedule');
+  await expect(schedulePreferences.nth(2)).toContainText('Night schedule notifications');
+  await disableLoudness.check();
+  await expect(disableLoudness).toBeChecked();
   await expect(page.locator('#schedule-notifications option')).toHaveText([
     'On start',
     'On end',
     'On start and end',
     'Never',
   ]);
-  await expect(page.locator('#schedule-status')).toBeEmpty();
+  await expect(page.locator('.schedule-status-label')).toHaveText('Status');
+  await expect(page.locator('#schedule-status')).toHaveText('Schedule disabled.');
   const cells = page.locator('.schedule-cell');
   await expect(cells).toHaveCount(336);
   await expect(cells.first()).toHaveAttribute('aria-label', 'Mon 00:00–00:30');
@@ -149,7 +163,9 @@ test('global half-hour grid supports painting, saving, keyboard editing and noti
   await expect(first).toHaveAttribute('aria-selected', 'true');
   await page.locator('#schedule-enabled').check();
   await expect(page.locator('#schedule-enabled')).toBeChecked();
-  await expect(page.locator('#schedule-status')).toBeEmpty();
+  await expect(page.locator('#schedule-status')).toHaveText(
+    'Outside scheduled hours. Manual control is available.',
+  );
   await expect(page.locator('#toolbar-section-title')).toHaveText('Night schedule');
   for (const mode of ['start', 'end', 'never', 'both']) {
     await page.locator('#schedule-notifications').selectOption(mode);

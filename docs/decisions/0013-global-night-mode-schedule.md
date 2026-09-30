@@ -35,6 +35,18 @@ not continuously. Startup, wake, reconnection, schedule edits/enabling, and cloc
 time-zone changes reconcile the expected current state without replaying missed
 transitions. Disabling scheduling leaves the current speaker value untouched.
 
+An independent, default-off **Disable loudness during night schedule** preference
+temporarily enforces Loudness off inside enabled schedule blocks. The integration
+layer expresses read, write, confirmation, and restoration policy through an
+abstract Loudness port; the shell implements it with the Sonos adapter. Before
+changing Loudness from on to off, the shell persists restoration ownership for the
+selected speaker. It restores only bridge-owned changes on exit, schedule disable,
+or preference disable, then clears that marker. Already-off Loudness is never
+restored to on. The marker survives restart and cannot be applied to another
+speaker. Loudness failures remain visible and retryable but do not pause Night Mode
+or its notifications. Manual Settings and tray attempts to enable Loudness are
+locked while the policy is active.
+
 ## Editing and persistence
 
 The dedicated Night schedule sidebar page contains the horizontal week grid.
@@ -42,10 +54,11 @@ The tray toggles scheduling above Night sound; speaker controls remain on Speake
 toggle one cell; drag painting uses the initial cell's opposite state throughout
 the gesture. Save commits the grid and explicitly applies its current on/off state, even when
 recurring scheduling is disabled or the grid has not changed; Cancel restores saved values. Refreshes preserve
-drafts, scroll position, and cell focus. Enable and notification preferences save
-immediately. Generic settings writes preserve independently managed schedule fields.
-Old schema-version-one configurations default to an empty disabled schedule and
-notifications off. Invalid grid dimensions fail validation before persistence.
+drafts, scroll position, and cell focus. Enable, night schedule Loudness, and
+notification preferences save immediately. Generic settings writes preserve all
+independently managed schedule fields. Old schema-version-one configurations default
+to an empty disabled schedule, notifications off, and night schedule Loudness control
+off. Invalid grid dimensions fail validation before persistence.
 
 ## Notifications
 
@@ -119,7 +132,7 @@ alive during OS menu tracking.
 Windows interval tooltips use the opaque platform surface color in both light
 and dark modes so underlying grid cells cannot show through the time label.
 
-Linux groups schedule status in the third boxed settings row, directly below
+Linux groups schedule status in a dedicated boxed settings row, directly below
 notification preferences. Current status and the next transition appear once;
 notification permission guidance and error feedback share that row. Successful
 saves show no confirmation, and a successful retry clears the prior error. Disabled

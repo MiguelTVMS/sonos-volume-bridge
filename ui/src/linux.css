@@ -110,6 +110,10 @@
 [data-platform='linux'] .toggle {
   min-height: 64px;
 }
+[data-platform='linux'] .night-schedule > .settings-group:first-child > * {
+  min-height: 53px;
+  padding-block: 11px;
+}
 [data-platform='linux'] .field-row {
   grid-template-columns: minmax(0, 1fr) 34px;
 }
@@ -207,12 +211,14 @@
 }
 [data-platform='linux'] .schedule-status-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 52%);
+  align-items: center;
   gap: 4px 16px;
 }
 [data-platform='linux'] .schedule-status-row p {
   margin: 0;
   grid-column: 2;
+  text-align: right;
 }
 [data-platform='linux'] #schedule-feedback:empty {
   display: none;

@@ -5,13 +5,14 @@ use async_trait::async_trait;
 use jiff::{Timestamp, tz::TimeZone};
 use serde::Serialize;
 use speaker_volume_bridge_integration::night_mode::{
-    NightModeController, NightModePort, NightModeReading,
+    NightModeController, NightModePort, NightModeReading, ScheduledLoudnessPort,
+    disable_scheduled_loudness, restore_scheduled_loudness,
 };
 use speaker_volume_bridge_sonos::{FeatureAvailability, SonosClient, SonosDevice};
 use std::{sync::atomic::Ordering, time::Duration};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
-pub use speaker_volume_bridge_integration::night_mode::LOCK_MESSAGE;
+pub use speaker_volume_bridge_integration::night_mode::{LOCK_MESSAGE, LOUDNESS_LOCK_MESSAGE};
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScheduleStatus {
@@ -43,6 +44,24 @@ impl NightModePort for Port {
             .map_err(|_| "Could not update Night Mode. Retrying automatically.".into())
     }
 }
+#[async_trait]
+impl ScheduledLoudnessPort for Port {
+    async fn read_loudness(&self) -> NightModeReading {
+        let value = self.client.get_loudness(&self.device).await;
+        match FeatureAvailability::from_read(&value) {
+            FeatureAvailability::Supported => NightModeReading::Supported(value.unwrap_or(false)),
+            FeatureAvailability::Unsupported => NightModeReading::Unsupported,
+            FeatureAvailability::Unavailable => NightModeReading::Unavailable,
+        }
+    }
+
+    async fn write_loudness(&self, value: bool) -> Result<(), String> {
+        self.client
+            .set_loudness(&self.device, value)
+            .await
+            .map_err(|_| "Could not update Loudness. Retrying automatically.".into())
+    }
+}
 async fn port(configuration: &AppConfiguration) -> Option<Port> {
     let client = SonosClient::builder()
         .timeout(Duration::from_secs(3))
@@ -70,6 +89,85 @@ pub fn locked(configuration: &AppConfiguration) -> bool {
             })
             .is_some_and(|window| window.active)
 }
+pub fn loudness_locked(configuration: &AppConfiguration) -> bool {
+    configuration.disable_loudness_during_night_schedule && locked(configuration)
+}
+
+pub async fn restore_owned_loudness(configuration: &AppConfiguration) -> Result<(), String> {
+    if configuration.night_schedule_loudness_restore_speaker_id != configuration.selected_sonos_id
+        || configuration.selected_sonos_id.is_none()
+    {
+        return Ok(());
+    }
+    let port = port(configuration)
+        .await
+        .ok_or("Speaker unavailable. Could not restore Loudness.")?;
+    restore_scheduled_loudness(&port).await
+}
+
+fn persist_loudness_state(
+    state: &AppState,
+    configuration: &AppConfiguration,
+) -> Result<(), String> {
+    state.store.save(configuration).map_err(|e| e.to_string())?;
+    *state
+        .configuration
+        .lock()
+        .map_err(|_| "Configuration unavailable")? = configuration.clone();
+    state
+        .snapshot
+        .lock()
+        .map_err(|_| "Snapshot unavailable")?
+        .configuration = configuration.clone();
+    Ok(())
+}
+
+async fn reconcile_scheduled_loudness(
+    state: &AppState,
+    configuration: &mut AppConfiguration,
+    port: &Port,
+    active: bool,
+) -> Option<String> {
+    let selected = configuration.selected_sonos_id.as_deref()?;
+    let owns_restore = configuration
+        .night_schedule_loudness_restore_speaker_id
+        .as_deref()
+        == Some(selected);
+    if configuration.disable_loudness_during_night_schedule && active {
+        if !owns_restore {
+            match port.read_loudness().await {
+                NightModeReading::Supported(false) => return None,
+                NightModeReading::Supported(true) => {
+                    configuration.night_schedule_loudness_restore_speaker_id =
+                        Some(selected.to_owned());
+                    if let Err(error) = persist_loudness_state(state, configuration) {
+                        configuration.night_schedule_loudness_restore_speaker_id = None;
+                        return Some(error);
+                    }
+                }
+                NightModeReading::Unsupported => {
+                    return Some("Loudness is not supported by this speaker.".into());
+                }
+                NightModeReading::Unavailable => {
+                    return Some(
+                        "Loudness is temporarily unavailable. Retrying automatically.".into(),
+                    );
+                }
+            }
+        }
+        return disable_scheduled_loudness(port).await.err();
+    }
+    if owns_restore {
+        if let Err(error) = restore_scheduled_loudness(port).await {
+            return Some(error);
+        }
+        configuration.night_schedule_loudness_restore_speaker_id = None;
+        if let Err(error) = persist_loudness_state(state, configuration) {
+            return Some(error);
+        }
+    }
+    None
+}
 #[allow(clippy::too_many_lines)] // One worker owns the selected speaker schedule lifecycle.
 pub fn start<R: Runtime>(app: AppHandle<R>) {
     tauri::async_runtime::spawn(async move {
@@ -87,7 +185,7 @@ pub fn start<R: Runtime>(app: AppHandle<R>) {
                 return;
             }
             let gate = state.speaker_gate.lock().await;
-            let Ok(configuration) = state.configuration.lock().map(|c| c.clone()) else {
+            let Ok(mut configuration) = state.configuration.lock().map(|c| c.clone()) else {
                 continue;
             };
             let now = Timestamp::now();
@@ -128,15 +226,33 @@ pub fn start<R: Runtime>(app: AppHandle<R>) {
             if !configuration.night_mode_schedule.enabled
                 || configuration.selected_sonos_id.is_none()
             {
+                let loudness_error = if configuration.selected_sonos_id.is_some()
+                    && configuration.night_schedule_loudness_restore_speaker_id
+                        == configuration.selected_sonos_id
+                {
+                    match port(&configuration).await {
+                        Some(port) => {
+                            reconcile_scheduled_loudness(&state, &mut configuration, &port, false)
+                                .await
+                        }
+                        None => Some(
+                            "Speaker unavailable. Loudness restoration will retry automatically."
+                                .into(),
+                        ),
+                    }
+                } else {
+                    None
+                };
                 publish(
                     &app,
                     ScheduleStatus {
-                        message: if configuration.selected_sonos_id.is_none() {
-                            "Select a compatible speaker."
+                        message: if let Some(error) = loudness_error {
+                            error
+                        } else if configuration.selected_sonos_id.is_none() {
+                            "Select a compatible speaker.".into()
                         } else {
-                            "Schedule disabled."
-                        }
-                        .into(),
+                            "Schedule disabled.".into()
+                        },
                         time_zone: zone_name,
                         notifications_blocked,
                         ..Default::default()
@@ -171,6 +287,9 @@ pub fn start<R: Runtime>(app: AppHandle<R>) {
             let result = controller
                 .step(&port, window.active, reconcile || recovering)
                 .await;
+            let loudness_error =
+                reconcile_scheduled_loudness(&state, &mut configuration, &port, window.active)
+                    .await;
             recovering = false;
             status.supported = matches!(result.reading, NightModeReading::Supported(_));
             status.message = result
@@ -188,6 +307,9 @@ pub fn start<R: Runtime>(app: AppHandle<R>) {
                         "Outside scheduled hours. Manual control is available.".into()
                     }
                 });
+            if let Some(error) = loudness_error {
+                status.message = format!("{} {error}", status.message);
+            }
             if result.error.is_some() || !status.supported {
                 retry_seconds = (retry_seconds * 2).min(60);
             } else {
@@ -210,6 +332,8 @@ pub fn start<R: Runtime>(app: AppHandle<R>) {
                         && c.night_mode_schedule == configuration.night_mode_schedule
                         && c.notify_night_mode_schedule_transitions
                             == configuration.notify_night_mode_schedule_transitions
+                        && c.disable_loudness_during_night_schedule
+                            == configuration.disable_loudness_during_night_schedule
                 }) {
                     continue;
                 }

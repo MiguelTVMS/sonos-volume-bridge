@@ -149,6 +149,15 @@ changes are allowed. Leaving a scheduled period turns Night Mode off once.
 The tray has a checked **Night schedule** item directly above **Night sound**.
 The checkmark represents enabled scheduling; the editor opens through Settings.
 
+**Disable loudness during night schedule** is off by default and saves immediately.
+When enabled, Loudness is kept off while the current time is inside the enabled
+schedule. If the bridge turned Loudness off, it restores Loudness after the period,
+when scheduling is disabled, or when this option is disabled. Loudness that was
+already off remains off. Restart-safe restoration state belongs to the selected
+speaker; it is never transferred to another speaker. A Loudness capability or
+network failure is retried independently and never stops Night Mode scheduling.
+Manual Loudness enable actions are unavailable while this policy is active.
+
 **Night schedule notifications** saves immediately and offers **On start**,
 **On end**, **On start and end**, and **Never** (the default). Confirmed boundaries notify
 only when their direction is selected. Applying an edited schedule also notifies
@@ -180,7 +189,7 @@ On Linux, a dedicated Schedule status row below notifications shows the current
 state, including disabled and outside-period states. Schedule errors appear in
 that same row instead of beneath the editor. Successful saves show no confirmation.
 
-On Windows, the third Night schedule card is the single Status area. It shows
+On Windows, the dedicated Night schedule Status card is the single Status area. It shows
 disabled/outside-period state as well as active restrictions, the next change,
 notification guidance and action errors. Its label sits on the left and its text
 wraps on the right. Successful saves and other settings actions show no confirmation

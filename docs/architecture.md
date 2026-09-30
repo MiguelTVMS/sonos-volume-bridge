@@ -189,6 +189,13 @@ adapters stay in the shell. A shared configuration/Night Mode write gate prevent
 selection races, while volume synchronization continues independently. See
 [ADR 0013](decisions/0013-global-night-mode-schedule.md).
 
+The default-off night schedule Loudness policy uses a separate integration port over
+the same shell-owned Sonos adapter. On entry it records speaker-scoped restoration
+ownership before disabling Loudness. While active it enforces Loudness off without
+coupling failures to Night Mode scheduling. On exit, schedule disablement, or policy
+disablement it restores Loudness only when the bridge previously changed it. The
+persisted ownership marker survives restart and is never applied to another speaker.
+
 Tray speaker controls retain their native menu objects for the tray lifetime.
 Refreshes update values in place; capability changes only attach or detach cached
 objects, preserving action targets while the OS is dispatching menu clicks.
@@ -202,7 +209,7 @@ Windows schedule tooltips use an opaque platform surface in both color schemes;
 the shared hover interaction remains in the frontend (ADR 0013).
 
 Windows Night schedule presents current state, next change, notification guidance,
-and action errors together in the third settings card. The shared notice output
+and action errors together in its dedicated Status card. The shared notice output
 moves into this card while the schedule page is active (ADR 0012).
 The Status label sits left of the right-aligned, wrapping text. The Windows default
 height is 820 logical pixels to allow multiline status. Successful settings actions
@@ -258,7 +265,7 @@ responsive grouped controls. Vertical resizing remains available.
 The platform stylesheet stays inside the frontend; the shell selects Linux
 window bounds through `tauri.linux.conf.json`. See ADR 0012.
 Linux Night schedule status, notification permission guidance, and schedule error
-feedback share the third settings row below notifications (ADR 0013).
+feedback share the dedicated Status row below notifications (ADR 0013).
 The shell requires Tauri 2.12 with Tao's repaired Wayland decorations so native
 title-bar buttons receive clicks on first show and after reopening (ADR 0012).
 

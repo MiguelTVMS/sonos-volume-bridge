@@ -359,6 +359,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::too_many_lines)] // One end-to-end test covers the shared native command path.
     async fn speaker_commands_and_schedule_work_without_process_inspection() {
         let speaker = speaker().await.unwrap();
         let configuration = AppConfiguration {
@@ -411,6 +412,12 @@ mod tests {
         commands::set_speaker_setting(runtime::SpeakerSetting::NightSound, false, app.state())
             .await
             .unwrap();
+        runtime::set_speaker_setting(saved.clone(), runtime::SpeakerSetting::Loudness, true)
+            .await
+            .unwrap();
+        commands::set_disable_loudness_during_night_schedule(true, app.state())
+            .await
+            .unwrap();
         commands::enable_night_schedule(true, app.state(), app.handle().clone())
             .await
             .unwrap();
@@ -436,9 +443,29 @@ mod tests {
             runtime::speaker_settings(saved.clone()).await.night_sound,
             Some(true)
         );
+        assert_eq!(
+            runtime::speaker_settings(saved.clone()).await.loudness,
+            Some(false)
+        );
+        assert!(
+            commands::set_speaker_setting(runtime::SpeakerSetting::Loudness, true, app.state())
+                .await
+                .unwrap_err()
+                .contains("night schedule")
+        );
         commands::enable_night_schedule(false, app.state(), app.handle().clone())
             .await
             .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if runtime::speaker_settings(saved.clone()).await.loudness == Some(true) {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .unwrap();
         assert_eq!(
             runtime::speaker_settings(saved.clone()).await.night_sound,
             Some(true)

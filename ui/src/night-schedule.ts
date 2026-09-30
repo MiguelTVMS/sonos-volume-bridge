@@ -10,6 +10,8 @@ export type ScheduleStatus = {
 };
 export const lockMessage =
   'Night Mode is on because of your schedule. Disable the schedule to turn Night Mode off.';
+export const loudnessLockMessage =
+  'Loudness is off during the night schedule. Disable that option to turn Loudness on.';
 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export const emptyBlocks = (): boolean[][] =>
   Array.from({ length: 7 }, () => Array<boolean>(48).fill(false));
@@ -88,10 +90,10 @@ export function scheduleMarkup(linux = false, windows = false): string {
   return `<section id="night-schedule" data-schedule class="night-schedule" aria-labelledby="night-schedule-title">
     <div class="settings-group">
     <label class="toggle"><span>Enable schedule</span><input id="schedule-enabled" type="checkbox" role="switch"></label>
+    <label class="toggle"><span>Disable loudness during night schedule</span><input id="schedule-disable-loudness" type="checkbox" role="switch"></label>
     <div class="control-field"><label for="schedule-notifications">Night schedule notifications</label><select id="schedule-notifications"><option value="start">On start</option><option value="end">On end</option><option value="both">On start and end</option><option value="never">Never</option></select></div>
-    ${linux ? `<div class="schedule-status-row"><span>Status</span>${status}${permission}<p id="schedule-feedback" class="setting-note" aria-live="polite"></p></div>` : windows ? `<div class="schedule-status-card"><span class="schedule-status-label">Status</span><div class="schedule-status-content">${status}${permission}<div id="schedule-feedback"></div></div></div>` : permission}
+    ${linux ? `<div class="schedule-status-row"><span>Status</span>${status}${permission}<p id="schedule-feedback" class="setting-note" aria-live="polite"></p></div>` : `<div class="schedule-status-card"><span class="schedule-status-label">Status</span><div class="schedule-status-content">${status}${permission}${windows ? '<div id="schedule-feedback"></div>' : ''}</div></div>`}
     </div>
-    ${linux || windows ? '' : status}
     <div class="settings-group schedule-editor"><div class="schedule-editor-content">
     <p class="schedule-legend"><span>■ Scheduled on</span> □ Manual control</p>
     <div class="schedule-scroll"><div class="schedule-grid" role="grid" aria-label="Weekly Night Mode schedule"></div></div>
@@ -103,6 +105,7 @@ export function scheduleMarkup(linux = false, windows = false): string {
 type Actions = {
   save: (blocks: boolean[][]) => Promise<void>;
   enable: (enabled: boolean) => Promise<void>;
+  disableLoudness: (enabled: boolean) => Promise<void>;
   notify: (mode: ScheduleNotifications) => Promise<void>;
   error: (message: string) => void;
 };
@@ -110,6 +113,7 @@ export function mountSchedule(
   scope: ParentNode,
   saved: NightSchedule,
   notifications: ScheduleNotifications,
+  disableLoudness: boolean,
   actions: Actions,
 ): void {
   const panel = scope.querySelector<HTMLElement>('#night-schedule');
@@ -151,8 +155,10 @@ export function mountSchedule(
   grid.addEventListener('pointerdown', hideTooltip);
   grid.addEventListener('scroll', hideTooltip, true);
   const enabled = panel.querySelector<HTMLInputElement>('#schedule-enabled')!;
+  const loudness = panel.querySelector<HTMLInputElement>('#schedule-disable-loudness')!;
   const notify = panel.querySelector<HTMLSelectElement>('#schedule-notifications')!;
   enabled.checked = saved.enabled;
+  loudness.checked = disableLoudness;
   notify.value = notifications;
   const repaint = (): void => {
     grid.querySelectorAll<HTMLButtonElement>('.schedule-cell').forEach((cell) => {
@@ -234,6 +240,7 @@ export function mountSchedule(
     void operation().catch((error: unknown) => actions.error(String(error)));
   };
   enabled.addEventListener('change', () => run(() => actions.enable(enabled.checked)));
+  loudness.addEventListener('change', () => run(() => actions.disableLoudness(loudness.checked)));
   notify.addEventListener('change', () =>
     run(() => actions.notify(notify.value as ScheduleNotifications)),
   );
@@ -266,6 +273,7 @@ export function updateScheduleView(
   status: ScheduleStatus,
   supported: boolean,
   enabled: boolean,
+  disableLoudness: boolean,
 ): void {
   const panel = scope.querySelector<HTMLElement>('#night-schedule');
   if (!panel) return;
@@ -295,5 +303,12 @@ export function updateScheduleView(
     toggle.disabled = true;
     toggle.title = lockMessage;
     if (label) label.textContent = lockMessage;
+  }
+  const loudness = scope.querySelector<HTMLInputElement>('[data-speaker-setting="loudness"]');
+  const loudnessLabel = scope.querySelector<HTMLElement>('[data-feature-status="loudness"]');
+  if (loudness && enabled && disableLoudness && status.active) {
+    loudness.disabled = true;
+    loudness.title = loudnessLockMessage;
+    if (loudnessLabel) loudnessLabel.textContent = loudnessLockMessage;
   }
 }
