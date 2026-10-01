@@ -24,6 +24,10 @@ The single-instance plugin is patched to use a new process namespace while retai
 
 Windows keeps the existing installer registry keys and MSIX identities and migrates executable targets. The NSIS installer moves the former default installation folder to the new product name before copying files, while retaining custom paths and settings. It refuses a pre-existing destination and aborts if the directory cannot be moved. Startup, owned shortcuts and existing toast activation registration follow the new path. Debian metadata replaces/conflicts with the old package and installs an old-command compatibility symlink. macOS retains bundle identity but changes the bundle filename; users must quit and replace the direct-download bundle without deleting application data.
 
+GitHub Release installers use only `speaker-volume-bridge-*` filenames. Legacy
+installed identities and the Debian command compatibility symlink do not require
+duplicate release assets using the former product name.
+
 Regression coverage exercises manual speaker commands and scheduling without a
 process check, and Settings navigation/saves without a legacy service. Native
 startup, single-instance behavior and the documented uninstall/reinstall flow

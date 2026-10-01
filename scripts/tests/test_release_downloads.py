@@ -42,11 +42,14 @@ class ReleaseDownloadsTests(unittest.TestCase):
                 subprocess.run(["bash", str(SCRIPT), directory, "v1.2.3"], check=True)
                 self.assertEqual(
                     {path.name for path in root.iterdir()},
-                    {f"{prefix}-{suffix}" for prefix in ("speaker-volume-bridge", "sonos-volume-bridge") for suffix in DESTINATIONS},
+                    {f"speaker-volume-bridge-{suffix}" for suffix in DESTINATIONS},
                 )
                 for source, destination in zip(SUFFIXES, DESTINATIONS):
-                    self.assertEqual((root / f"speaker-volume-bridge-{destination}").read_bytes(), source.encode())
-                    self.assertEqual((root / f"sonos-volume-bridge-{destination}").read_bytes(), source.encode())
+                    self.assertEqual(
+                        (root / f"speaker-volume-bridge-{destination}").read_bytes(),
+                        source.encode(),
+                    )
+                    self.assertFalse((root / f"sonos-volume-bridge-{destination}").exists())
 
     def test_missing_or_empty_installer_leaves_all_inputs_untouched(self):
         for missing in SUFFIXES:
